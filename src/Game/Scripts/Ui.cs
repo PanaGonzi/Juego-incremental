@@ -525,6 +525,25 @@ public partial class Hud : Control
             }
         }
 
+        if (def.Kind is not (MachineKind.Generator or MachineKind.Shuttle or MachineKind.Radiator))
+        {
+            var source = def.Kind == MachineKind.Production ? m.Out : m.In;
+            var me = client.LocalPlayer!;
+            var transfer = new HFlowContainer { CustomMinimumSize = new Vector2(560, 0) };
+            foreach (var kv in source.Items.ToList())
+            {
+                var item = kv.Key;
+                transfer.AddChild(Ui.Btn($"{Loc.T("transfer_take")}: {Loc.T("item_" + item)}", () => client.Send(new Command { Type = CommandType.Extract, A = id, Text = item })));
+            }
+            foreach (var kv in me.Bag.Items.ToList())
+            {
+                var item = kv.Key;
+                if (w.InputRoom(m, item) <= 0) continue;
+                transfer.AddChild(Ui.Btn($"{Loc.T("transfer_put")}: {Loc.T("item_" + item)}", () => client.Send(new Command { Type = CommandType.Insert, A = id, Text = item })));
+            }
+            if (transfer.GetChildCount() > 0) Add(transfer);
+        }
+
         foreach (var link in w.Links.Values.Where(l => l.From == id || l.To == id).ToList())
         {
             var otherId = link.From == id ? link.To : link.From;

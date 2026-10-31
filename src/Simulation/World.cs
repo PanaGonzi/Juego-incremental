@@ -278,8 +278,8 @@ public sealed partial class World
             CommandType.Move => Move(p, c.A, c.B, c.C, c.D),
             CommandType.Link => AddLink(p, c.A, c.B),
             CommandType.Unlink => RemoveLink(p, c.A),
-            CommandType.Insert => Insert(p, c.A),
-            CommandType.Extract => Extract(p, c.A),
+            CommandType.Insert => Insert(p, c.A, c.Text),
+            CommandType.Extract => Extract(p, c.A, c.Text),
             CommandType.Sell => Sell(p, c.A, c.Text, c.Amount),
             CommandType.SetAutoSell => SetAutoSell(p, c.A, c.B != 0, c.Text, c.Amount),
             CommandType.FulfillContract => Fulfill(p, c.Text),
@@ -642,7 +642,8 @@ public sealed partial class World
         }
     }
 
-    private CommandResult Insert(PlayerState p, int id)
+    /// <summary>Con un objeto indicado transfiere solo ese; sin él, todo lo que quepa.</summary>
+    private CommandResult Insert(PlayerState p, int id, string only = "")
     {
         if (!Machines.TryGetValue(id, out var m) || m.Planet != p.Planet) return CommandResult.Fail("err_gone");
         var (cx, cz) = MachineCenterMm(m);
@@ -650,6 +651,7 @@ public sealed partial class World
         long moved = 0;
         foreach (var kv in p.Bag.Items.ToList())
         {
+            if (only.Length > 0 && kv.Key != only) continue;
             var qty = Math.Min(kv.Value, InputRoom(m, kv.Key));
             if (qty <= 0) continue;
             p.Bag.TryRemove(kv.Key, qty);
@@ -662,7 +664,7 @@ public sealed partial class World
         return CommandResult.Success;
     }
 
-    private CommandResult Extract(PlayerState p, int id)
+    private CommandResult Extract(PlayerState p, int id, string only = "")
     {
         if (!Machines.TryGetValue(id, out var m) || m.Planet != p.Planet) return CommandResult.Fail("err_gone");
         var (cx, cz) = MachineCenterMm(m);
@@ -672,6 +674,7 @@ public sealed partial class World
         long moved = 0;
         foreach (var kv in source.Items.ToList())
         {
+            if (only.Length > 0 && kv.Key != only) continue;
             var room = B.PersonalStackLimit - p.Bag.Get(kv.Key);
             var qty = Math.Min(kv.Value, room);
             if (qty <= 0) continue;

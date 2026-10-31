@@ -197,6 +197,22 @@ public class SimulationTests
     }
 
     [Fact]
+    public void Transfers_can_target_a_single_item()
+    {
+        var (w, p) = Fixture.NewWorld();
+        var depot = Fixture.Find(w, "depot");
+        Fixture.StandAt(w, p, depot);
+        depot.In.Add("ingot", 5);
+        depot.In.Add("ore", 7);
+        Assert.True(w.Apply(p, new Command { Type = CommandType.Extract, A = depot.Id, Text = "ore" }).Ok);
+        Assert.Equal(7, p.Bag.Get("ore"));
+        Assert.Equal(5, depot.In.Get("ingot"));
+        Assert.Equal("err_nothing", w.Apply(p, new Command { Type = CommandType.Insert, A = depot.Id, Text = "ingot" }).Error);
+        Assert.True(w.Apply(p, new Command { Type = CommandType.Insert, A = depot.Id, Text = "ore" }).Ok);
+        Assert.Equal(7, depot.In.Get("ore"));
+    }
+
+    [Fact]
     public void Contract_pays_once_and_consumes_once()
     {
         var (w, p) = Fixture.NewWorld();

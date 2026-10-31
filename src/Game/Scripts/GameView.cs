@@ -122,6 +122,7 @@ public partial class GameView : Node3D
     // Control por programa para las pruebas del cliente exportado.
     public Vector3? AutoWalkTarget;
     public bool AutoHoldPrimary;
+    private float _autoStuck, _autoSidestep;
     public bool TestCapture;
     public Tool CurrentTool => _tool;
     public bool PanelIsOpen => _hud.PanelOpen;
@@ -1308,7 +1309,23 @@ public partial class GameView : Node3D
             var flat = target - _body.GlobalPosition;
             flat.Y = 0;
             if (flat.Length() < 0.6f) AutoWalkTarget = null;
-            else dir = flat.Normalized();
+            else
+            {
+                dir = flat.Normalized();
+                // Rodeo sencillo del recorrido de prueba: si deja de avanzar, se aparta un momento.
+                _autoStuck = _body.GetRealVelocity().Length() < 1.5f ? _autoStuck + dt : 0;
+                if (_autoStuck > 0.35f)
+                {
+                    _autoSidestep = 0.7f;
+                    if (_body.IsOnFloor()) _body.Velocity = _body.Velocity with { Y = 4.2f };
+                }
+                if (_autoSidestep > 0)
+                {
+                    _autoSidestep -= dt;
+                    dir = (dir + dir.Cross(Vector3.Up) * 1.6f).Normalized();
+                    _autoStuck = 0;
+                }
+            }
         }
         else if (!typing)
         {

@@ -240,6 +240,8 @@
   "panel_auto_sell": "Venta automática",
   "panel_reserve": "Reserva",
   "panel_close": "Cerrar",
+  "transfer_take": "Coger",
+  "transfer_put": "Dejar",
   "tech_title": "Contratos y mejoras",
   "tech_upgrades": "Mejoras",
   "tech_contracts": "Contratos",

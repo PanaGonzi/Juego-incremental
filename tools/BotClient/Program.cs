@@ -36,12 +36,21 @@ long maxRtt = 0;
 string closeReason = "";
 var rng = new Random(index * 7919 + 13);
 var plan0 = new BotPlan();
+var errors = new Dictionary<string, int>();
 
 while (total.Elapsed.TotalSeconds < seconds)
 {
     var connectStart = total.ElapsedMilliseconds;
     var client = new GameClient(content, LiteNetTransport.Dial(host, port), key, protocolLabel);
-    client.ResultReceived += (_, r) => { if (r.Ok) ok++; else failed++; };
+    client.ResultReceived += (_, r) =>
+    {
+        if (r.Ok) ok++;
+        else
+        {
+            failed++;
+            errors[r.Error] = errors.GetValueOrDefault(r.Error) + 1;
+        }
+    };
     var sessionEnd = reconnectEvery > 0 ? total.Elapsed.TotalSeconds + reconnectEvery : double.MaxValue;
     var connected = false;
     float x = 0, z = 0, angle = (float)(rng.NextDouble() * Math.PI * 2);
@@ -124,7 +133,7 @@ Environment.Exit(mismatches == 0 ? 0 : 5);
 
 void Report() => Console.WriteLine(
     $"{protocolLabel} connects={connects} avgConnectMs={(connects == 0 ? 0 : connectMsSum / connects)} ok={ok} failed={failed} moves={moves} chats={chats} " +
-    $"reconnects={reconnects} hashChecks={checks} hashMismatch={mismatches} maxRttMs={maxRtt} relayDropped={relay?.Dropped ?? 0} relayForwarded={relay?.Forwarded ?? 0} travels={plan0.Travels} closeReason={closeReason}");
+    $"reconnects={reconnects} hashChecks={checks} hashMismatch={mismatches} maxRttMs={maxRtt} relayDropped={relay?.Dropped ?? 0} relayForwarded={relay?.Forwarded ?? 0} travels={plan0.Travels} closeReason={closeReason} errores=[{string.Join(",", errors.OrderByDescending(e => e.Value).Take(4).Select(e => e.Key + ":" + e.Value))}]");
 
 static void Act(GameClient client, string behaviour, Random rng, float x, float z, BotPlan plan)
 {

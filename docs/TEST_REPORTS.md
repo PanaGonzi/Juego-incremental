@@ -1,18 +1,34 @@
 # Informes de prueba
 
-Tipos separados: **L** lógica · **R** red local UDP con procesos o sesiones reales · **I** integración con el cliente Godot exportado · **H** uso humano · **N** Internet.
-Los resultados de un tipo no demuestran otro. Logs en `logs/` (fuera de Git).
+Tipos separados: **L** lógica · **R** red local con procesos reales · **I** integración con el cliente Godot exportado · **H** uso humano · **N** Internet.
+Los resultados de un tipo no demuestran otro. Todo se ejecutó en una sola máquina salvo que se indique. Logs en `logs/` (fuera de Git).
 
 | ID | Fecha | Tipo | Prueba | Resultado |
 | --- | --- | --- | --- | --- |
 | T-001 | 31-10-2026 | — | `setup.ps1`: .NET 10.0.403, Godot 4.7.2 .NET, plantillas; hashes SHA-512 oficiales | Correcto |
-| T-002 | 31-10-2026 | R | `net-test`: dedicado + 2 y + 12 procesos cliente, con reconexiones, plaza 13 y cliente abusivo, 30 s | 0 divergencias, 0 ticks tardíos, 13.º `reject_full`. **Límite: la mayoría de acciones de los bots «worker» se rechazan por alcance; carga económica baja** |
-| T-003 | 31-10-2026 | R | xUnit: rechazo por versión, contraseña, sala llena, sesión duplicada, paquete malformado, velocidad, reconexión, entrada tardía, idempotencia | Correcto |
-| T-004 | 31-10-2026 | Local Steam | `SteamSpike`, AppID de prueba 480: init, 25 relays, socket pair fiable y no fiable, lobby privado 12 | Correcto en una máquina y cuenta. **Conexión entre cuentas: NO VERIFICADA** |
-| T-005 | 31-10-2026 | L | 38 pruebas xUnit: economía, energía, conservación, conflictos entre 2 jugadores, guardado, corrupción, formato nuevo, recorrido completo y ciclo cooperativo | 38/38. Recorrido hasta 8 piezas: 9,4 min de juego con bot |
-| T-006 | 31-10-2026 | I | `auto-test` en build exportada, 1080p, con eventos reales de teclado y ratón, herramientas, guardar y reanudar | 6 ejecuciones: 4 correctas; 1 falló por un error de la propia prueba, ya corregido; 1 terminó por pérdida de GPU (BUG-001) |
-| T-007 | 31-10-2026 | I | `coop-test`: anfitrión + invitado y dedicado + 2 clientes Godot, misma máquina | Correcto: acción compartida, posiciones interpoladas, jugador visible, sin divergencias |
+| T-003 | 31-10-2026 | R | xUnit por UDP: rechazo por versión, contraseña, sala llena, sesión duplicada, paquete malformado, velocidad, reconexión, entrada tardía, idempotencia, expulsión | Correcto |
+| T-004 | 31-10-2026 | Steam local | `SteamSpike`, AppID de prueba 480: init, 25 relays, 12 clientes y servidor reales por Steam Networking Sockets (pares locales): 996 acciones, 1980 firmas, 0 divergencias, desconexión detectada | Correcto en una máquina y cuenta. **Entre cuentas y por relay: NO VERIFICADO** |
+| T-005 | 31-10-2026 | L | xUnit: economía, energía, calor, conservación, conflictos, trenes, reservas, viajes, carga interplanetaria, offline, eventos, guardados reales de 0.1.0, 0.2.0 y 0.3.0, idiomas | Ver CHANGELOG para el recuento vigente |
+| T-006 | 31-10-2026 | L | **Campaña completa con comandos válidos: 23/23 objetivos en 176 min de juego** con un bot eficiente | Correcto. Duración humana NO VERIFICADA |
+| T-008 | 31-10-2026 | I | `auto-test` en build exportada, 1080p: bucle, eventos reales de teclado y ratón, reasignación de teclas, tren, viaje, Halloween | Correcto en 0.3.0 |
+| T-007 | 31-10-2026 | I | `coop-test`: anfitrión + invitado y dedicado + 2 clientes Godot | Correcto: acción compartida, jugador visible, sin divergencias |
+| T-009 | 31-10-2026 | I + R | **Anfitrión Godot + 11 procesos cliente**, escenario medio, 1080p | 12 conectados, 0 divergencias. Ver PERFORMANCE |
+| T-010 | 31-10-2026 | R | Matriz 4, 8 y 12 clientes con dedicado; jugador 13 `reject_full` | 0 divergencias, 0 ticks tardíos |
+| T-011 | 31-10-2026 | R | 12 clientes con relé UDP real: 50 ms/1 %, 100 ms/2 %, 150 ms/3 % con jitter, con viajeros | Pérdida medida 1,0/2,0/3,0 %, 0 divergencias, 0 tardíos. RTT máximo observado 544/739/1006 ms sin investigar |
+| T-012 | 31-10-2026 | R | **60 min, 12 clientes, 100 ms/2 %**, escenario medio, sobre 0.2.0 (057afc5): 87 reconexiones, 436 viajes | Memoria 63→65 MB, tick 0,25-0,31 ms, 0 tardíos, 4320 firmas sin divergencia. **Carga económica débil: 1604 acciones aplicadas frente a 21428 rechazadas** |
+| T-013 | 31-10-2026 | R | Dedicado: cierre ordenado, reinicio, `kill` forzado con recuperación del último autosave | Correcto: cargado en tick 133, luego 184 tras el `kill` |
+| T-014 | 31-10-2026 | I | 8 tramos de viaje en el cliente | Memoria estable, llegada al planeta correcto, Plutón sigue produciendo |
+
+## Errores que estas pruebas encontraron
+
+- Caída real del servidor al terminar dos jugadores el mismo escombro (**también en 0.1.0**). Probado rojo → verde.
+- Los motivos de rechazo no llegaban: el cierre inmediato los descartaba.
+- Las filas de latencia iniciales eran **inválidas**: la simulación de LiteNetLib no actúa en release. Sustituidas por relé UDP.
+- El `delta` de Godot está suavizado: las primeras cifras de frame eran falsas. Sustituido por reloj real.
+- Picos de 180 ms atribuidos primero a shaders: eran mis propias capturas PNG. Precalentamiento retirado.
+- Picos de 55 ms reales: regeneración masiva de `Label3D`. Eliminados.
+- Ciclo de reinicio del servidor sin guardar por fallo: añadido guardado de emergencia sin pisar el válido.
 
 ## Sin verificar
 
-Dos PCs reales · Internet · Steam entre cuentas · juego humano · 4/8 clientes por separado · 12 clientes en anfitrión · red con latencia y pérdida · 60 min · escenarios medio y estrés · Linux · ultrawide.
+**Una persona jugando** · dos PC reales · Internet · Steam entre cuentas y relays · Linux · ultrawide 3440×1440 · instalación limpia en otro equipo · causa de BUG-001.

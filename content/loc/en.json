@@ -260,6 +260,8 @@
   "panel_auto_sell": "Auto-sell",
   "panel_reserve": "Reserve",
   "panel_close": "Close",
+  "transfer_take": "Take",
+  "transfer_put": "Put",
   "tech_title": "Contracts and upgrades",
   "tech_upgrades": "Upgrades",
   "tech_contracts": "Contracts",

@@ -186,6 +186,22 @@ public partial class AutoTest : Node
                 world.EventsSeeded.Remove("halloween");
                 _main.StartSession(GameSession.Local(_main, world, "autotest-halloween", null, _main.Prefs));
             }
+            else if (_args.GetValueOrDefault("scenario") == "mars")
+            {
+                var world = World.CreateNew(_main.Content);
+                foreach (var id in new[] { "tech_assembly", "tech_rail", "tech_cryo", "tech_shuttle" }) world.Upgrades.Add(id);
+                world.Credits = 50000;
+                var marsDepot = world.Machines.Values.First(m => m.Def == "depot" && m.Planet == 1);
+                marsDepot.In.Add("ingot", 300);
+                marsDepot.In.Add("parts", 200);
+                marsDepot.In.Add("recovered", 100);
+                var plutoDepot = world.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
+                plutoDepot.In.Add("ingot", 100);
+                plutoDepot.In.Add("parts", 60);
+                plutoDepot.In.Add("cryo_module", 40);
+                world.Reindex();
+                _main.StartSession(GameSession.Local(_main, world, "autotest-mars", null, _main.Prefs));
+            }
             else if (_args.GetValueOrDefault("scenario") == "travel")
             {
                 var world = World.CreateNew(_main.Content);
@@ -212,6 +228,7 @@ public partial class AutoTest : Node
             else if (_args.GetValueOrDefault("scenario") == "rail") await RailScenario();
             else if (_args.GetValueOrDefault("scenario") == "travel") await TravelScenario();
             else if (_args.GetValueOrDefault("scenario") == "halloween") await HalloweenScenario();
+            else if (_args.GetValueOrDefault("scenario") == "mars") await MarsScenario();
             else if (_args.ContainsKey("join") || _args.ContainsKey("host")) await JoinedScenario();
             else await FullLoop();
         }
@@ -502,6 +519,68 @@ public partial class AutoTest : Node
         }
         Check(v.Session.Client.HashMismatches == 0, $"sin divergencias ({v.Session.Client.HashChecks} comprobaciones)");
         _frames.Clear();
+    }
+
+    /// <summary>Marte con las herramientas: yacimiento, calor visible, radiador y carga real desde Plutón.</summary>
+    private async Task MarsScenario()
+    {
+        var v = _view!;
+        var client = v.Session.Client;
+        var server = v.Session.Runner!.Server.World;
+        var padPluto = W.Machines.Values.First(m => m.Def == "shuttle_terminal" && m.Planet == 0);
+
+        Check(await Build("cargo_pad", -8, 12), "plataforma de carga en Plutón");
+        var send = W.Machines.Values.Last(m => m.Def == "cargo_pad");
+        var depot = W.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
+        await UseOn(depot, () => client.Send(new Command { Type = CommandType.Extract, A = depot.Id, Text = "cryo_module" }));
+        Check(await Until(() => Me.Bag.Get("cryo_module") == 40, 3), "coger solo módulos del depósito");
+        Check(Me.Bag.Get("ingot") == 0, "los demás objetos quedan en el depósito");
+        await UseOn(W.Machines[send.Id], () => client.Send(new Command { Type = CommandType.Insert, A = send.Id }));
+        client.Send(new Command { Type = CommandType.StationMode, A = send.Id, B = 0 });
+
+        var c = CenterOf(padPluto);
+        await WalkTo(c + new Vector3(0, -1.2f, 7));
+        client.Send(new Command { Type = CommandType.Travel, A = 1 });
+        Check(await Until(() => v.InFlight, 3), "despega hacia Marte");
+        Check(await Until(() => !v.InFlight && Me.Planet == 1, 40), "llega a Marte");
+        await Wait(1);
+        await Shot("mars_01_llegada");
+
+        var node = W.Nodes.Values.Where(n => n.Item == "silicon_ore").OrderBy(n => n.X * n.X + n.Z * n.Z).First();
+        foreach (var d in W.DebrisById.Values.Where(d => d.CoversNode == node.Id).ToList()) await CutDebris(d);
+        Check(await Until(() => W.Nodes[node.Id].Revealed, 3), "yacimiento de silicio descubierto");
+        foreach (var d in W.DebrisById.Values.Where(d => d.Planet == 1 && d.X >= node.X - 2 && d.X <= node.X + 9 && d.Z >= node.Z - 2 && d.Z <= node.Z + 8).ToList()) await CutDebris(d);
+
+        Check(await Build("silicon_extractor", node.X, node.Z), "extractor de silicio");
+        var extractor = W.Machines.Values.Last(m => m.Def == "silicon_extractor");
+        Check(await Build("wafer_refinery", node.X + 3, node.Z), "refinería");
+        var refinery = W.Machines.Values.Last(m => m.Def == "wafer_refinery");
+        Check(await LinkMachines(extractor, refinery), "enlace extractor → refinería");
+        Check(await Until(() => W.Machines[refinery.Id].Status == MachineStatus.Overheated, 40), "la refinería se sobrecalienta sin radiadores");
+        var cc = CenterOf(W.Machines[refinery.Id]);
+        await WalkTo(cc + new Vector3(0, -1.2f, 10));
+        v.AimAt(cc);
+        await Wait(0.4);
+        await Shot("mars_02_sobrecalentada");
+
+        Check(await Build("radiator", node.X + 3, node.Z + 4), "radiador 1");
+        Check(await Build("radiator", node.X + 6, node.Z + 4), "radiador 2");
+        Check(await Until(() => W.Machines[refinery.Id].Status != MachineStatus.Overheated, 15), "los radiadores eliminan el sobrecalentamiento");
+        await WalkTo(cc + new Vector3(0, -1.2f, 12));
+        v.AimAt(cc);
+        await Wait(0.4);
+        await Shot("mars_03_refrigerada");
+
+        Check(await Build("cargo_pad", -2, -14), "plataforma en Marte");
+        var receive = W.Machines.Values.Last(m => m.Def == "cargo_pad" && m.Planet == 1);
+        var arrived = await Until(() => W.Machines[receive.Id].In.Get("cryo_module") == 40, 110);
+        Check(arrived, $"los módulos enviados desde Plutón llegan: destino {W.Machines[receive.Id].In.Get("cryo_module")}, origen {W.Machines[send.Id].In.Get("cryo_module")}, en vuelo {W.Shipments.Count}, modo origen recibe={W.Machines[send.Id].StationUnload}");
+        Check(server.CountEverywhere("cryo_module") == 40, "sin duplicar ni perder carga");
+        v.OpenMachinePanel(receive.Id);
+        await Wait(0.4);
+        await Shot("mars_04_plataforma");
+        v.ClosePanelForTest();
+        Check(client.HashMismatches == 0, $"sin divergencias ({client.HashChecks} comprobaciones)");
     }
 
     /// <summary>El evento se activa sin tocar el reloj, se juega con las herramientas y su recompensa permanece.</summary>
