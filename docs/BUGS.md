@@ -7,7 +7,7 @@
 | BUG-002 | Baja | 0.1.0 | Abierto | El espejo del cliente solo actualiza `Tick` al recibir cambios. No debe usarse como reloj. | Mundo sin actividad |
 | BUG-005 | Media | 0.2.0 | En investigación | RTT máximo observado de hasta ~1 s con 150 ms configurados. | `net-matrix`, fila 150 ms |
 | BUG-006 | Baja | 0.3.0 | Abierto | Dos trenes parados en el mismo andén se solapan visualmente. Sin efecto económico. | Dos trenes con el mismo destino |
-| BUG-007 | Baja | 0.3.0 | Abierto | Cambiar de idioma en partida no retraduce la barra de herramientas hasta recargar. | Ajustes en pausa |
+| BUG-007 | Baja | 0.3.0 | Corregido en 0.4.1 | Cambiar de idioma en partida no retraducía la barra de herramientas. | Ajustes en pausa |
 
 ## Limitaciones de las alfas
 

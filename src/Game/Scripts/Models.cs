@@ -714,6 +714,15 @@ public static class Sfx
         Streams["error"] = Make(0.16f, t => Mathf.Sign(Mathf.Sin(t * 950)) * 0.2f * Fade(t, 0.16f));
         Streams["objective"] = Make(0.55f, t => (Mathf.Sin(t * 3300) + Mathf.Sin(t * (t < 0.18f ? 3300 : t < 0.36f ? 4150 : 4950))) * 0.25f * Fade(t, 0.55f));
         Streams["ghost"] = MakeLoop(4f, t => (Mathf.Sin(t * Mathf.Tau * 110 + Mathf.Sin(t * Mathf.Tau * 0.5f) * 3f) * 0.16f + Mathf.Sin(t * Mathf.Tau * 165.5f) * 0.09f) * (0.6f + 0.4f * Mathf.Sin(t * Mathf.Tau * 0.25f)));
+        // Viento: parciales enteros en 8 s para que el bucle no tenga salto.
+        Streams["wind"] = MakeLoop(8f, t =>
+        {
+            float s = 0;
+            for (var i = 1; i <= 9; i++)
+                s += Mathf.Sin(t * Mathf.Tau * (30 + i * 11.125f) + i * 1.7f) * (1f / i);
+            var swell = 0.55f + 0.45f * Mathf.Sin(t * Mathf.Tau / 8f);
+            return s * swell * 0.1f;
+        });
         Streams["hum"] = MakeLoop(1f, t => Mathf.Sin(t * Mathf.Tau * 60) * 0.3f + Mathf.Sin(t * Mathf.Tau * 180) * 0.1f + Mathf.Sin(t * Mathf.Tau * 2) * Mathf.Sin(t * Mathf.Tau * 240) * 0.08f);
     }
 
@@ -744,6 +753,8 @@ public static class Sfx
 
     public static AudioStream Hum => Streams["hum"];
     public static AudioStream Ghost => Streams["ghost"];
+    public static AudioStream Wind => Streams["wind"];
+    public static float AmbienceDb => Mathf.LinearToDb(Mathf.Max(0.001f, _prefs.MasterVolume * _prefs.SfxVolume * 0.6f));
     public static float MasterLinear => _prefs.MasterVolume;
     public static float MachineDb => Mathf.LinearToDb(Mathf.Max(0.001f, _prefs.MasterVolume * _prefs.MachineVolume));
 

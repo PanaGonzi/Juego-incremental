@@ -31,4 +31,4 @@ Los resultados de un tipo no demuestran otro. Todo se ejecutó en una sola máqu
 
 ## Sin verificar
 
-**Una persona jugando** · dos PC reales · Internet · Steam entre cuentas y relays · Linux · ultrawide 3440×1440 · instalación limpia en otro equipo · causa de BUG-001.
+**Una persona jugando** · **todo el audio: generado y reproducido sin errores, pero nadie lo ha escuchado** · dos PC reales · Internet · Steam entre cuentas y relays · Linux · ultrawide 3440×1440 · instalación limpia en otro equipo · causa de BUG-001.

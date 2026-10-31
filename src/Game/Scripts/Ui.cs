@@ -86,6 +86,7 @@ public partial class Hud : Control
     private readonly GameView _view;
     private Label _credits = null!, _power = null!, _income = null!, _objective = null!, _bag = null!, _prompt = null!, _status = null!, _players = null!, _chatLog = null!, _toast = null!;
     private readonly List<PanelContainer> _toolSlots = new();
+    private readonly List<(Label label, string key)> _toolNames = new();
     private PanelContainer _center = null!;
     private VBoxContainer _centerBody = null!;
     private LineEdit _chatInput = null!;
@@ -158,7 +159,9 @@ public partial class Hud : Control
             var box = new VBoxContainer();
             slot.AddChild(box);
             box.AddChild(Ui.Text(key, 13, Ui.Dim));
-            box.AddChild(Ui.Text(Loc.T(label), 17));
+            var name = Ui.Text(Loc.T(label), 17);
+            box.AddChild(name);
+            _toolNames.Add((name, label));
             hotbar.AddChild(slot);
             _toolSlots.Add(slot);
         }
@@ -264,6 +267,12 @@ public partial class Hud : Control
         _status.Text = status;
         _status.AddThemeColorOverride("font_color", statusColor);
         _prompt.Text = prompt;
+    }
+
+    /// <summary>Vuelve a aplicar el idioma a los textos fijos del HUD.</summary>
+    public void RefreshStaticText()
+    {
+        foreach (var (label, key) in _toolNames) label.Text = Loc.T(key);
     }
 
     public void SetTool(int index)

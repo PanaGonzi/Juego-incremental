@@ -63,7 +63,7 @@ Estados: pendiente · en curso · bloqueada · implementada (pendiente de prueba
 | --- | --- | --- | --- |
 | B-1 | A | Inglés, controles reasignables, ultrawide | verificada (revisión de inglés nativo pendiente) |
 | B-2 | A | Ensayo de 60 min, escenario medio, anfitrión + 11 | verificada (ver T-012 y su repetición) |
-| B-3 | A | Tutorial propio con ayudas contextuales | pendiente |
+| B-3 | A | Tutorial propio con ayudas contextuales | implementada en parte: objetivos con marcador y distancia; validar con personas |
 | B-4 | M | Dibujo instanciado de vías y LOD | pendiente; hoy cumple el objetivo sin ello |
 | B-5 | M | Exportar y comprobar servidor Linux | pendiente; sin entorno Linux aquí, no se anuncia |
 | B-6 | M | Arte: variedad, animación de jugadores, audio ambiente | pendiente |

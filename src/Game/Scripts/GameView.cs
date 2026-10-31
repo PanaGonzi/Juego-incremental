@@ -434,6 +434,8 @@ public partial class GameView : Node3D
     {
         _viewPlanet = planet;
         var mars = planet == 1;
+        _ambience ??= CreateAmbience();
+        _ambience.PitchScale = mars ? 1.25f : 0.85f;
         _ground.SetShaderParameter("low_color", mars ? new Vector3(0.20f, 0.075f, 0.04f) : new Vector3(0.115f, 0.075f, 0.062f));
         _ground.SetShaderParameter("high_color", mars ? new Vector3(0.50f, 0.26f, 0.13f) : new Vector3(0.50f, 0.54f, 0.61f));
         _sky.SetShaderParameter("moon", mars ? 0f : 1f);
@@ -441,6 +443,15 @@ public partial class GameView : Node3D
         _sun.LightColor = mars ? new Color(1f, 0.88f, 0.74f) : new Color(0.86f, 0.9f, 1f);
         _sun.LightEnergy = mars ? 1.7f : 1.25f;
         _env.Environment.FogLightColor = mars ? new Color(0.5f, 0.28f, 0.17f) : new Color(0.22f, 0.28f, 0.42f);
+    }
+
+    private AudioStreamPlayer? _ambience;
+
+    private AudioStreamPlayer CreateAmbience()
+    {
+        var player = new AudioStreamPlayer { Stream = Sfx.Wind, VolumeDb = Sfx.AmbienceDb, Autoplay = true };
+        AddChild(player);
+        return player;
     }
 
     /// <summary>Retira la representación del planeta anterior; su simulación sigue en el servidor.</summary>
@@ -1079,6 +1090,8 @@ public partial class GameView : Node3D
 
     private void ApplyPrefs()
     {
+        _hud.RefreshStaticText();
+        if (_ambience != null) _ambience.VolumeDb = Sfx.AmbienceDb;
         if (_eventLight != null) _eventLight.LightEnergy = 1.6f * _main.Prefs.EventAmbience;
         if (_eventAmbience != null)
         {

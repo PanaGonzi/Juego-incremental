@@ -1,5 +1,9 @@
 # Cambios
 
+## 0.4.1 (protocolo 4, guardado 4; compatible con 0.4.0)
+
+Marcador en el mundo y distancia para el objetivo actual. Viento ambiente por planeta. La barra de herramientas se retraduce al cambiar de idioma.
+
 ## 0.4.0 (protocolo 4, guardado 4; migra 1, 2 y 3)
 
 Marte jugable: silicio, obleas, núcleos de navegación, regla de calor con radiadores y radiador criogénico, plataformas de carga interplanetaria con envíos persistentes. Campaña completa hasta el Proyecto Noveno Planeta. Transferencia por tipo de objeto en los paneles. Avisos de licencias en el paquete.
