@@ -16,6 +16,9 @@ Los resultados de un tipo no demuestran otro. Todo se ejecutó en una sola máqu
 | T-010 | 31-10-2026 | R | Matriz 4, 8 y 12 clientes con dedicado; jugador 13 `reject_full` | 0 divergencias, 0 ticks tardíos |
 | T-011 | 31-10-2026 | R | 12 clientes con relé UDP real: 50 ms/1 %, 100 ms/2 %, 150 ms/3 % con jitter, con viajeros | Pérdida medida 1,0/2,0/3,0 %, 0 divergencias, 0 tardíos. RTT máximo observado 544/739/1006 ms sin investigar |
 | T-012 | 31-10-2026 | R | **60 min, 12 clientes, 100 ms/2 %**, escenario medio, sobre 0.2.0 (057afc5): 87 reconexiones, 436 viajes | Memoria 63→65 MB, tick 0,25-0,31 ms, 0 tardíos, 4320 firmas sin divergencia. **Carga económica débil: 1604 acciones aplicadas frente a 21428 rechazadas** |
+| T-015 | 31-10-2026 | R | **60 min, 12 clientes, 100 ms/2 % real (30664 de 1511936 datagramas), medio, sobre 0.4.0 (f71efaa)**: 87 reconexiones, 434 viajes, 5638 acciones aplicadas y 8402 rechazadas (bolsa vacía, sin coste, celda ocupada) | Memoria 63→66 MB, tick 0,23-0,33 ms, p99 máx. 38 ms, 0 tardíos, 4320 firmas sin divergencia, sin errores fatales. 0.4.1 solo añade cliente: no repetido sobre ella |
+| T-016 | 31-10-2026 | I | Regresión sobre el paquete 0.4.0: bucle, tren, Marte, Halloween, cooperativo; sobre 0.4.1: bucle, Marte, dedicado | Correcto, sin eventos de GPU |
+| T-017 | 31-10-2026 | I | Ultrawide 3440×1440 (ventana mayor que el monitor de 1080p: render y disposición, no un monitor real), panel de permisos, aviso de ausencia | Correcto |
 | T-013 | 31-10-2026 | R | Dedicado: cierre ordenado, reinicio, `kill` forzado con recuperación del último autosave | Correcto: cargado en tick 133, luego 184 tras el `kill` |
 | T-014 | 31-10-2026 | I | 8 tramos de viaje en el cliente | Memoria estable, llegada al planeta correcto, Plutón sigue produciendo |
 
@@ -31,4 +34,4 @@ Los resultados de un tipo no demuestran otro. Todo se ejecutó en una sola máqu
 
 ## Sin verificar
 
-**Una persona jugando** · **todo el audio: generado y reproducido sin errores, pero nadie lo ha escuchado** · dos PC reales · Internet · Steam entre cuentas y relays · Linux · ultrawide 3440×1440 · instalación limpia en otro equipo · causa de BUG-001.
+**Una persona jugando** · **todo el audio: generado y reproducido sin errores, pero nadie lo ha escuchado** · dos PC reales · Internet · Steam entre cuentas y relays · Linux · monitor ultrawide físico · instalación limpia en otro equipo · causa de BUG-001.

@@ -33,11 +33,11 @@ Anfitrión + 11 en el medio: tick 0,40 ms, p99 3,45, tardíos 0, subida ~660 kbi
 
 ## Ensayo sostenido
 
-60 min, 12 clientes, 100 ms/2 %, medio: memoria 63→65 MB, tick 0,25-0,31 ms, 0 tardíos, envío medio 434-738 kbit/s, picos de hasta 10466 kbit/s al repartir instantáneas. Ver T-012 y su limitación.
+60 min, 12 clientes, 100 ms/2 %, medio, sobre 0.4.0: memoria 63→66 MB, tick 0,23-0,33 ms, p99 máx. 38 ms, 0 tardíos, envío medio 449-743 kbit/s, picos de hasta 10310 kbit/s al repartir instantáneas. Ver T-015. Ensayo anterior sobre 0.2.0: T-012.
 
 ## Viajes
 
-Trayecto de 20 s a 1080p con VSync (180 Hz): media 5,56 ms, p99 ≤ 5,93, máx. ≤ 30 ms en los tramos sin capturas; memoria estable en 8 tramos (~560 MB). Los dos primeros tramos con capturas dan picos de hasta 106 ms atribuidos al bloqueo de `GetImage`: comprobación limpia pendiente.
+Trayecto de 20 s a 1080p con VSync (180 Hz): media 5,56 ms, p99 ≤ 5,93, máx. ≤ 31 ms sin capturas, salvo un pico de 53 ms en el primer tramo; memoria estable en 8 tramos (~545 MB).
 
 ## Pendiente
 

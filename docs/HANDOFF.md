@@ -1,12 +1,12 @@
 # Traspaso
 
 - **Rama:** `main`, sin remoto: publicar requiere autorización del titular.
-- **Alfas:** etiquetas `alpha-0.1.0` a `alpha-0.4.0`. Commit y versión en `builds/alpha-*/VERSION.txt`. Ver `git log` para lo posterior.
-- **Procesos activos que dejar en marcha:** ninguno al cerrar; un ensayo largo escribe en `logs/net/*-soak60-040`.
+- **Alfas:** etiquetas `alpha-0.1.0` a `alpha-0.4.1`. Commit y versión en `builds/alpha-*/VERSION.txt`. Ver `git log` para lo posterior.
+- **Procesos activos:** ninguno.
 - **Comandos:** en [CLAUDE.md](../CLAUDE.md); además `tools/net-matrix.ps1`, `tools/host-test.ps1`, y `auto-test.ps1 -Scenario rail|travel|mars|halloween`, `-Measure small|medium|stress`.
 - **Bloqueos exactos:** ver [STATUS](STATUS.md). Todos requieren al titular.
 - **Pruebas pendientes:** «Sin verificar» en [TEST_REPORTS](TEST_REPORTS.md).
-- **Siguiente tarea concreta:** B-3, tutorial con ayudas contextuales; después B-8, desvíos y señales.
+- **Siguiente tarea concreta:** recoger en FEEDBACK la primera partida del titular y ajustar con ella. Sin esa información: B-8, desvíos y señales; después B-6, arte y audio.
 - **Cuidado:**
   - `auto-test`, `coop-test` y `host-test` abren ventanas y usan GPU: comprobar antes que no haya un `Pluton.exe` del titular abierto.
   - Tras pruebas gráficas, vigilar `LiveKernelEvent` y comparar horas (BUG-001).

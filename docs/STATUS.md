@@ -1,6 +1,6 @@
 # Estado
 
-**Última build estable:** `builds/alpha-0.4.0` (commit f71efaa, etiqueta `alpha-0.4.0`, protocolo 4, guardado 4). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`.
+**Última build estable:** `builds/alpha-0.4.1` (commit babc91c, etiqueta `alpha-0.4.1`, protocolo 4, guardado 4). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`.
 
 **Hitos:** M0, A0.1, A0.2, A0.4 y evento/offline de A0.5 implementados, con verificación en una sola máquina. A0.3 completo salvo Steam en el menú. Siguiente trabajo: Beta (ver [ROADMAP](ROADMAP.md)).
 
