@@ -16,6 +16,8 @@ public sealed class ServerOptions
     public int AutosaveSeconds = 120;
     public string SaveSlot = "";
     public SaveStore? Store;
+    public string JoinNoticeKey = "";
+    public string JoinNoticeArg = "";
     public Action<string>? Log;
 }
 
@@ -484,6 +486,14 @@ public sealed class GameServer : IDisposable
             w.Write(hash);
             _pw.Send(_transport, s.Peer, Channel.Reliable);
             s.Synced = true;
+            if (_opt.JoinNoticeKey.Length > 0)
+            {
+                w = _pw.Begin(MsgType.Notice);
+                w.Write(_opt.JoinNoticeKey);
+                w.Write(_opt.JoinNoticeArg);
+                _pw.Send(_transport, s.Peer, Channel.Reliable);
+                _opt.JoinNoticeKey = "";
+            }
         }
         _pendingJoin.Clear();
     }
@@ -545,6 +555,7 @@ public sealed class GameServer : IDisposable
     {
         if (_opt.Store == null || _opt.SaveSlot.Length == 0) return;
         if (_saveTask is { IsCompleted: false }) return;
+        World.SavedUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var bytes = WorldCodec.Serialize(World);
         var revision = World.Content.Revision;
         var tick = World.Tick;

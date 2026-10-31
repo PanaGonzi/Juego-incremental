@@ -1,0 +1,13 @@
+[
+  {
+    "id": "halloween",
+    "startMonth": 10,
+    "startDay": 20,
+    "endMonth": 11,
+    "endDay": 5,
+    "debrisFields": [
+      { "def": "shadow_scrap", "x": -45, "z": 45, "radius": 12, "count": 12, "seed": 1031 }
+    ],
+    "decor": { "x": -45, "z": 45 }
+  }
+]

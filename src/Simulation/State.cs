@@ -149,7 +149,7 @@ public enum CommandType : byte
 {
     CutDebris, Place, Remove, Move, Link, Unlink, Insert, Extract, Sell, SetAutoSell,
     FulfillContract, BuyUpgrade, SetRole, Kick,
-    PlaceRail, RemoveRail, StationMode, CreateTrain, RemoveTrain, Travel,
+    PlaceRail, RemoveRail, StationMode, CreateTrain, RemoveTrain, Travel, SetEvent, SetCosmetic,
 }
 
 /// <summary>Intención de un jugador. Todo lo que contiene se valida antes de aplicarse.</summary>

@@ -10,6 +10,12 @@ public sealed partial class World
     public int NextPlayerNum = 1;
     public int ObjectiveIndex;
     public string OwnerKey = "";
+    public long SavedUnix;
+    public int TimeScale = 1;
+    public readonly SortedSet<string> ActiveEvents = new(StringComparer.Ordinal);
+    public readonly SortedSet<string> EventsSeeded = new(StringComparer.Ordinal);
+    public readonly SortedSet<string> Cosmetics = new(StringComparer.Ordinal);
+    public readonly SortedSet<string> EquippedCosmetics = new(StringComparer.Ordinal);
 
     public readonly SortedDictionary<int, Machine> Machines = new();
     public readonly SortedDictionary<int, Link> Links = new();
@@ -233,7 +239,7 @@ public sealed partial class World
     {
         var need = c.Type switch
         {
-            CommandType.SetRole or CommandType.Kick => Role.Admin,
+            CommandType.SetRole or CommandType.Kick or CommandType.SetEvent => Role.Admin,
             CommandType.Sell or CommandType.SetAutoSell or CommandType.FulfillContract or CommandType.BuyUpgrade => Role.Builder,
             _ => Role.Builder,
         };
@@ -261,8 +267,48 @@ public sealed partial class World
             CommandType.CreateTrain => CreateTrain(p, c.A, c.B),
             CommandType.RemoveTrain => RemoveTrain(p, c.A),
             CommandType.Travel => Travel(p, c.A),
+            CommandType.SetEvent => SetEvent(c.Text, c.A != 0) ? CommandResult.Success : CommandResult.Fail("err_invalid"),
+            CommandType.SetCosmetic => SetCosmetic(c.Text, c.A != 0),
             _ => CommandResult.Fail("err_invalid"),
         };
+    }
+
+    /// <summary>Activa o desactiva un evento. Desactivarlo no retira recompensas ni lo ya conseguido.</summary>
+    public bool SetEvent(string id, bool active)
+    {
+        if (!Content.Events.TryGetValue(id, out var e)) return false;
+        if (active)
+        {
+            ActiveEvents.Add(id);
+            if (EventsSeeded.Add(id))
+            {
+                // Los escombros del evento aparecen una sola vez por mundo: reactivarlo no da más material.
+                var planet = Content.Planets[0];
+                foreach (var f in e.DebrisFields) ScatterDebrisLive(planet, f);
+            }
+        }
+        else
+        {
+            ActiveEvents.Remove(id);
+        }
+        MarkGlobal();
+        return true;
+    }
+
+    private void ScatterDebrisLive(PlanetDef planet, DebrisFieldDef f)
+    {
+        var before = DebrisById.Keys.ToHashSet();
+        ScatterDebris(planet, f);
+        foreach (var id in DebrisById.Keys.Where(id => !before.Contains(id))) DirtyDebris.Add(id);
+    }
+
+    private CommandResult SetCosmetic(string id, bool on)
+    {
+        if (!Cosmetics.Contains(id)) return CommandResult.Fail("err_locked");
+        if (on) EquippedCosmetics.Add(id);
+        else EquippedCosmetics.Remove(id);
+        MarkGlobal();
+        return CommandResult.Success;
     }
 
     private CommandResult Travel(PlayerState p, int destination)
@@ -324,6 +370,7 @@ public sealed partial class World
         _debrisCells.Remove((d.Planet, d.X, d.Z));
         RemovedDebris.Add((d.Planet, d.Id));
         Bump("cleared");
+        Bump("cleared." + d.Def);
         if (d.CoversNode >= 0 && Nodes.TryGetValue(d.CoversNode, out var node) && !node.Revealed)
         {
             var stillCovered = false;
@@ -651,6 +698,9 @@ public sealed partial class World
         if (!Content.Contracts.TryGetValue(id, out var c)) return CommandResult.Fail("err_invalid");
         if (ContractsDone.Contains(id)) return CommandResult.Fail("err_done");
         if (c.Requires != null && !Upgrades.Contains(c.Requires)) return CommandResult.Fail("err_locked");
+        if (c.Event != null && !ActiveEvents.Contains(c.Event)) return CommandResult.Fail("err_locked");
+        foreach (var (stat, qty) in c.NeedStats)
+            if (Stats.GetValueOrDefault(stat) < qty) return CommandResult.Fail("err_need_stats");
 
         // Reúne de terminales y depósito del planeta y de la mochila, sin tocar nada hasta confirmar.
         var sources = _machineList
@@ -681,6 +731,11 @@ public sealed partial class World
         DirtyPlayers.Add(p.Key);
         ContractsDone.Add(id);
         AddCredits(c.Credits);
+        if (c.Cosmetic != null)
+        {
+            Cosmetics.Add(c.Cosmetic);
+            EquippedCosmetics.Add(c.Cosmetic);
+        }
         Bump("contract." + id);
         Bump("contract_credits", c.Credits);
         return CommandResult.Success;
@@ -715,13 +770,14 @@ public sealed partial class World
     public void Step()
     {
         _inStep = true;
-        Tick++;
+        var previousSecond = Tick / B.TicksPerSecond;
+        Tick += TimeScale;
         StepPower();
         foreach (var m in _machineList) StepMachine(m);
         foreach (var l in _linkList) StepLink(l);
         StepTrains();
         StepTransit();
-        if (Tick % B.TicksPerSecond == 0) StepObjectives();
+        if (Tick / B.TicksPerSecond != previousSecond) StepObjectives();
         _inStep = false;
     }
 
@@ -801,9 +857,11 @@ public sealed partial class World
 
     private void StepAutoSell(Machine m)
     {
-        if (--m.SellCooldown > 0) return;
-        m.SellCooldown = B.SellIntervalTicks;
-        var budget = (long)B.SellUnitsPerInterval;
+        m.SellCooldown -= TimeScale;
+        if (m.SellCooldown > 0) return;
+        var intervals = 1 + (-m.SellCooldown) / B.SellIntervalTicks;
+        m.SellCooldown += intervals * B.SellIntervalTicks;
+        var budget = (long)B.SellUnitsPerInterval * intervals;
         foreach (var kv in m.In.Items.ToList())
         {
             if (budget == 0) break;
@@ -837,7 +895,7 @@ public sealed partial class World
         m.Status = satisfaction < 1000 ? MachineStatus.LowPower : MachineStatus.Working;
 
         var yieldPermille = m.NodeId >= 0 && Nodes.TryGetValue(m.NodeId, out var source) ? source.YieldPermille : 1000;
-        m.Progress += satisfaction * (1000 + Mod("speed." + recipe.Id)) / 1000 * yieldPermille / 1000;
+        m.Progress += satisfaction * (1000 + Mod("speed." + recipe.Id)) / 1000 * yieldPermille / 1000 * TimeScale;
         if (m.Progress < recipe.Ticks * 1000L) return;
 
         foreach (var (item, qty) in recipe.Outputs)
@@ -852,10 +910,12 @@ public sealed partial class World
 
     private void StepLink(Link l)
     {
-        if (--l.Cooldown > 0) return;
+        l.Cooldown -= TimeScale;
+        if (l.Cooldown > 0) return;
+        var intervals = 1 + (-l.Cooldown) / B.LinkIntervalTicks;
         if (!Machines.TryGetValue(l.From, out var a) || !Machines.TryGetValue(l.To, out var b)) return;
         var source = Content.Machines[a.Def].Kind == MachineKind.Production ? a.Out : a.In;
-        var units = 1 + Mod("link_rate");
+        var units = (1 + Mod("link_rate")) * intervals;
         foreach (var kv in source.Items)
         {
             var qty = Math.Min(Math.Min(kv.Value, units), InputRoom(b, kv.Key));
@@ -881,6 +941,30 @@ public sealed partial class World
             ObjectiveIndex++;
             MarkGlobal();
         }
+    }
+
+    /// <summary>Tras simular sin clientes, los cambios acumulados no deben replicarse: la instantánea ya los incluye.</summary>
+    public void ClearReplicationState()
+    {
+        DirtyMachines.Clear();
+        DirtySimMachines.Clear();
+        DirtyDebris.Clear();
+        DirtyNodes.Clear();
+        DirtyLinks.Clear();
+        DirtyPlayers.Clear();
+        DirtyTrains.Clear();
+        DirtySimTrains.Clear();
+        DirtyTrainPaths.Clear();
+        DirtyRailNodes.Clear();
+        DirtyRailSegments.Clear();
+        RemovedMachines.Clear();
+        RemovedDebris.Clear();
+        RemovedLinks.Clear();
+        RemovedRailNodes.Clear();
+        RemovedRailSegments.Clear();
+        RemovedTrains.Clear();
+        DirtyGlobal = true;
+        DirtyGlobalSim = false;
     }
 
     // ---------- Totales para pruebas de conservación ----------

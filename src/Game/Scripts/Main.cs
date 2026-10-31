@@ -67,13 +67,25 @@ public partial class Main : Node
     public void StartSolo(string slot, bool isNew)
     {
         var world = isNew ? World.CreateNew(Content) : Store.Load(slot, Content);
-        StartSession(GameSession.Local(this, world, slot, hostPort: null, Prefs));
+        StartSession(GameSession.Local(this, world, slot, hostPort: null, Prefs, PrepareWorld(world, isNew)));
     }
 
     public void StartHost(string slot, bool isNew, int port)
     {
-        var world = isNew || !File.Exists(Store.PathOf(slot)) ? World.CreateNew(Content) : Store.Load(slot, Content);
-        StartSession(GameSession.Local(this, world, slot, port, Prefs));
+        isNew = isNew || !File.Exists(Store.PathOf(slot));
+        var world = isNew ? World.CreateNew(Content) : Store.Load(slot, Content);
+        StartSession(GameSession.Local(this, world, slot, port, Prefs, PrepareWorld(world, isNew)));
+    }
+
+    /// <summary>Progreso de ausencia y eventos de temporada. Devuelve el resumen que se avisa al jugador.</summary>
+    private string PrepareWorld(World world, bool isNew)
+    {
+        foreach (var e in Content.Events.Values)
+            if (e.InSeason(DateTime.Now) && !world.EventsSeeded.Contains(e.Id)) world.SetEvent(e.Id, true);
+        if (isNew) return "";
+        var report = OfflineProgress.Apply(world, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        if (report == null || report.SecondsApplied < 60) return "";
+        return $"{report.SecondsApplied / 3600.0:0.#} h, +{report.CreditsEarned:N0} ¤";
     }
 
     public void StartJoin(string host, int port, string password)
@@ -140,7 +152,7 @@ public sealed class GameSession
         Slot = slot;
     }
 
-    public static GameSession Local(Main main, World world, string slot, int? hostPort, Settings prefs)
+    public static GameSession Local(Main main, World world, string slot, int? hostPort, Settings prefs, string noticeArg = "")
     {
         // Modo individual: servidor en un hilo y conexión en memoria; no toca la red.
         var hub = new LoopbackHub();
@@ -149,6 +161,8 @@ public sealed class GameSession
         var server = new GameServer(world, serverTransport, new ServerOptions
         {
             HostKey = prefs.PlayerKey,
+            JoinNoticeKey = noticeArg.Length > 0 ? "notice_offline" : "",
+            JoinNoticeArg = noticeArg,
             Store = main.Store,
             SaveSlot = slot,
             Log = message => GD.Print("[servidor] " + message),
@@ -194,6 +208,7 @@ public sealed class Settings
     public bool CameraBob { get; set; } = true;
     public bool Shadows { get; set; } = true;
     public bool Glow { get; set; } = true;
+    public float EventAmbience { get; set; } = 0.7f;
 
     private string _path = "";
 

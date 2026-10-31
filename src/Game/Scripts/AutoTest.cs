@@ -175,6 +175,13 @@ public partial class AutoTest : Node
                 var parts = join.Split(':');
                 _main.StartJoin(parts[0], int.Parse(parts[1]), "");
             }
+            else if (_args.GetValueOrDefault("scenario") == "halloween")
+            {
+                var world = RailWorld();
+                foreach (var e in _main.Content.Events.Keys) world.EventsSeeded.Add(e);
+                world.EventsSeeded.Remove("halloween");
+                _main.StartSession(GameSession.Local(_main, world, "autotest-halloween", null, _main.Prefs));
+            }
             else if (_args.GetValueOrDefault("scenario") == "travel")
             {
                 var world = World.CreateNew(_main.Content);
@@ -200,6 +207,7 @@ public partial class AutoTest : Node
             if (_args.ContainsKey("measure")) await MeasureScenario();
             else if (_args.GetValueOrDefault("scenario") == "rail") await RailScenario();
             else if (_args.GetValueOrDefault("scenario") == "travel") await TravelScenario();
+            else if (_args.GetValueOrDefault("scenario") == "halloween") await HalloweenScenario();
             else if (_args.ContainsKey("join") || _args.ContainsKey("host")) await JoinedScenario();
             else await FullLoop();
         }
@@ -471,6 +479,65 @@ public partial class AutoTest : Node
         }
         Check(v.Session.Client.HashMismatches == 0, $"sin divergencias ({v.Session.Client.HashChecks} comprobaciones)");
         _frames.Clear();
+    }
+
+    /// <summary>El evento se activa sin tocar el reloj, se juega con las herramientas y su recompensa permanece.</summary>
+    private async Task HalloweenScenario()
+    {
+        var v = _view!;
+        var client = v.Session.Client;
+        var server = v.Session.Runner!.Server.World;
+        client.Send(new Command { Type = CommandType.SetEvent, Text = "halloween", A = 1 });
+        Check(await Until(() => W.ActiveEvents.Contains("halloween") && v.EventDecorVisible, 3), "evento activado desde el panel, sin cambiar la fecha");
+        var decor = _main.Content.Events["halloween"].Decor;
+        var center = new Vector3(decor.X * 2f, 0, decor.Z * 2f);
+        await WalkTo(center + new Vector3(0, 0, -14), 30);
+        v.AimAt(center + new Vector3(0, 1, 0));
+        await Wait(0.8);
+        await Shot("halloween_01_ramal");
+        var shadow = W.DebrisById.Values.Where(d => d.Def == "shadow_scrap").ToList();
+        Check(shadow.Count >= 8, $"chatarra sombría: {shadow.Count}");
+        foreach (var d in shadow.Take(8)) await CutDebris(d);
+        Check(W.Stats.GetValueOrDefault("cleared.shadow_scrap") >= 8, "ramal limpiado con el cortador");
+        await Shot("halloween_02_limpio");
+
+        // Las entregas por tren ya se prueban aparte; aquí se fija la estadística en el servidor de prueba.
+        client.Send(new Command { Type = CommandType.FulfillContract, Text = "c_shadow_express" });
+        await Wait(0.4);
+        Check(!W.ContractsDone.Contains("c_shadow_express"), "sin entregas por tren el contrato se rechaza");
+        server.Stats["train_delivered"] = 120;
+        var depot = W.Machines.Values.First(m => m.Def == "depot");
+        var credits = W.Credits;
+        client.Send(new Command { Type = CommandType.FulfillContract, Text = "c_shadow_express" });
+        Check(await Until(() => W.ContractsDone.Contains("c_shadow_express"), 3), "contrato completado");
+        Check(await Until(() => W.Cosmetics.Contains("spectral_train"), 3), "recompensa cosmética obtenida");
+        await Wait(0.3);
+        var paid = W.Credits - credits;
+        client.Send(new Command { Type = CommandType.FulfillContract, Text = "c_shadow_express" });
+        await Wait(0.4);
+        Check(W.Credits - credits == paid, $"el contrato paga una sola vez: {paid}");
+
+        // Tren espectral en una ruta real
+        Check(await Build("station", 2, -14), "estación A");
+        var a = W.Machines.Values.Last(m => m.Def == "station");
+        Check(await Build("station", 14, -14), "estación B");
+        var b = W.Machines.Values.Last(m => m.Def == "station");
+        Check(await PlaceRailAt(6, -12, 14, -12, 0, ""), "vía");
+        client.Send(new Command { Type = CommandType.CreateTrain, A = a.Id, B = b.Id });
+        Check(await Until(() => W.Trains.Count == 1, 3), "tren creado");
+        await WalkTo(new Vector3(18, 0, -14), 10);
+        v.AimAt(new Vector3(11, 1.2f, -24));
+        await Wait(1);
+        await Shot("halloween_03_tren_espectral");
+
+        client.Send(new Command { Type = CommandType.SetEvent, Text = "halloween", A = 0 });
+        Check(await Until(() => !W.ActiveEvents.Contains("halloween") && !v.EventDecorVisible, 3), "evento desactivado");
+        Check(W.Cosmetics.Contains("spectral_train") && W.EquippedCosmetics.Contains("spectral_train"), "la recompensa permanece al desactivarlo");
+        var cash = W.Credits;
+        client.Send(new Command { Type = CommandType.SetEvent, Text = "halloween", A = 1 });
+        await Wait(0.5);
+        Check(W.DebrisById.Values.Count(d => d.Def == "shadow_scrap") == shadow.Count - 8, "reactivarlo no regenera material");
+        Check(W.Credits == cash, "reactivarlo no paga de nuevo");
     }
 
     private static void Summarize(List<float> frames, out string text)

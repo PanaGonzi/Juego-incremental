@@ -4,8 +4,8 @@ namespace Pluton.Networking;
 
 public static class Protocol
 {
-    public const int Version = 2;
-    public const string GameVersion = "0.2.0";
+    public const int Version = 3;
+    public const string GameVersion = "0.3.0";
     public const int MaxPlayers = 12;
     public const int MaxClientPacket = 2048;
     public const int MaxNameLength = 24;

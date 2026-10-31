@@ -32,6 +32,25 @@ else
     Log($"Mundo nuevo '{slot}'");
 }
 
+var joinNotice = "";
+if (File.Exists(store.PathOf(slot)))
+{
+    var report = OfflineProgress.Apply(world, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+    if (report != null)
+    {
+        Log($"Ausencia {report.SecondsAway} s: aplicados {report.SecondsApplied} s en {report.Steps} pasos, +{report.CreditsEarned} créditos");
+        if (report.SecondsApplied >= 60) joinNotice = $"{report.SecondsApplied / 3600.0:0.#} h, +{report.CreditsEarned:N0} ¤";
+    }
+}
+foreach (var e in content.Events.Values)
+    if (e.InSeason(DateTime.Now) && !world.EventsSeeded.Contains(e.Id)) world.SetEvent(e.Id, true);
+if (args2.TryGetValue("event", out var eventArg))
+{
+    // --event halloween activa; --event -halloween desactiva. No depende del reloj del sistema.
+    var off = eventArg.StartsWith('-');
+    if (!world.SetEvent(eventArg.TrimStart('-'), !off)) Log($"Evento desconocido: {eventArg}");
+}
+
 if (args2.TryGetValue("load-test-scenario", out var scenario))
 {
     // Ensayo: reemplaza el mundo por uno de medición. No se guarda sobre partidas normales porque exige su propio perfil.
@@ -52,6 +71,8 @@ var server = new GameServer(world, transport, new ServerOptions
     MaxPlayers = maxPlayers,
     Password = args2.GetValueOrDefault("password", ""),
     Store = store,
+    JoinNoticeKey = joinNotice.Length > 0 ? "notice_offline" : "",
+    JoinNoticeArg = joinNotice,
     SaveSlot = slot,
     AutosaveSeconds = autosave,
     Log = Log,

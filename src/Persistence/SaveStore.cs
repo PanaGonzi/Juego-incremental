@@ -73,8 +73,11 @@ public sealed class SaveStore
             File.Move(temp, path);
     }
 
-    public void Save(string slot, World world) =>
+    public void Save(string slot, World world)
+    {
+        world.SavedUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         Write(slot, Encode(WorldCodec.Serialize(world), world.Content.Revision, world.Tick, DateTime.UtcNow));
+    }
 
     /// <summary>Carga una ranura; si está corrupta recurre al respaldo. Nunca sobrescribe un formato más nuevo.</summary>
     public World Load(string slot, ContentDb content)

@@ -53,6 +53,35 @@ public sealed class ContractDef
     public Dictionary<string, long> Items { get; set; } = new();
     public long Credits { get; set; }
     public string? Requires { get; set; }
+    public string? Event { get; set; }
+    public Dictionary<string, long> NeedStats { get; set; } = new();
+    public string? Cosmetic { get; set; }
+}
+
+public sealed class EventDecorDef
+{
+    public int X { get; set; }
+    public int Z { get; set; }
+}
+
+public sealed class EventDef
+{
+    public string Id { get; set; } = "";
+    public int StartMonth { get; set; }
+    public int StartDay { get; set; }
+    public int EndMonth { get; set; }
+    public int EndDay { get; set; }
+    public List<DebrisFieldDef> DebrisFields { get; set; } = new();
+    public EventDecorDef Decor { get; set; } = new();
+
+    /// <summary>Temporada configurable; admite cruzar de un mes a otro y de un año a otro.</summary>
+    public bool InSeason(DateTime date)
+    {
+        var day = date.Month * 100 + date.Day;
+        var from = StartMonth * 100 + StartDay;
+        var to = EndMonth * 100 + EndDay;
+        return from <= to ? day >= from && day <= to : day >= from || day <= to;
+    }
 }
 
 public sealed class ObjectiveDef
@@ -164,7 +193,7 @@ public sealed class BalanceDef
 public sealed class ContentDb
 {
     private static readonly string[] Files =
-        { "items.json", "recipes.json", "machines.json", "progression.json", "planets.json", "balance.json" };
+        { "items.json", "recipes.json", "machines.json", "progression.json", "planets.json", "balance.json", "events.json" };
 
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -183,6 +212,7 @@ public sealed class ContentDb
     public List<ObjectiveDef> Objectives { get; private set; } = new();
     public List<PlanetDef> Planets { get; private set; } = new();
     public BalanceDef Balance { get; private set; } = new();
+    public Dictionary<string, EventDef> Events { get; private set; } = new();
 
     /// <summary>Lee y valida un directorio completo. Lanza ContentException sin efectos parciales.</summary>
     public static ContentDb Load(string dir)
@@ -213,6 +243,7 @@ public sealed class ContentDb
                 Objectives = progression.Objectives,
                 Planets = Parse<List<PlanetDef>>(raw["planets.json"]),
                 Balance = Parse<BalanceDef>(raw["balance.json"]),
+                Events = Parse<List<EventDef>>(raw["events.json"]).ToDictionary(x => x.Id),
             };
             db.Validate();
             return db;
@@ -269,8 +300,13 @@ public sealed class ContentDb
             if (c.Credits < 0) throw new ContentException($"Contrato {c.Id}: recompensa negativa");
             if (c.Requires != null && !Upgrades.ContainsKey(c.Requires))
                 throw new ContentException($"Contrato {c.Id}: requisito desconocido");
+            if (c.Event != null && !Events.ContainsKey(c.Event))
+                throw new ContentException($"Contrato {c.Id}: evento desconocido");
         }
         foreach (var d in Balance.Debris.Values) Item(d.Drop, "Escombro");
+        foreach (var e in Events.Values)
+            foreach (var f in e.DebrisFields)
+                if (!Balance.Debris.ContainsKey(f.Def)) throw new ContentException($"Evento {e.Id}: escombro '{f.Def}'");
         foreach (var p in Planets)
         {
             foreach (var b in p.Builtins)

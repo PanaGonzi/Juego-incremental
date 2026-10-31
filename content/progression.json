@@ -14,7 +14,8 @@
     { "id": "c_first_ingots",  "items": { "ingot": 10 },       "credits": 150 },
     { "id": "c_first_parts",   "items": { "parts": 8 },        "credits": 350, "requires": "tech_assembly" },
     { "id": "c_rail_survey",   "items": { "ingot": 40, "parts": 15 }, "credits": 700, "requires": "tech_assembly" },
-    { "id": "c_cryo_pilot",    "items": { "cryo_module": 3 },  "credits": 900, "requires": "tech_cryo" }
+    { "id": "c_cryo_pilot",    "items": { "cryo_module": 3 },  "credits": 900, "requires": "tech_cryo" },
+    { "id": "c_shadow_express", "event": "halloween", "items": { "ingot": 30 }, "credits": 400, "needStats": { "cleared.shadow_scrap": 8, "train_delivered": 120 }, "cosmetic": "spectral_train" }
   ],
   "objectives": [
     { "id": "o_clear",      "stat": "cleared",                "qty": 3,   "credits": 20 },

@@ -396,7 +396,8 @@ public sealed partial class World
                 case TrainState.Loading: StepLoading(t); break;
                 case TrainState.Unloading: StepUnloading(t); break;
                 case TrainState.Waiting:
-                    if (--t.Timer <= 0) Depart(t);
+                    t.Timer -= TimeScale;
+                    if (t.Timer <= 0) Depart(t);
                     break;
             }
         }
@@ -404,8 +405,8 @@ public sealed partial class World
 
     private void StepMoving(Train t)
     {
-        t.PosMm += R.TrainSpeedMmPerTick;
-        if (Tick % 20 == 0) DirtySimTrains.Add(t.Id);
+        t.PosMm += R.TrainSpeedMmPerTick * TimeScale;
+        if (Tick % 20 == 0 || TimeScale > 1) DirtySimTrains.Add(t.Id);
         while (t.State == TrainState.Moving)
         {
             if (!RailSegments.TryGetValue(t.Path[t.PathIndex], out var s))
@@ -444,7 +445,7 @@ public sealed partial class World
             DirtyTrains.Add(t.Id);
             return;
         }
-        var budget = Math.Min(R.TransferUnitsPerTick, R.TrainCapacity - t.Cargo.Total);
+        var budget = Math.Min(R.TransferUnitsPerTick * TimeScale, R.TrainCapacity - t.Cargo.Total);
         foreach (var kv in station.In.Items.ToList())
         {
             if (budget <= 0) break;
@@ -462,7 +463,8 @@ public sealed partial class World
             return;
         }
         SetWait(t, "");
-        if (++t.Timer >= R.MaxLoadWaitTicks) Depart(t);
+        t.Timer += TimeScale;
+        if (t.Timer >= R.MaxLoadWaitTicks) Depart(t);
     }
 
     private void StepUnloading(Train t)
@@ -476,7 +478,7 @@ public sealed partial class World
             DirtyTrains.Add(t.Id);
             return;
         }
-        var budget = R.TransferUnitsPerTick;
+        var budget = R.TransferUnitsPerTick * TimeScale;
         var moved = false;
         foreach (var kv in t.Cargo.Items.ToList())
         {

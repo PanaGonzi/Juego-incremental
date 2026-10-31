@@ -7,7 +7,7 @@ namespace Pluton.Simulation;
 /// </summary>
 public static class WorldCodec
 {
-    public const int FormatVersion = 2;
+    public const int FormatVersion = 3;
 
     private static void WriteInv(BinaryWriter w, Inventory inv)
     {
@@ -314,9 +314,26 @@ public static class WorldCodec
             w.Write(kv.Key);
             w.Write7BitEncodedInt64(kv.Value);
         }
+        WriteSet(w, world.ActiveEvents);
+        WriteSet(w, world.EventsSeeded);
+        WriteSet(w, world.Cosmetics);
+        WriteSet(w, world.EquippedCosmetics);
     }
 
-    public static void ReadGlobal(BinaryReader r, World world)
+    private static void WriteSet(BinaryWriter w, SortedSet<string> set)
+    {
+        w.Write7BitEncodedInt(set.Count);
+        foreach (var s in set) w.Write(s);
+    }
+
+    private static void ReadSet(BinaryReader r, SortedSet<string> set)
+    {
+        set.Clear();
+        var n = r.Read7BitEncodedInt();
+        for (var i = 0; i < n; i++) set.Add(r.ReadString());
+    }
+
+    public static void ReadGlobal(BinaryReader r, World world, int version = FormatVersion)
     {
         world.Tick = r.Read7BitEncodedInt64();
         world.Credits = r.Read7BitEncodedInt64();
@@ -334,6 +351,13 @@ public static class WorldCodec
             var key = r.ReadString();
             world.Stats[key] = r.Read7BitEncodedInt64();
         }
+        if (version >= 3)
+        {
+            ReadSet(r, world.ActiveEvents);
+            ReadSet(r, world.EventsSeeded);
+            ReadSet(r, world.Cosmetics);
+            ReadSet(r, world.EquippedCosmetics);
+        }
     }
 
     public static byte[] Serialize(World world)
@@ -343,6 +367,7 @@ public static class WorldCodec
         w.Write(world.NextId);
         w.Write(world.NextPlayerNum);
         w.Write(world.OwnerKey);
+        w.Write(world.SavedUnix);
         WriteGlobal(w, world);
         w.Write7BitEncodedInt(world.Machines.Count);
         foreach (var m in world.Machines.Values) WriteMachine(w, m);
@@ -374,7 +399,8 @@ public static class WorldCodec
             NextPlayerNum = r.ReadInt32(),
             OwnerKey = r.ReadString(),
         };
-        ReadGlobal(r, world);
+        if (formatVersion >= 3) world.SavedUnix = r.ReadInt64();
+        ReadGlobal(r, world, formatVersion);
         var n = r.Read7BitEncodedInt();
         for (var i = 0; i < n; i++)
         {

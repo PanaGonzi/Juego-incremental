@@ -547,6 +547,21 @@ public partial class Hud : Control
             }
             Add(row);
         }
+        if (me.Role >= Role.Admin)
+        {
+            foreach (var e in w.Content.Events.Keys)
+            {
+                var id = e;
+                var active = w.ActiveEvents.Contains(id);
+                Add(Ui.Btn($"{Loc.T("event_" + id)}: {Loc.T(active ? "event_on" : "event_off")}", () => client.Send(new Command { Type = CommandType.SetEvent, Text = id, A = active ? 0 : 1 })));
+            }
+        }
+        foreach (var c in w.Cosmetics)
+        {
+            var id = c;
+            var worn = w.EquippedCosmetics.Contains(id);
+            Add(Ui.Btn($"{Loc.T("cosmetic_" + id)}: {Loc.T(worn ? "cosmetic_on" : "cosmetic_off")}", () => client.Send(new Command { Type = CommandType.SetCosmetic, Text = id, A = worn ? 0 : 1 })));
+        }
         Add(Ui.Btn(Loc.T("panel_close"), ClosePanel));
     }
 
@@ -571,11 +586,16 @@ public partial class Hud : Control
         left.AddChild(Ui.Text(Loc.T("tech_contracts"), 20, Ui.Ink));
         foreach (var c in w.Content.Contracts.Values)
         {
+            // Un contrato de evento solo se ofrece con el evento activo, salvo que ya esté cumplido.
+            if (c.Event != null && !w.ActiveEvents.Contains(c.Event) && !w.ContractsDone.Contains(c.Id)) continue;
             var done = w.ContractsDone.Contains(c.Id);
             var locked = c.Requires != null && !w.Upgrades.Contains(c.Requires);
             var id = c.Id;
             left.AddChild(Ui.Text($"{Loc.T("contract_" + c.Id)}  (+{c.Credits} ¤)", 17, done ? Ui.Dim : Ui.Ink));
             left.AddChild(Ui.Text(Ui.Amounts(c.Items), 15, Ui.Dim));
+            foreach (var (stat, qty) in c.NeedStats)
+                left.AddChild(Ui.Text($"{Loc.T("stat_" + stat)}: {Math.Min(qty, w.Stats.GetValueOrDefault(stat))}/{qty}", 15, w.Stats.GetValueOrDefault(stat) >= qty ? Ui.Good : Ui.Dim));
+            if (c.Event != null && !done) left.AddChild(Ui.Text(Loc.T("event_hint"), 14, Ui.Amber));
             var b = Ui.Btn(done ? Loc.T("tech_done") : locked ? Loc.T("tech_locked") : Loc.T("tech_deliver"),
                 () => client.Send(new Command { Type = CommandType.FulfillContract, Text = id }));
             b.Disabled = done || locked;

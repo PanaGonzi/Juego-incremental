@@ -52,6 +52,10 @@ public partial class GameView : Node3D
     }
 
     private readonly Dictionary<int, TrainNode> _trains = new();
+    private MeshInstance3D? _eventDecor;
+    private AudioStreamPlayer3D? _eventAmbience;
+    private OmniLight3D? _eventLight;
+    public bool EventDecorVisible => _eventDecor != null;
     private int _railStartX, _railStartZ;
     private bool _railPlacing;
     private byte _railShape;
@@ -676,6 +680,8 @@ public partial class GameView : Node3D
             _trains.Remove(id);
         }
 
+        UpdateEvent(w);
+
         if (w.ObjectiveIndex != _objectiveSeen)
         {
             _objectiveSeen = w.ObjectiveIndex;
@@ -683,6 +689,40 @@ public partial class GameView : Node3D
         }
         if (w.Credits > _lastCredits + 5) Sfx.Play("sell");
         _lastCredits = w.Credits;
+    }
+
+    private void UpdateEvent(World w)
+    {
+        var show = w.ActiveEvents.Contains("halloween") && _viewPlanet == 0;
+        if (show && _eventDecor == null)
+        {
+            var decor = w.Content.Events["halloween"].Decor;
+            var at = new Vector3(decor.X * Cell, 0, decor.Z * Cell);
+            _eventDecor = new MeshInstance3D { Mesh = Models.HalloweenDecor(), Position = at };
+            AddChild(_eventDecor);
+            _eventLight = new OmniLight3D { LightColor = new Color(0.35f, 1f, 0.65f), LightEnergy = 1.6f * _main.Prefs.EventAmbience, OmniRange = 42, Position = at + Vector3.Up * 6 };
+            AddChild(_eventLight);
+            _eventAmbience = new AudioStreamPlayer3D { Stream = Sfx.Ghost, MaxDistance = 75, UnitSize = 10, Position = at + Vector3.Up, VolumeDb = Mathf.LinearToDb(Mathf.Max(0.001f, Sfx.MasterLinear * _main.Prefs.EventAmbience)) };
+            AddChild(_eventAmbience);
+            if (_main.Prefs.EventAmbience > 0.01f) _eventAmbience.Play();
+        }
+        else if (!show && _eventDecor != null)
+        {
+            _eventDecor.QueueFree();
+            _eventDecor = null;
+            _eventLight?.QueueFree();
+            _eventLight = null;
+            _eventAmbience?.QueueFree();
+            _eventAmbience = null;
+        }
+        // Las recompensas son del mundo y permanecen aunque el evento se desactive.
+        var spectral = w.EquippedCosmetics.Contains("spectral_train");
+        foreach (var t in _trains.Values)
+        {
+            var material = spectral ? Models.Mat("spectral") : null;
+            foreach (var child in t.Loco.GetChildren().Concat(t.Wagon.GetChildren()))
+                if (child is MeshInstance3D mesh && mesh != t.Cargo) mesh.MaterialOverride = material;
+        }
     }
 
     private static Vector3 RailPoint(RailNode a, RailNode b, byte shape, double t)
@@ -999,6 +1039,13 @@ public partial class GameView : Node3D
 
     private void ApplyPrefs()
     {
+        if (_eventLight != null) _eventLight.LightEnergy = 1.6f * _main.Prefs.EventAmbience;
+        if (_eventAmbience != null)
+        {
+            _eventAmbience.VolumeDb = Mathf.LinearToDb(Mathf.Max(0.001f, Sfx.MasterLinear * _main.Prefs.EventAmbience));
+            if (_main.Prefs.EventAmbience <= 0.01f) _eventAmbience.Stop();
+            else if (!_eventAmbience.Playing) _eventAmbience.Play();
+        }
         _camera.Fov = _main.Prefs.Fov;
         _sun.ShadowEnabled = _main.Prefs.Shadows;
         _env.Environment.GlowEnabled = _main.Prefs.Glow;

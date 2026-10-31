@@ -335,6 +335,151 @@ public class SimulationTests
     }
 }
 
+public class EventTests
+{
+    private static Command Deliver => new() { Type = CommandType.FulfillContract, Text = "c_shadow_express" };
+
+    [Fact]
+    public void Activating_works_without_date_and_contract_is_locked_when_off()
+    {
+        var (w, p) = Fixture.NewWorld();
+        var depot = Fixture.Find(w, "depot");
+        depot.In.Add("ingot", 100);
+        Assert.Equal("err_locked", w.Apply(p, Deliver).Error);
+        p.Role = Role.Admin;
+        Assert.True(w.Apply(p, new Command { Type = CommandType.SetEvent, Text = "halloween", A = 1 }).Ok);
+        Assert.Equal("err_need_stats", w.Apply(p, Deliver).Error);
+        Assert.Equal(100, depot.In.Get("ingot"));
+    }
+
+    [Fact]
+    public void Only_admins_control_events()
+    {
+        var (w, p) = Fixture.NewWorld();
+        Assert.Equal("err_permission", w.Apply(p, new Command { Type = CommandType.SetEvent, Text = "halloween", A = 1 }).Error);
+        Assert.Empty(w.ActiveEvents);
+    }
+
+    [Fact]
+    public void Reward_is_paid_once_and_survives_disabling_save_and_reactivation()
+    {
+        var (w, p) = Fixture.NewWorld();
+        p.Role = Role.Owner;
+        var depot = Fixture.Find(w, "depot");
+        depot.In.Add("ingot", 100);
+        w.SetEvent("halloween", true);
+        var debrisAfterFirst = w.DebrisById.Count;
+        w.Stats["cleared.shadow_scrap"] = 8;
+        w.Stats["train_delivered"] = 120;
+        var credits = w.Credits;
+        Assert.True(w.Apply(p, Deliver).Ok);
+        Assert.Equal("err_done", w.Apply(p, Deliver).Error);
+        Assert.Equal(credits + 400, w.Credits);
+        Assert.Contains("spectral_train", w.Cosmetics);
+
+        w.SetEvent("halloween", false);
+        var loaded = WorldCodec.Deserialize(Fixture.Content, WorldCodec.Serialize(w));
+        Assert.Contains("spectral_train", loaded.Cosmetics);
+        loaded.SetEvent("halloween", true);
+        Assert.Equal(debrisAfterFirst, loaded.DebrisById.Count);
+        Assert.Equal("err_done", loaded.Apply(loaded.Players[p.Key], Deliver).Error);
+    }
+
+    [Theory]
+    [InlineData(10, 31, true)]
+    [InlineData(11, 5, true)]
+    [InlineData(11, 6, false)]
+    [InlineData(10, 19, false)]
+    public void Season_comes_from_data(int month, int day, bool expected)
+    {
+        Assert.Equal(expected, Fixture.Content.Events["halloween"].InSeason(new DateTime(2027, month, day)));
+    }
+}
+
+public class OfflineTests
+{
+    private static World Factory()
+    {
+        var (w, p) = Fixture.NewWorld();
+        var recycler = Fixture.Find(w, "recycler");
+        var terminal = Fixture.Find(w, "export_terminal");
+        recycler.In.Add("scrap", 20);
+        terminal.In.Add("ingot", 200);
+        terminal.AutoSell = true;
+        terminal.Reserves["ingot"] = 50;
+        w.SavedUnix = 1_000_000;
+        return w;
+    }
+
+    [Fact]
+    public void Applies_once_respecting_recipes_reserves_and_cap()
+    {
+        var w = Factory();
+        var terminal = Fixture.Find(w, "export_terminal");
+        var report = OfflineProgress.Apply(w, 1_000_000 + 3600 * 100);
+        Assert.NotNull(report);
+        Assert.Equal(8 * 3600, report!.SecondsApplied);
+        Assert.Equal(50, terminal.In.Get("ingot"));
+        var recycler = Fixture.Find(w, "recycler");
+        // 20 de chatarra dan como máximo 10: nunca recursos imposibles, y la salida respeta su límite.
+        Assert.True(recycler.Out.Get("recovered") <= 10);
+        Assert.Equal(20, w.CountEverywhere("scrap") + w.CountEverywhere("recovered") * 2);
+        Assert.Equal(150 * w.SellPrice("ingot"), report.CreditsEarned);
+
+        var credits = w.Credits;
+        Assert.Null(OfflineProgress.Apply(w, 1_000_000 + 3600 * 100));
+        Assert.Equal(credits, w.Credits);
+    }
+
+    [Fact]
+    public void Clock_moved_backwards_gives_nothing_and_does_not_rearm()
+    {
+        var w = Factory();
+        var credits = w.Credits;
+        Assert.Null(OfflineProgress.Apply(w, 999_000));
+        Assert.Equal(credits, w.Credits);
+        Assert.Equal(1_000_000, w.SavedUnix);
+    }
+
+    [Fact]
+    public void Repeated_short_restarts_do_not_exceed_real_elapsed_time()
+    {
+        var a = Factory();
+        var b = Factory();
+        OfflineProgress.Apply(a, 1_000_000 + 7200);
+        for (var i = 1; i <= 12; i++) OfflineProgress.Apply(b, 1_000_000 + 600 * i);
+        Assert.Equal(a.Credits, b.Credits);
+    }
+
+    [Fact]
+    public void Result_never_beats_real_time_simulation()
+    {
+        // Línea con energía y enlaces: lo aproximado debe quedar por debajo o igual.
+        World Build()
+        {
+            var (w, p) = Fixture.NewWorld();
+            var node = w.Nodes.Values.First(n => n.Item == "ore");
+            node.Revealed = true;
+            foreach (var d in w.DebrisById.Values.Where(d => d.CoversNode == node.Id).ToList()) w.DebrisById.Remove(d.Id);
+            var ex = new Machine { Id = w.NextId++, Def = "ore_extractor", Planet = 0, X = node.X, Z = node.Z, NodeId = node.Id };
+            w.Machines[ex.Id] = ex;
+            var sm = new Machine { Id = w.NextId++, Def = "smelter", Planet = 0, X = node.X - 3, Z = node.Z };
+            w.Machines[sm.Id] = sm;
+            w.Links[w.NextId] = new Link { Id = w.NextId++, From = ex.Id, To = sm.Id, Planet = 0 };
+            var depot = Fixture.Find(w, "depot");
+            w.Reindex();
+            w.SavedUnix = 1_000_000;
+            return w;
+        }
+        var real = Build();
+        for (var i = 0; i < 36000; i++) real.Step();
+        var approx = Build();
+        OfflineProgress.Apply(approx, 1_000_000 + 3600);
+        Assert.True(approx.Stats.GetValueOrDefault("produced.ingot") <= real.Stats.GetValueOrDefault("produced.ingot"));
+        Assert.True(approx.Stats.GetValueOrDefault("produced.ingot") > 0);
+    }
+}
+
 public class ScenarioTests
 {
     [Theory]
@@ -759,7 +904,12 @@ public class SaveTests : IDisposable
             bw.Write(w.NextId);
             bw.Write(w.NextPlayerNum);
             bw.Write(w.OwnerKey);
-            WorldCodec.WriteGlobal(bw, w);
+            bw.Write7BitEncodedInt64(w.Tick);
+            bw.Write7BitEncodedInt64(w.Credits);
+            bw.Write7BitEncodedInt(w.ObjectiveIndex);
+            bw.Write7BitEncodedInt(0);
+            bw.Write7BitEncodedInt(0);
+            bw.Write7BitEncodedInt(0);
             bw.Write7BitEncodedInt(w.Machines.Count);
             foreach (var m in w.Machines.Values)
             {
@@ -781,7 +931,12 @@ public class SaveTests : IDisposable
                 bw.Write(n.Id); bw.Write(n.Item); bw.Write7BitEncodedInt(n.Planet); bw.Write(n.X); bw.Write(n.Z); bw.Write(n.Revealed);
             }
             bw.Write7BitEncodedInt(w.Players.Count);
-            foreach (var pl in w.Players.Values) WorldCodec.WritePlayer(bw, pl);
+            foreach (var pl in w.Players.Values)
+            {
+                bw.Write(pl.Key); bw.Write(pl.Name); bw.Write((byte)pl.Role); bw.Write7BitEncodedInt(pl.Planet); bw.Write7BitEncodedInt(pl.Num);
+                bw.Write(pl.Connected); bw.Write(pl.X); bw.Write(pl.Y); bw.Write(pl.Z); bw.Write(pl.Yaw);
+                bw.Write7BitEncodedInt(0);
+            }
         }
         var encoded = SaveStore.Encode(ms.ToArray(), "antiguo", w.Tick, DateTime.UtcNow);
         BitConverter.GetBytes(1).CopyTo(encoded, 4);
@@ -818,6 +973,21 @@ public class SaveTests : IDisposable
         store.Save("real", world);
         Assert.Equal(WorldCodec.FormatVersion, BitConverter.ToInt32(File.ReadAllBytes(store.PathOf("real")), 4));
         Assert.Equal(WorldCodec.Hash(world), WorldCodec.Hash(store.Load("real", Fixture.Content)));
+    }
+
+    [Fact]
+    public void Real_save_from_alpha_0_2_0_keeps_rails_and_trains()
+    {
+        var store = new SaveStore("test", _root);
+        var original = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixtures", "save-v2-alpha-0.2.0-rail.plsave"));
+        Assert.Equal(2, BitConverter.ToInt32(original, 4));
+        store.Write("real2", original);
+        var world = store.Load("real2", Fixture.Content);
+        Assert.Single(world.Trains);
+        Assert.True(world.RailSegments.Count >= 5);
+        Assert.True(File.Exists(store.PathOf("real2") + ".v2.bak"));
+        for (var i = 0; i < 600; i++) world.Step();
+        Assert.Equal(WorldCodec.Hash(world), WorldCodec.Hash(WorldCodec.Deserialize(Fixture.Content, WorldCodec.Serialize(world))));
     }
 
     [Fact]

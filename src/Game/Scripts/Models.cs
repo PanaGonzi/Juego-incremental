@@ -16,6 +16,15 @@ public static class Models
             case "hull": Pbr(m, new Color(0.25f, 0.29f, 0.35f), 0.65f, 0.5f); break;
             case "panel": Pbr(m, new Color(0.42f, 0.47f, 0.53f), 0.45f, 0.55f); break;
             case "dark": Pbr(m, new Color(0.07f, 0.08f, 0.1f), 0.5f, 0.7f); break;
+            case "pumpkin": Pbr(m, new Color(0.95f, 0.42f, 0.08f), 0f, 0.6f); m.EmissionEnabled = true; m.Emission = new Color(0.9f, 0.3f, 0.03f); m.EmissionEnergyMultiplier = 0.25f; break;
+            case "stem": Pbr(m, new Color(0.2f, 0.32f, 0.12f), 0f, 0.8f); break;
+            case "spectral":
+                m.AlbedoColor = new Color(0.45f, 1f, 0.75f, 0.45f);
+                m.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+                m.EmissionEnabled = true;
+                m.Emission = new Color(0.2f, 0.95f, 0.6f);
+                m.EmissionEnergyMultiplier = 1.4f;
+                break;
             case "rock": Pbr(m, new Color(0.2f, 0.17f, 0.16f), 0f, 0.95f); break;
             case "redrock": Pbr(m, new Color(0.42f, 0.19f, 0.11f), 0f, 0.92f); break;
             case "rust": Pbr(m, new Color(0.33f, 0.2f, 0.13f), 0.55f, 0.85f); break;
@@ -354,6 +363,12 @@ public static class Models
                 b.Box(i % 3 == 0 ? "rustlight" : "rust", R(-0.7f, 0.7f), R(0.15f, 0.7f), R(-0.7f, 0.7f), R(0.3f, 1.1f), R(0.08f, 0.5f), R(0.2f, 0.9f), R(0, 180), R(-35, 35), R(-35, 35));
             b.Cyl("hull", R(-0.4f, 0.4f), 0.5f, R(-0.4f, 0.4f), 0.1f, 1.5f, R(50, 85), R(-30, 30), sides: 6);
         }
+        else if (def == "shadow_scrap")
+        {
+            for (var i = 0; i < 6; i++)
+                b.Box(i % 2 == 0 ? "dark" : "rust", R(-0.7f, 0.7f), R(0.15f, 0.7f), R(-0.7f, 0.7f), R(0.3f, 1.1f), R(0.08f, 0.5f), R(0.2f, 0.9f), R(0, 180), R(-35, 35), R(-35, 35));
+            b.Ball("spectral", R(-0.3f, 0.3f), 0.6f, R(-0.3f, 0.3f), 0.22f, 8, 5);
+        }
         else if (def == "red_rock")
         {
             for (var i = 0; i < 4; i++)
@@ -546,6 +561,44 @@ public static class Models
         return mesh;
     }
 
+    /// <summary>Decoración del evento: calabazas talladas y faroles. Sin colisión ni efecto en la economía.</summary>
+    public static ArrayMesh HalloweenDecor()
+    {
+        const string key = "halloween";
+        if (DebrisCache.TryGetValue(key, out var mesh)) return mesh;
+        var rng = new RandomNumberGenerator { Seed = 1031 };
+        var b = new Builder();
+        for (var i = 0; i < 26; i++)
+        {
+            var a = rng.RandfRange(0, Mathf.Tau);
+            var r = rng.RandfRange(8, 34);
+            var x = Mathf.Cos(a) * r;
+            var z = Mathf.Sin(a) * r;
+            var s = rng.RandfRange(0.35f, 0.7f);
+            b.Ball("pumpkin", x, s * 0.75f, z, s, 12, 6, 0.8f);
+            b.Cyl("stem", x, s * 1.35f, z, 0.06f, 0.22f);
+            // Cara orientada hacia el centro del ramal
+            var ox = -Mathf.Cos(a) * s;
+            var oz = -Mathf.Sin(a) * s;
+            var yaw = Mathf.RadToDeg(Mathf.Atan2(ox, oz));
+            b.Box("amber", x + ox * 0.95f + oz * 0.3f, s * 0.95f, z + oz * 0.95f - ox * 0.3f, s * 0.2f, s * 0.2f, 0.04f, yaw);
+            b.Box("amber", x + ox * 0.95f - oz * 0.3f, s * 0.95f, z + oz * 0.95f + ox * 0.3f, s * 0.2f, s * 0.2f, 0.04f, yaw);
+            b.Box("amber", x + ox * 0.97f, s * 0.6f, z + oz * 0.97f, s * 0.6f, s * 0.12f, 0.04f, yaw);
+        }
+        for (var i = 0; i < 12; i++)
+        {
+            var a = i * Mathf.Tau / 12;
+            var x = Mathf.Cos(a) * 30;
+            var z = Mathf.Sin(a) * 30;
+            b.Cyl("dark", x, 1.5f, z, 0.08f, 3f);
+            b.Box("dark", x, 3f, z, 0.9f, 0.08f, 0.08f);
+            b.Ball("spectral", x + 0.4f, 2.75f, z, 0.17f, 8, 5);
+        }
+        mesh = b.Commit();
+        DebrisCache[key] = mesh;
+        return mesh;
+    }
+
     public static ArrayMesh Astronaut()
     {
         const string key = "astronaut";
@@ -587,6 +640,7 @@ public static class Sfx
         Streams["sell"] = Make(0.4f, t => (Mathf.Sin(t * 5200) * 0.3f + Mathf.Sin(t * (t < 0.12f ? 4400 : 6600)) * 0.35f) * Fade(t, 0.4f));
         Streams["error"] = Make(0.16f, t => Mathf.Sign(Mathf.Sin(t * 950)) * 0.2f * Fade(t, 0.16f));
         Streams["objective"] = Make(0.55f, t => (Mathf.Sin(t * 3300) + Mathf.Sin(t * (t < 0.18f ? 3300 : t < 0.36f ? 4150 : 4950))) * 0.25f * Fade(t, 0.55f));
+        Streams["ghost"] = MakeLoop(4f, t => (Mathf.Sin(t * Mathf.Tau * 110 + Mathf.Sin(t * Mathf.Tau * 0.5f) * 3f) * 0.16f + Mathf.Sin(t * Mathf.Tau * 165.5f) * 0.09f) * (0.6f + 0.4f * Mathf.Sin(t * Mathf.Tau * 0.25f)));
         Streams["hum"] = MakeLoop(1f, t => Mathf.Sin(t * Mathf.Tau * 60) * 0.3f + Mathf.Sin(t * Mathf.Tau * 180) * 0.1f + Mathf.Sin(t * Mathf.Tau * 2) * Mathf.Sin(t * Mathf.Tau * 240) * 0.08f);
     }
 
@@ -616,6 +670,8 @@ public static class Sfx
     }
 
     public static AudioStream Hum => Streams["hum"];
+    public static AudioStream Ghost => Streams["ghost"];
+    public static float MasterLinear => _prefs.MasterVolume;
     public static float MachineDb => Mathf.LinearToDb(Mathf.Max(0.001f, _prefs.MasterVolume * _prefs.MachineVolume));
 
     public static void Play(string name, float pitchVariation = 0f)

@@ -31,6 +31,7 @@
   "debris": {
     "scrap_pile":  { "hp": 6,  "drop": "scrap", "perHit": 1, "final": 4, "credits": 2, "cells": 1 },
     "ice_block":   { "hp": 6,  "drop": "ice",   "perHit": 1, "final": 3, "credits": 1, "cells": 1 },
+    "shadow_scrap": { "hp": 6, "drop": "scrap", "perHit": 1, "final": 5, "credits": 3, "cells": 1 },
     "red_rock":    { "hp": 8,  "drop": "scrap", "perHit": 1, "final": 3, "credits": 1, "cells": 1 },
     "ice_crust":   { "hp": 10, "drop": "ice",   "perHit": 1, "final": 2, "credits": 3, "cells": 1 }
   }

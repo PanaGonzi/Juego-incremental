@@ -221,6 +221,7 @@ public static class SettingsForm
             prefs.UiScale = v;
             ((SceneTree)Engine.GetMainLoop()).Root.ContentScaleFactor = v;
         });
+        Slider("settings_event_ambience", 0, 1, 0.05f, prefs.EventAmbience, v => prefs.EventAmbience = v);
         Toggle("settings_fullscreen", prefs.Fullscreen, v => { prefs.Fullscreen = v; prefs.ApplyDisplay(); });
         Toggle("settings_bob", prefs.CameraBob, v => prefs.CameraBob = v);
         Toggle("settings_shadows", prefs.Shadows, v => prefs.Shadows = v);
