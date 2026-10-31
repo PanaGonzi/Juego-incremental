@@ -22,6 +22,7 @@ public partial class AutoTest : Node
     private int _failures;
     private ulong _lastUsec;
     private bool _skipFrame;
+    private long _offlineCredits;
     private readonly List<string> _spikes = new();
 
     public AutoTest(Main main, Dictionary<string, string> args)
@@ -186,6 +187,20 @@ public partial class AutoTest : Node
                 world.EventsSeeded.Remove("halloween");
                 _main.StartSession(GameSession.Local(_main, world, "autotest-halloween", null, _main.Prefs));
             }
+            else if (_args.GetValueOrDefault("scenario") == "offline")
+            {
+                // Mundo con una ausencia simulada en sus datos, cargado por la ruta normal del juego.
+                var world = World.CreateNew(_main.Content);
+                var terminal = world.Machines.Values.First(m => m.Def == "export_terminal");
+                terminal.In.Add("ingot", 200);
+                terminal.AutoSell = true;
+                _offlineCredits = world.Credits;
+                _main.Store.Save("autotest-offline", world);
+                var bytes = WorldCodec.Serialize(world);
+                world.SavedUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 3 * 3600;
+                _main.Store.Write("autotest-offline", Pluton.Persistence.SaveStore.Encode(WorldCodec.Serialize(world), world.Content.Revision, world.Tick, DateTime.UtcNow));
+                _main.StartSolo("autotest-offline", false);
+            }
             else if (_args.GetValueOrDefault("scenario") == "mars")
             {
                 var world = World.CreateNew(_main.Content);
@@ -229,6 +244,12 @@ public partial class AutoTest : Node
             else if (_args.GetValueOrDefault("scenario") == "travel") await TravelScenario();
             else if (_args.GetValueOrDefault("scenario") == "halloween") await HalloweenScenario();
             else if (_args.GetValueOrDefault("scenario") == "mars") await MarsScenario();
+            else if (_args.GetValueOrDefault("scenario") == "offline")
+            {
+                await Wait(1);
+                Check(W.Credits > _offlineCredits, $"progreso de ausencia aplicado: {_offlineCredits} → {W.Credits}");
+                await Shot("offline_aviso");
+            }
             else if (_args.ContainsKey("join") || _args.ContainsKey("host")) await JoinedScenario();
             else await FullLoop();
         }
@@ -250,6 +271,7 @@ public partial class AutoTest : Node
         await CutDebris(target);
         Check(!W.DebrisById.ContainsKey(target.Id), "cliente remoto limpia un escombro validado por el servidor");
         Check(W.Credits > creditsBefore, "créditos compartidos actualizados");
+        if (_args.ContainsKey("host")) await PlayersPanelCheck();
         var remote = await Until(() => _view!.FirstRemotePlayer != null, 15);
         Check(remote, "posición de otro jugador recibida e interpolada");
         if (_view!.FirstRemotePlayer is { } other)
@@ -519,6 +541,26 @@ public partial class AutoTest : Node
         }
         Check(v.Session.Client.HashMismatches == 0, $"sin divergencias ({v.Session.Client.HashChecks} comprobaciones)");
         _frames.Clear();
+    }
+
+    /// <summary>Panel de jugadores en cooperativo real: un anfitrión cambia el rol de un invitado desde la interfaz.</summary>
+    private async Task PlayersPanelCheck()
+    {
+        var v = _view!;
+        var client = v.Session.Client;
+        Key(Godot.Key.P);
+        await Wait(0.3);
+        Check(v.PanelIsOpen, "P abre el panel de jugadores");
+        await Shot("players_panel");
+        Key(Godot.Key.Escape);
+        await Wait(0.2);
+        var guest = W.Players.Values.FirstOrDefault(p => p.Key != Me.Key && p.Connected);
+        if (guest == null) return;
+        client.Send(new Command { Type = CommandType.SetRole, Text = guest.Key, A = (int)Role.Visitor });
+        Check(await Until(() => W.Players[guest.Key].Role == Role.Visitor, 3), "el anfitrión limita a un invitado a mirar");
+        await Wait(0.5);
+        client.Send(new Command { Type = CommandType.SetRole, Text = guest.Key, A = (int)Role.Builder });
+        Check(await Until(() => W.Players[guest.Key].Role == Role.Builder, 3), "y le devuelve el permiso");
     }
 
     /// <summary>Marte con las herramientas: yacimiento, calor visible, radiador y carga real desde Plutón.</summary>
