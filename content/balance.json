@@ -16,6 +16,7 @@
   "sellUnitsPerInterval": 4,
   "offlineCapHours": 8,
   "travelTicks": 200,
+  "cargo": { "intervalTicks": 300, "travelTicks": 300, "unitsPerShipment": 200 },
   "shuttleRangeMm": 12000,
   "rail": {
     "creditsPerCell": 2,

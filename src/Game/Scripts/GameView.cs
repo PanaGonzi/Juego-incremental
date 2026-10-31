@@ -1244,11 +1244,11 @@ public partial class GameView : Node3D
         var t = (float)_time;
         foreach (var node in _machines.Values)
         {
-            var running = node.Status is MachineStatus.Working or MachineStatus.LowPower or MachineStatus.Generating or MachineStatus.Storing;
+            var running = node.Status is MachineStatus.Working or MachineStatus.LowPower or MachineStatus.Overheated or MachineStatus.Generating or MachineStatus.Storing;
             if (node.Rotor != null && running) node.Rotor.RotateY(delta * 2.6f);
             if (node.Piston != null)
             {
-                var offset = node.Status is MachineStatus.Working or MachineStatus.LowPower ? (Mathf.Sin(t * 3.2f + node.Phase) + 1f) * 0.3f : 0.6f;
+                var offset = node.Status is MachineStatus.Working or MachineStatus.LowPower or MachineStatus.Overheated ? (Mathf.Sin(t * 3.2f + node.Phase) + 1f) * 0.3f : 0.6f;
                 node.Piston.Position = node.PistonRest + new Vector3(0, offset - 0.3f, 0);
             }
         }
@@ -1278,7 +1278,7 @@ public partial class GameView : Node3D
         _humTimer = 0.5;
         var pos = _body.GlobalPosition;
         var nearest = _machines.Values
-            .Where(n => n.Status is MachineStatus.Working or MachineStatus.LowPower)
+            .Where(n => n.Status is MachineStatus.Working or MachineStatus.LowPower or MachineStatus.Overheated)
             .OrderBy(n => n.Root.GlobalPosition.DistanceSquaredTo(pos))
             .Take(_hums.Count)
             .ToList();
@@ -1494,7 +1494,7 @@ public partial class GameView : Node3D
         if (_aim.kind == "machine" && w.Machines.TryGetValue(_aim.id, out var aimed))
         {
             status = $"{Loc.T("machine_" + aimed.Def)} — {Loc.T("status_" + aimed.Status)}";
-            statusColor = aimed.Status is MachineStatus.NoInput or MachineStatus.OutputFull or MachineStatus.NoPower or MachineStatus.LowPower ? Ui.Bad : Ui.Good;
+            statusColor = aimed.Status is MachineStatus.NoInput or MachineStatus.OutputFull or MachineStatus.NoPower or MachineStatus.LowPower or MachineStatus.Overheated ? Ui.Bad : Ui.Good;
             prompt = Loc.T("prompt_interact");
         }
         else if (_aim.kind == "debris" && w.DebrisById.TryGetValue(_aim.id, out var aimedDebris))

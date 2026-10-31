@@ -5,5 +5,9 @@
   { "id": "smelt_ingot",   "ticks": 40,  "inputs": { "ore": 2 },                   "outputs": { "ingot": 1 } },
   { "id": "make_parts",    "ticks": 50,  "inputs": { "ingot": 2 },                 "outputs": { "parts": 1 } },
   { "id": "make_coolant",  "ticks": 40,  "inputs": { "ice": 2 },                   "outputs": { "coolant": 1 } },
-  { "id": "make_cryo",     "ticks": 100, "inputs": { "parts": 2, "coolant": 2 },   "outputs": { "cryo_module": 1 } }
+  { "id": "make_cryo",     "ticks": 100, "inputs": { "parts": 2, "coolant": 2 },   "outputs": { "cryo_module": 1 } },
+  { "id": "extract_silicon", "ticks": 20, "inputs": {},                            "outputs": { "silicon_ore": 1 } },
+  { "id": "refine_wafer",  "ticks": 50,  "inputs": { "silicon_ore": 2 },           "outputs": { "wafer": 1 } },
+  { "id": "make_nav_core", "ticks": 150, "inputs": { "wafer": 3, "cryo_module": 1 }, "outputs": { "nav_core": 1 } },
+  { "id": "burn_coolant",  "ticks": 100, "inputs": { "coolant": 1 },               "outputs": {} }
 ]

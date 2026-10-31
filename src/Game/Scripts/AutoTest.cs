@@ -602,7 +602,7 @@ public partial class AutoTest : Node
             _measuring = true;
             v.Session.Client.Send(new Command { Type = CommandType.Travel, A = to });
             Check(await Until(() => v.InFlight, 3), $"tramo {leg}: despega {from}→{to}");
-            if (leg < 2)
+            if (leg < 2 && !_args.ContainsKey("no-shots"))
             {
                 v.AimAt(c + new Vector3(0, 1000, -900));
                 await Until(() => v.FlightProgress > 0.15, 10);
@@ -623,7 +623,7 @@ public partial class AutoTest : Node
             await Wait(0.5);
             Check(v.PlayerPosition.Y > -0.1f && v.PlayerPosition.Y < 4f, $"tramo {leg}: en el suelo, y={v.PlayerPosition.Y:F2}");
             Log($"tramo {leg}: {stats}; memoria {memBefore} → {WorkingSetMb()} MB, vídeo {RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.VideoMemUsed) / 1048576} MB");
-            if (leg < 2) await Shot($"travel_l{leg}_e_llegada");
+            if (leg < 2 && !_args.ContainsKey("no-shots")) await Shot($"travel_l{leg}_e_llegada");
         }
         var produced = v.Session.Runner!.Server.World.Stats.GetValueOrDefault("produced.recovered") - scrapWas;
         Check(produced > 0, $"Plutón siguió produciendo con el jugador fuera: {produced}");

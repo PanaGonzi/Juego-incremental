@@ -7,7 +7,7 @@ namespace Pluton.Simulation;
 /// </summary>
 public static class WorldCodec
 {
-    public const int FormatVersion = 3;
+    public const int FormatVersion = 4;
 
     private static void WriteInv(BinaryWriter w, Inventory inv)
     {
@@ -158,6 +158,30 @@ public static class WorldCodec
         };
         if (version >= 2) n.YieldPermille = r.Read7BitEncodedInt();
         return n;
+    }
+
+    public static void WriteShipments(BinaryWriter w, World world)
+    {
+        w.Write7BitEncodedInt(world.Shipments.Count);
+        foreach (var s in world.Shipments.Values)
+        {
+            w.Write(s.Id);
+            w.Write7BitEncodedInt(s.ToPlanet);
+            w.Write7BitEncodedInt64(s.ArriveTick);
+            WriteInv(w, s.Cargo);
+        }
+    }
+
+    public static void ReadShipments(BinaryReader r, World world)
+    {
+        world.Shipments.Clear();
+        var n = r.Read7BitEncodedInt();
+        for (var i = 0; i < n; i++)
+        {
+            var s = new Shipment { Id = r.ReadInt32(), ToPlanet = r.Read7BitEncodedInt(), ArriveTick = r.Read7BitEncodedInt64() };
+            ReadInv(r, s.Cargo);
+            world.Shipments[s.Id] = s;
+        }
     }
 
     public static void WriteRailNode(BinaryWriter w, RailNode n)
@@ -385,6 +409,7 @@ public static class WorldCodec
         foreach (var s in world.RailSegments.Values) WriteRailSegment(w, s);
         w.Write7BitEncodedInt(world.Trains.Count);
         foreach (var t in world.Trains.Values) WriteTrain(w, t);
+        WriteShipments(w, world);
         w.Flush();
         return ms.ToArray();
     }
@@ -459,6 +484,12 @@ public static class WorldCodec
         {
             MigrateFromV1(world);
         }
+        if (formatVersion >= 4) ReadShipments(r, world);
+        else
+        {
+            // v4 añade los yacimientos de Marte y sus objetivos al final, sin desplazar el progreso.
+            foreach (var planet in content.Planets) world.EnsureNodes(planet);
+        }
         world.Reindex();
         return world;
     }
@@ -502,6 +533,7 @@ public static class WorldCodec
         foreach (var n in world.RailNodes.Values) WriteRailNode(w, n);
         foreach (var s in world.RailSegments.Values) WriteRailSegment(w, s);
         foreach (var t in world.Trains.Values) WriteTrain(w, t, forHash: true);
+        WriteShipments(w, world);
         w.Flush();
         return ms.ToArray();
     }

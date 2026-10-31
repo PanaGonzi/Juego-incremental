@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 
 namespace Pluton.Simulation;
 
-public enum MachineKind { Production, Generator, Storage, Terminal, Station, Shuttle }
+public enum MachineKind { Production, Generator, Storage, Terminal, Station, Shuttle, Radiator, CargoPad }
 
 public sealed class ItemDef
 {
@@ -29,6 +29,8 @@ public sealed class MachineDef
     public int D { get; set; } = 1;
     public int Power { get; set; }
     public int PowerGen { get; set; }
+    public int Heat { get; set; }
+    public int Cooling { get; set; }
     public long Capacity { get; set; }
     public long Credits { get; set; }
     public Dictionary<string, long> Cost { get; set; } = new();
@@ -137,6 +139,7 @@ public sealed class PlanetDef
     public int HalfSizeCells { get; set; }
     public long StartCredits { get; set; }
     public CellDef Spawn { get; set; } = new();
+    public bool Thermal { get; set; }
     public List<BuiltinDef> Builtins { get; set; } = new();
     public List<NodeDef> Nodes { get; set; } = new();
     public List<DebrisFieldDef> DebrisFields { get; set; } = new();
@@ -150,6 +153,13 @@ public sealed class DebrisDef
     public long Final { get; set; }
     public long Credits { get; set; }
     public int Cells { get; set; } = 1;
+}
+
+public sealed class CargoDef
+{
+    public int IntervalTicks { get; set; }
+    public int TravelTicks { get; set; }
+    public long UnitsPerShipment { get; set; }
 }
 
 public sealed class RailDef
@@ -168,6 +178,7 @@ public sealed class RailDef
 public sealed class BalanceDef
 {
     public RailDef Rail { get; set; } = new();
+    public CargoDef Cargo { get; set; } = new();
     public int CellSizeMm { get; set; } = 2000;
     public int TicksPerSecond { get; set; } = 10;
     public long MaxCredits { get; set; }

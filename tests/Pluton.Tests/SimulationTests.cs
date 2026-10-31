@@ -531,6 +531,104 @@ public class ScenarioTests
     }
 }
 
+public class MarsTests
+{
+    private static (World w, PlayerState p, Machine pad0, Machine pad1) Pads()
+    {
+        var (w, p) = Fixture.NewWorld("player-a", 40, 40);
+        w.Upgrades.Add("tech_shuttle");
+        w.Reindex();
+        var pad0 = new Machine { Id = w.NextId++, Def = "cargo_pad", Planet = 0, X = 20, Z = 30 };
+        var pad1 = new Machine { Id = w.NextId++, Def = "cargo_pad", Planet = 1, X = 20, Z = 20, StationUnload = true };
+        w.Machines[pad0.Id] = pad0;
+        w.Machines[pad1.Id] = pad1;
+        w.Reindex();
+        return (w, p, pad0, pad1);
+    }
+
+    [Fact]
+    public void Cargo_is_never_in_two_places_and_arrives_once()
+    {
+        var (w, _, a, b) = Pads();
+        a.In.Add("cryo_module", 500);
+        var maxInFlight = 0L;
+        for (var i = 0; i < 2000 && b.In.Get("cryo_module") < 500; i++)
+        {
+            w.Step();
+            Assert.Equal(500, w.CountEverywhere("cryo_module"));
+            maxInFlight = Math.Max(maxInFlight, w.Shipments.Values.Sum(s => s.Cargo.Total));
+        }
+        Assert.Equal(500, b.In.Get("cryo_module"));
+        Assert.Equal(0, a.In.Get("cryo_module"));
+        Assert.True(maxInFlight > 0);
+        Assert.Empty(w.Shipments);
+    }
+
+    [Fact]
+    public void Receiving_pad_does_not_send_back()
+    {
+        var (w, _, a, b) = Pads();
+        b.In.Add("wafer", 50);
+        for (var i = 0; i < 1000; i++) w.Step();
+        Assert.Equal(50, b.In.Get("wafer"));
+        Assert.Equal(0, a.In.Get("wafer"));
+    }
+
+    [Fact]
+    public void Save_with_cargo_in_flight_does_not_duplicate()
+    {
+        var (w, _, a, b) = Pads();
+        a.In.Add("wafer", 100);
+        for (var i = 0; i < 3000 && w.Shipments.Count == 0; i++) w.Step();
+        Assert.NotEmpty(w.Shipments);
+        var loaded = WorldCodec.Deserialize(Fixture.Content, WorldCodec.Serialize(w));
+        Assert.Equal(WorldCodec.Hash(w), WorldCodec.Hash(loaded));
+        Assert.Equal(100, loaded.CountEverywhere("wafer"));
+        for (var i = 0; i < 1000; i++) loaded.Step();
+        Assert.Equal(100, loaded.Machines[b.Id].In.Get("wafer"));
+    }
+
+    [Fact]
+    public void Heat_slows_only_thermal_planets_and_radiators_fix_it()
+    {
+        long Wafers(int planet, bool radiator)
+        {
+            var (w, _) = Fixture.NewWorld();
+            var refinery = new Machine { Id = w.NextId++, Def = "wafer_refinery", Planet = planet, X = 40, Z = 40 };
+            w.Machines[refinery.Id] = refinery;
+            if (radiator) w.Machines[w.NextId] = new Machine { Id = w.NextId++, Def = "radiator", Planet = planet, X = 50, Z = 40 };
+            w.Reindex();
+            long made = 0;
+            for (var i = 0; i < 3000; i++)
+            {
+                if (refinery.In.Get("silicon_ore") < 2) refinery.In.Add("silicon_ore", 20);
+                w.Step();
+                made += refinery.Out.Get("wafer");
+                refinery.Out.Clear();
+            }
+            return made;
+        }
+        var marsHot = Wafers(1, false);
+        var marsCool = Wafers(1, true);
+        var pluto = Wafers(0, false);
+        Assert.True(marsHot < marsCool / 2, $"sin refrigerar {marsHot}, refrigerada {marsCool}");
+        Assert.Equal(pluto, marsCool);
+    }
+
+    [Fact]
+    public void Removing_destination_pad_mid_flight_delivers_to_depot()
+    {
+        var (w, p, a, b) = Pads();
+        a.In.Add("wafer", 30);
+        for (var i = 0; i < 3000 && w.Shipments.Count == 0; i++) w.Step();
+        Assert.NotEmpty(w.Shipments);
+        w.Machines.Remove(b.Id);
+        w.Reindex();
+        for (var i = 0; i < 500 && w.Shipments.Count > 0; i++) w.Step();
+        Assert.Equal(30, w.DepotOf(1)!.In.Get("wafer"));
+    }
+}
+
 public class TravelTests
 {
     private static (World w, PlayerState p) AtPad()
@@ -845,7 +943,7 @@ public class RailTests
         p.Bag.Add("ingot", 200);
         p.Bag.Add("parts", 50);
         foreach (var d in w.DebrisById.Values.ToList()) w.DebrisById.Remove(d.Id);
-        var rich = w.Nodes.Values.Where(n => n.YieldPermille > 1000).ToList();
+        var rich = w.Nodes.Values.Where(n => n.Item == "ore" && n.YieldPermille > 1000).ToList();
         foreach (var n in rich)
         {
             n.Revealed = true;
@@ -1043,6 +1141,20 @@ public class SaveTests : IDisposable
         Assert.True(world.RailSegments.Count >= 5);
         Assert.True(File.Exists(store.PathOf("real2") + ".v2.bak"));
         for (var i = 0; i < 600; i++) world.Step();
+        Assert.Equal(WorldCodec.Hash(world), WorldCodec.Hash(WorldCodec.Deserialize(Fixture.Content, WorldCodec.Serialize(world))));
+    }
+
+    [Fact]
+    public void Real_save_from_alpha_0_3_0_gains_mars_content()
+    {
+        var store = new SaveStore("test", _root);
+        var original = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixtures", "save-v3-alpha-0.3.0-rail.plsave"));
+        Assert.Equal(3, BitConverter.ToInt32(original, 4));
+        store.Write("real3", original);
+        var world = store.Load("real3", Fixture.Content);
+        Assert.Single(world.Trains);
+        Assert.Contains(world.Nodes.Values, n => n.Item == "silicon_ore" && n.Planet == 1);
+        for (var i = 0; i < 300; i++) world.Step();
         Assert.Equal(WorldCodec.Hash(world), WorldCodec.Hash(WorldCodec.Deserialize(Fixture.Content, WorldCodec.Serialize(world))));
     }
 

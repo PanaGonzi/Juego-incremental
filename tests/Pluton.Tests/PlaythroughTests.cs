@@ -39,7 +39,7 @@ public class PlaythroughTests
         {
             Advance(WalkTicks);
             var r = W.Apply(P, c);
-            if (mustWork) Assert.True(r.Ok, $"{c.Type} {c.Text} {c.A}: {r.Error} (tick {W.Tick})");
+            if (mustWork) Assert.True(r.Ok, $"{c.Type} {c.Text} {c.A}: {r.Error} (tick {W.Tick}, planeta {P.Planet}, créditos {W.Credits}, mochila [{string.Join(",", P.Bag.Items.Select(i => i.Key + "=" + i.Value))}], depósito [{string.Join(",", W.DepotOf(P.Planet)!.In.Items.Select(i => i.Key + "=" + i.Value))}])");
         }
 
         public void WalkTo(Machine m)
@@ -109,6 +109,236 @@ public class PlaythroughTests
             WalkTo(recycler);
             Do(new Command { Type = CommandType.Insert, A = recycler.Id }, mustWork: false);
         }
+    }
+
+    /// <summary>La campaña entera, solo con comandos válidos: cada coste se paga con lo producido en esta partida.</summary>
+    [Fact]
+    public void Full_campaign_reaches_final_objective_with_valid_commands_only()
+    {
+        var w = World.CreateNew(Fixture.Content);
+        var p = Fixture.AddPlayer(w, "player-a");
+        var bot = new Bot(w, p);
+        var recycler = Fixture.Find(w, "recycler");
+        var depot = Fixture.Find(w, "depot");
+        var terminal = Fixture.Find(w, "export_terminal");
+        var crates = new Dictionary<string, Machine>();
+
+        void Reveal(ResourceNode n)
+        {
+            foreach (var d in w.DebrisById.Values.Where(d => d.CoversNode == n.Id).ToList()) bot.Cut(d);
+        }
+        void Clear(int planet, int x0, int z0, int x1, int z1)
+        {
+            foreach (var d in w.DebrisById.Values.Where(d => d.Planet == planet && d.CoversNode < 0 && d.X >= x0 && d.X <= x1 && d.Z >= z0 && d.Z <= z1).ToList()) bot.Cut(d);
+        }
+        void Carry(Machine from, Machine to)
+        {
+            bot.WalkTo(from);
+            bot.Do(new Command { Type = CommandType.Extract, A = from.Id }, mustWork: false);
+            bot.WalkTo(to);
+            bot.Do(new Command { Type = CommandType.Insert, A = to.Id }, mustWork: false);
+        }
+        void Stock(string item, long qty)
+        {
+            if (item == "recovered") { bot.GatherRecovered(recycler, depot, qty); return; }
+            bot.WaitUntil(() => crates[item].In.Get(item) + depot.In.Get(item) + p.Bag.Get(item) >= qty, 90000, "stock de " + item);
+            if (depot.In.Get(item) + p.Bag.Get(item) < qty) Carry(crates[item], depot);
+        }
+        void Earn(long target)
+        {
+            for (var round = 0; round < 600 && w.Credits < target; round++)
+            {
+                bot.Advance(200);
+                foreach (var item in new[] { "cryo_module", "parts", "ingot" })
+                {
+                    if (!crates.TryGetValue(item, out var crate) || crate.In.Get(item) < 25) continue;
+                    Carry(crate, terminal);
+                    foreach (var kv in terminal.In.Items.ToList())
+                        bot.Do(new Command { Type = CommandType.Sell, A = terminal.Id, Text = kv.Key, Amount = kv.Value }, mustWork: false);
+                    break;
+                }
+            }
+            Assert.True(w.Credits >= target, $"créditos {w.Credits} de {target} (tick {w.Tick})");
+        }
+        void Afford(long credits, Dictionary<string, long> cost)
+        {
+            Earn(credits);
+            foreach (var (item, qty) in cost) Stock(item, qty);
+        }
+        Machine Build(string def, int x, int z)
+        {
+            var d = w.Content.Machines[def];
+            if (p.Planet == 0) Afford(d.Credits, d.Cost);
+            return bot.Build(def, x, z);
+        }
+        void Buy(string id)
+        {
+            var u = w.Content.Upgrades[id];
+            Afford(u.Credits, u.Cost);
+            bot.Do(new Command { Type = CommandType.BuyUpgrade, Text = id });
+        }
+        void Fly(int planet)
+        {
+            var pad = w.Machines.Values.First(m => m.Def == "shuttle_terminal" && m.Planet == p.Planet);
+            bot.WalkTo(pad);
+            bot.Do(new Command { Type = CommandType.Travel, A = planet });
+            bot.WaitUntil(() => p.Planet == planet && p.TransitTo < 0, 400, "llegada a " + planet);
+        }
+
+        // Plutón: primera línea, de chatarra a lingotes
+        bot.Link(recycler, depot);
+        var ore = w.Nodes.Values.Where(n => n.Item == "ore" && n.YieldPermille == 1000).OrderBy(n => n.X * n.X + n.Z * n.Z).ToList();
+        foreach (var n in ore) Reveal(n);
+        var ex1 = Build("ore_extractor", ore[0].X, ore[0].Z);
+        var smelter = Build("smelter", 21, -3);
+        bot.Link(ex1, smelter);
+        crates["ingot"] = Build("storage_crate", 16, -2);
+        bot.Link(smelter, crates["ingot"]);
+        var ex2 = Build("ore_extractor", ore[1].X, ore[1].Z);
+        bot.Link(ex2, smelter);
+        Stock("ingot", 10);
+        bot.Do(new Command { Type = CommandType.FulfillContract, Text = "c_first_ingots" });
+
+        Buy("tech_assembly");
+        var assembler = Build("assembler", 10, -3);
+        bot.Link(crates["ingot"], assembler);
+        crates["parts"] = Build("storage_crate", 5, -3);
+        bot.Link(assembler, crates["parts"]);
+        Build("rtg_generator", 8, 8);
+        var ex3 = Build("ore_extractor", ore[2].X, ore[2].Z);
+        bot.Link(ex3, smelter);
+        var byAssembly = w.Tick / 600.0;
+
+        // Ferrocarril hacia los yacimientos ricos
+        Buy("tech_rail");
+        Clear(0, 20, -40, 64, -7);
+        var rich = w.Nodes.Values.Where(n => n.Item == "ore" && n.YieldPermille > 1000).OrderBy(n => n.X).ToList();
+        foreach (var n in rich) Reveal(n);
+        var baseStation = Build("station", 21, -9);
+        bot.Do(new Command { Type = CommandType.StationMode, A = baseStation.Id, B = 1 });
+        bot.Link(baseStation, smelter);
+        var mine = Build("station", 55, -37);
+        Earn(200);
+        bot.WalkToCell(35, -17);
+        bot.Do(new Command { Type = CommandType.PlaceRail, A = 25, B = -7, C = 45, D = -27 });
+        bot.WalkToCell(49, -31);
+        bot.Do(new Command { Type = CommandType.PlaceRail, A = 45, B = -27, C = 53, D = -35 });
+        bot.Do(new Command { Type = CommandType.PlaceRail, A = 53, B = -35, C = 55, D = -35 });
+        foreach (var n in rich)
+        {
+            var e = Build("ore_extractor", n.X, n.Z);
+            bot.Link(e, mine);
+        }
+        Build("rtg_generator", 12, 8);
+        var rail = w.Content.Balance.Rail;
+        Afford(rail.TrainCredits, rail.TrainCost);
+        bot.WalkTo(mine);
+        bot.Do(new Command { Type = CommandType.CreateTrain, A = mine.Id, B = baseStation.Id });
+        bot.WaitUntil(() => w.Stats.GetValueOrDefault("train_delivered") >= 40, 12000, "entrega por tren");
+        var byRail = w.Tick / 600.0;
+
+        // Criogenia
+        Buy("tech_cryo");
+        var ice = w.Nodes.Values.Where(n => n.Item == "ice").OrderBy(n => n.X * n.X + n.Z * n.Z).ToList();
+        Reveal(ice[0]);
+        Clear(0, ice[0].X - 1, ice[0].Z - 1, ice[0].X + 10, ice[0].Z + 4);
+        Clear(0, -7, -11, 4, -4);
+        var iceEx = Build("ice_extractor", ice[0].X, ice[0].Z);
+        var chiller = Build("chiller", ice[0].X + 3, ice[0].Z);
+        bot.Link(iceEx, chiller);
+        crates["coolant"] = Build("storage_crate", ice[0].X + 7, ice[0].Z);
+        bot.Link(chiller, crates["coolant"]);
+        var cryo = Build("cryo_assembler", 1, -8);
+        bot.Link(crates["parts"], cryo);
+        crates["cryo_module"] = Build("storage_crate", -5, -9);
+        bot.Link(cryo, crates["cryo_module"]);
+        Build("rtg_generator", 16, 8);
+        void MakeModules(long total)
+        {
+            // El refrigerante va a mano hasta la ensambladora: está lejos de los enlaces.
+            for (var i = 0; i < 200 && w.Stats.GetValueOrDefault("produced.cryo_module") < total; i++)
+            {
+                Carry(crates["coolant"], cryo);
+                bot.Advance(500);
+            }
+            Assert.True(w.Stats.GetValueOrDefault("produced.cryo_module") >= total, $"módulos (tick {w.Tick})");
+        }
+        MakeModules(3);
+        var byCryo = w.Tick / 600.0;
+
+        // Marte: se viaja con material para la primera instalación
+        Buy("tech_shuttle");
+        var padPluto = Build("cargo_pad", -20, 10);
+        Earn(4500);
+        foreach (var (item, qty) in new[] { ("ingot", 140L), ("parts", 90L), ("recovered", 45L) })
+        {
+            Stock(item, qty);
+            bot.WalkTo(depot);
+            bot.Do(new Command { Type = CommandType.Extract, A = depot.Id }, mustWork: false);
+        }
+        Fly(1);
+        var marsDepot = w.DepotOf(1)!;
+        bot.WalkTo(marsDepot);
+        bot.Do(new Command { Type = CommandType.Insert, A = marsDepot.Id }, mustWork: false);
+        var silicon = w.Nodes.Values.Where(n => n.Item == "silicon_ore").OrderBy(n => n.X * n.X + n.Z * n.Z).Take(3).ToList();
+        foreach (var n in silicon) Reveal(n);
+        var sx = bot.Build("silicon_extractor", silicon[0].X, silicon[0].Z);
+        Clear(1, 8, -20, 26, 14);
+        var refinery = bot.Build("wafer_refinery", silicon[0].X + 3, silicon[0].Z + 3);
+        bot.Link(sx, refinery);
+        bot.Build("radiator", 10, -5);
+        bot.Build("radiator", 10, -9);
+        bot.Build("rtg_generator", 10, -1);
+        var wafers = bot.Build("storage_crate", 13, -2);
+        bot.Link(refinery, wafers);
+        var padMars = bot.Build("cargo_pad", 8, 4);
+        bot.WaitUntil(() => wafers.In.Get("wafer") >= 40, 24000, "obleas");
+        Carry(wafers, marsDepot);
+
+        // De vuelta a Plutón para enviar los módulos y reunir el contrato final
+        Fly(0);
+        MakeModules(14);
+        Carry(crates["cryo_module"], padPluto);
+        bot.Do(new Command { Type = CommandType.StationMode, A = padPluto.Id, B = 0 });
+        Earn(2500);
+        foreach (var (item, qty) in new[] { ("parts", 30L), ("recovered", 30L) })
+        {
+            Stock(item, qty);
+            bot.WalkTo(depot);
+            bot.Do(new Command { Type = CommandType.Extract, A = depot.Id }, mustWork: false);
+        }
+        Fly(1);
+        bot.WaitUntil(() => padMars.In.Get("cryo_module") >= 6, 4000, "módulos en Marte");
+        _out.WriteLine($"Llega: mochila [{string.Join(",", p.Bag.Items.Select(i => i.Key + "=" + i.Value))}] depósito [{string.Join(",", marsDepot.In.Items.Select(i => i.Key + "=" + i.Value))}]");
+        bot.WalkTo(marsDepot);
+        bot.Do(new Command { Type = CommandType.Insert, A = marsDepot.Id });
+        _out.WriteLine($"Tras depositar: mochila [{string.Join(",", p.Bag.Items.Select(i => i.Key + "=" + i.Value))}] depósito [{string.Join(",", marsDepot.In.Items.Select(i => i.Key + "=" + i.Value))}]");
+        bot.Do(new Command { Type = CommandType.FulfillContract, Text = "c_mars_samples" }, mustWork: false);
+        Earn(0);
+        var fab = bot.Build("nav_fab", 9, 8);
+        bot.Link(padMars, fab);
+        var cores = bot.Build("storage_crate", 13, 10);
+        bot.Link(fab, cores);
+        var waferStock = bot.Build("storage_crate", 13, 4);
+        Carry(marsDepot, waferStock);
+        bot.Link(waferStock, fab);
+        bot.Link(wafers, waferStock);
+        bot.WaitUntil(() => cores.In.Get("nav_core") >= 6, 30000, "núcleos");
+        bot.WalkTo(cores);
+        bot.Do(new Command { Type = CommandType.Extract, A = cores.Id });
+
+        Fly(0);
+        MakeModules(22);
+        bot.WalkTo(crates["cryo_module"]);
+        bot.Do(new Command { Type = CommandType.Extract, A = crates["cryo_module"].Id });
+        bot.Do(new Command { Type = CommandType.FulfillContract, Text = "c_ninth_planet" });
+        bot.Advance(20);
+
+        _out.WriteLine(string.Join("\n", bot.Timeline));
+        _out.WriteLine($"Campaña: ensamblaje {byAssembly:F0} min, tren {byRail:F0} min, criogenia {byCryo:F0} min, final {w.Tick / 600.0:F0} min ({w.Tick / 36000.0:F1} h); créditos {w.Credits}; objetivo {w.ObjectiveIndex}/{w.Content.Objectives.Count}");
+        Assert.Equal(w.Content.Objectives.Count, w.ObjectiveIndex);
+        Assert.Equal(1, w.Stats["contract.c_ninth_planet"]);
+        Assert.Equal(WorldCodec.Hash(w), WorldCodec.Hash(WorldCodec.Deserialize(Fixture.Content, WorldCodec.Serialize(w))));
     }
 
     [Fact]

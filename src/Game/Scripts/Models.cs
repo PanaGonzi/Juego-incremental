@@ -26,6 +26,7 @@ public static class Models
                 m.EmissionEnergyMultiplier = 1.4f;
                 break;
             case "rock": Pbr(m, new Color(0.2f, 0.17f, 0.16f), 0f, 0.95f); break;
+            case "silicon": Pbr(m, new Color(0.2f, 0.32f, 0.5f), 0.9f, 0.2f); m.EmissionEnabled = true; m.Emission = new Color(0.1f, 0.35f, 0.75f); m.EmissionEnergyMultiplier = 0.8f; break;
             case "redrock": Pbr(m, new Color(0.42f, 0.19f, 0.11f), 0f, 0.92f); break;
             case "rust": Pbr(m, new Color(0.33f, 0.2f, 0.13f), 0.55f, 0.85f); break;
             case "rustlight": Pbr(m, new Color(0.47f, 0.37f, 0.28f), 0.5f, 0.75f); break;
@@ -310,6 +311,63 @@ public static class Models
                 m.Height = 3.4f;
                 m.LampPos = new Vector3(-0.5f, 1.2f, 0.3f);
                 break;
+            case "silicon_extractor":
+                b.Plinth(4, 4);
+                b.Box("hull", 0, 0.8f, 0, 3.4f, 1.1f, 3.4f);
+                b.Seams(0, 0.8f, 0, 3.4f, 1.1f, 3.4f);
+                foreach (var (x, z) in new[] { (-1.3f, 0f), (1.3f, 0f) })
+                    b.Box("rustlight", x, 2.6f, z, 0.26f, 3.6f, 2.6f);
+                b.Box("panel", 0, 4.5f, 0, 3f, 0.3f, 2.8f);
+                m.Piston = new Builder().Cyl("cyan", 0, 0, 0, 0.3f, 2.8f, sides: 6).Cyl("dark", 0, -1.6f, 0, 0.5f, 0.45f, sides: 6).Commit();
+                m.PistonPos = new Vector3(0, 2.7f, 0);
+                m.Height = 4.8f;
+                m.LampPos = new Vector3(1.5f, 1.5f, 1.72f);
+                break;
+            case "wafer_refinery":
+                b.Plinth(6, 6);
+                b.Box("panel", 0, 1.3f, 0, 5f, 2.2f, 5f);
+                b.Seams(0, 1.3f, 0, 5f, 2.2f, 5f);
+                for (var i = 0; i < 3; i++) b.Cyl("cyan", -1.6f + i * 1.6f, 3f, -0.8f, 0.42f, 1.3f, sides: 10);
+                b.Box("dark", 0, 1.3f, 2.53f, 3.4f, 1.1f, 0.05f);
+                for (var i = 0; i < 4; i++) b.Cyl("heat", -1.2f + i * 0.8f, 1.3f, 2.57f, 0.3f, 0.03f, 90);
+                m.Height = 3.7f;
+                m.LampPos = new Vector3(2.2f, 2.5f, 2.5f);
+                break;
+            case "nav_fab":
+                b.Plinth(6, 6);
+                b.Box("hull", 0, 0.9f, 0, 5.2f, 1.2f, 5.2f);
+                b.Seams(0, 0.9f, 0, 5.2f, 1.2f, 5.2f);
+                b.Cyl("panel", 0, 2.1f, 0, 2f, 1.2f, sides: 8, topRadius: 1.4f);
+                b.Ball("cyan", 0, 3.1f, 0, 0.8f, 12, 6);
+                foreach (var (x, z) in new[] { (-2.2f, -2.2f), (2.2f, -2.2f), (-2.2f, 2.2f), (2.2f, 2.2f) })
+                    b.Box("panel", x, 2.2f, z, 0.2f, 2f, 0.2f);
+                m.Rotor = new Builder().Cyl("copper", 0, 0, 0, 2.4f, 0.1f, sides: 16).Box("dark", 0, 0.06f, 0, 4.6f, 0.03f, 0.3f).Commit();
+                m.RotorPos = new Vector3(0, 3.9f, 0);
+                m.Height = 4.3f;
+                m.LampPos = new Vector3(2.3f, 1.6f, 2.65f);
+                break;
+            case "radiator":
+            case "cryo_radiator":
+                b.Plinth(4, def == "radiator" ? 4 : 6);
+                b.Box("hull", 0, 0.6f, 0, 3.2f, 0.7f, def == "radiator" ? 3.2f : 5f);
+                for (var i = -3; i <= 3; i++)
+                    b.Box(def == "radiator" ? "panel" : "cyan", 0, 2.1f, i * 0.42f, 3.2f, 2.4f, 0.07f);
+                m.Height = 3.4f;
+                m.LampPos = new Vector3(1.5f, 1.1f, 1.5f);
+                break;
+            case "cargo_pad":
+                b.Box("dark", 0, 0.15f, 0, 7.9f, 0.3f, 7.9f);
+                b.Cyl("panel", 0, 0.4f, 0, 3.4f, 0.2f, sides: 24);
+                b.Cyl("stripe", 0, 0.52f, 0, 3.1f, 0.03f, sides: 24);
+                b.Cyl("dark", 0, 0.55f, 0, 2.8f, 0.03f, sides: 24);
+                foreach (var (x, z) in new[] { (-3.4f, -3.4f), (3.4f, -3.4f), (-3.4f, 3.4f), (3.4f, 3.4f) })
+                {
+                    b.Box("hull", x, 1f, z, 0.6f, 1.6f, 0.6f);
+                    b.Ball("amber", x, 1.9f, z, 0.15f);
+                }
+                m.Height = 2f;
+                m.LampPos = new Vector3(0, 0.9f, 0);
+                break;
             case "shuttle_terminal":
                 b.Box("dark", 0, 0.15f, 0, 7.9f, 0.3f, 7.9f);
                 b.Box("panel", 0, 0.34f, 0, 7.2f, 0.08f, 7.2f);
@@ -399,7 +457,7 @@ public static class Models
         if (DebrisCache.TryGetValue(key, out var mesh)) return mesh;
         var rng = new RandomNumberGenerator { Seed = (ulong)key.GetHashCode(StringComparison.Ordinal) ^ 0x71u };
         var b = new Builder();
-        var mat = item == "ore" ? "ore" : "ice";
+        var mat = item == "ore" ? "ore" : item == "silicon_ore" ? "silicon" : "ice";
         b.Cyl("dark", 0, 0.03f, 0, 2.1f, 0.06f, sides: 16);
         for (var i = 0; i < 12; i++)
         {
@@ -528,6 +586,14 @@ public static class Models
         StandardMaterial3D material;
         switch (status)
         {
+            case Pluton.Simulation.MachineStatus.Overheated:
+                // Termómetro
+                Quad(0, 0.08f, 0.13f, 0.5f);
+                Quad(0, -0.25f, 0.28f, 0.2f);
+                Quad(0.16f, 0.24f, 0.12f, 0.05f);
+                Quad(0.16f, 0.08f, 0.12f, 0.05f);
+                material = IconBad;
+                break;
             case Pluton.Simulation.MachineStatus.NoPower:
             case Pluton.Simulation.MachineStatus.LowPower:
                 // Rayo

@@ -299,6 +299,12 @@ public partial class Hud : Control
         var (supply, demand) = EstimatePower(w, me.Planet);
         _power.Text = $"{Loc.T("hud_power")}: {demand} / {supply}";
         _power.AddThemeColorOverride("font_color", demand > supply ? Ui.Bad : Ui.Good);
+        if (w.Content.Planets.First(pl => pl.Id == me.Planet).Thermal)
+        {
+            var (heat, cooling) = EstimateHeat(w, me.Planet);
+            _power.Text += $"\n{Loc.T("hud_heat")}: {heat} / {cooling}";
+            if (heat > cooling) _power.AddThemeColorOverride("font_color", Ui.Bad);
+        }
 
         _objective.Text = w.ObjectiveIndex < w.Content.Objectives.Count
             ? Loc.T("objective_" + w.Content.Objectives[w.ObjectiveIndex].Id)
@@ -323,6 +329,19 @@ public partial class Hud : Control
         }
     }
 
+    private static (long heat, long cooling) EstimateHeat(World w, int planet)
+    {
+        long heat = 0, cooling = 0;
+        foreach (var m in w.Machines.Values)
+        {
+            if (m.Planet != planet) continue;
+            var d = w.Content.Machines[m.Def];
+            if (m.Status is MachineStatus.Working or MachineStatus.LowPower or MachineStatus.NoPower or MachineStatus.Overheated) heat += d.Heat;
+            if (d.Kind == MachineKind.Radiator || (d.Cooling > 0 && m.Processing)) cooling += d.Cooling;
+        }
+        return (heat, cooling);
+    }
+
     private static (long supply, long demand) EstimatePower(World w, int planet)
     {
         long supply = 0, demand = 0;
@@ -331,7 +350,7 @@ public partial class Hud : Control
             if (m.Planet != planet) continue;
             var d = w.Content.Machines[m.Def];
             supply += d.PowerGen;
-            if (m.Status is MachineStatus.Working or MachineStatus.LowPower or MachineStatus.NoPower) demand += d.Power;
+            if (m.Status is MachineStatus.Working or MachineStatus.LowPower or MachineStatus.NoPower or MachineStatus.Overheated) demand += d.Power;
         }
         return (supply, demand);
     }
@@ -420,7 +439,9 @@ public partial class Hud : Control
         Clear();
         var def = w.Content.Machines[m.Def];
         Add(Ui.Text(Loc.T("machine_" + m.Def), 26, Ui.Amber));
-        var color = m.Status is MachineStatus.NoInput or MachineStatus.OutputFull or MachineStatus.NoPower or MachineStatus.LowPower ? Ui.Bad : Ui.Good;
+        var color = m.Status is MachineStatus.NoInput or MachineStatus.OutputFull or MachineStatus.NoPower or MachineStatus.LowPower or MachineStatus.Overheated ? Ui.Bad : Ui.Good;
+        if (def.Heat > 0) Add(Ui.Text($"{Loc.T("panel_heat")}: {def.Heat}", 16, Ui.Dim));
+        if (def.Cooling > 0) Add(Ui.Text($"{Loc.T("panel_cooling")}: {def.Cooling}", 16, Ui.Dim));
         Add(Ui.Text($"{Loc.T("panel_status")}: {Loc.T("status_" + m.Status)}", 18, color));
         if (def.Power > 0) Add(Ui.Text($"{Loc.T("panel_power_use")}: {def.Power}", 16, Ui.Dim));
         if (def.PowerGen > 0) Add(Ui.Text($"{Loc.T("panel_power_gen")}: {def.PowerGen}", 16, Ui.Dim));
@@ -460,6 +481,13 @@ public partial class Hud : Control
                 row.AddChild(Ui.Btn(Loc.T("train_remove"), () => client.Send(new Command { Type = CommandType.RemoveTrain, A = trainId })));
                 Add(row);
             }
+        }
+
+        if (def.Kind == MachineKind.CargoPad)
+        {
+            Add(Ui.Text(Loc.T(m.StationUnload ? "pad_mode_receive" : "pad_mode_send"), 17, Ui.Ink));
+            Add(Ui.Btn(Loc.T("station_toggle"), () => client.Send(new Command { Type = CommandType.StationMode, A = id, B = m.StationUnload ? 0 : 1 })));
+            Add(Ui.Text($"{Loc.T("pad_in_flight")}: {w.Shipments.Count}", 16, Ui.Dim));
         }
 
         if (def.Kind == MachineKind.Shuttle)

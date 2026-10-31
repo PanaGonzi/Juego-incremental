@@ -6,5 +6,8 @@
   { "id": "parts",       "price": 16 },
   { "id": "ice",         "price": 1 },
   { "id": "coolant",     "price": 6 },
-  { "id": "cryo_module", "price": 80 }
+  { "id": "cryo_module", "price": 80 },
+  { "id": "silicon_ore", "price": 2 },
+  { "id": "wafer",       "price": 24 },
+  { "id": "nav_core",    "price": 420 }
 ]

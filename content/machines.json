@@ -11,6 +11,12 @@
   { "id": "cryo_assembler",  "kind": "Production", "w": 3, "d": 3, "power": 20, "credits": 500, "cost": { "parts": 20, "coolant": 10 }, "recipe": "make_cryo", "unlock": "tech_cryo" },
   { "id": "rtg_generator",   "kind": "Generator",  "w": 2, "d": 2, "powerGen": 25, "credits": 80, "cost": { "recovered": 15 } },
   { "id": "storage_crate",   "kind": "Storage",    "w": 2, "d": 2, "capacity": 200, "credits": 25, "cost": { "recovered": 6 } },
+  { "id": "silicon_extractor", "kind": "Production", "w": 2, "d": 2, "power": 8, "heat": 4, "credits": 200, "cost": { "ingot": 15, "parts": 5 }, "recipe": "extract_silicon", "node": "silicon_ore", "unlock": "tech_shuttle" },
+  { "id": "wafer_refinery",  "kind": "Production", "w": 3, "d": 3, "power": 14, "heat": 10, "credits": 450, "cost": { "ingot": 20, "parts": 15 }, "recipe": "refine_wafer", "unlock": "tech_shuttle" },
+  { "id": "nav_fab",         "kind": "Production", "w": 3, "d": 3, "power": 25, "heat": 20, "credits": 1500, "cost": { "parts": 30, "wafer": 20 }, "recipe": "make_nav_core", "unlock": "tech_shuttle" },
+  { "id": "radiator",        "kind": "Radiator",   "w": 2, "d": 2, "cooling": 12, "credits": 120, "cost": { "ingot": 10 }, "unlock": "tech_shuttle" },
+  { "id": "cryo_radiator",   "kind": "Production", "w": 2, "d": 3, "cooling": 60, "power": 4, "credits": 400, "cost": { "ingot": 15, "coolant": 10 }, "recipe": "burn_coolant", "unlock": "tech_shuttle" },
+  { "id": "cargo_pad",       "kind": "CargoPad",   "w": 4, "d": 4, "capacity": 800, "credits": 600, "cost": { "ingot": 30, "parts": 15 }, "unlock": "tech_shuttle" },
   { "id": "shuttle_terminal", "kind": "Shuttle",   "w": 4, "d": 4, "builtin": true },
   { "id": "station",         "kind": "Station",    "w": 4, "d": 2, "capacity": 400, "credits": 120, "cost": { "recovered": 15, "ingot": 5 }, "unlock": "tech_rail" }
 ]

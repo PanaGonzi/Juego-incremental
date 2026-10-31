@@ -292,6 +292,7 @@ public sealed class GameClient : IDisposable
         n = r.Read7BitEncodedInt();
         structural |= n > 0;
         for (var i = 0; i < n; i++) world.Trains.Remove(r.ReadInt32());
+        if (r.ReadBoolean()) WorldCodec.ReadShipments(r, world);
         if (structural)
         {
             StructuralDeltas++;

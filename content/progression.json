@@ -15,6 +15,8 @@
     { "id": "c_first_parts",   "items": { "parts": 8 },        "credits": 350, "requires": "tech_assembly" },
     { "id": "c_rail_survey",   "items": { "ingot": 40, "parts": 15 }, "credits": 700, "requires": "tech_assembly" },
     { "id": "c_cryo_pilot",    "items": { "cryo_module": 3 },  "credits": 900, "requires": "tech_cryo" },
+    { "id": "c_mars_samples",  "items": { "wafer": 15 }, "credits": 800, "requires": "tech_shuttle" },
+    { "id": "c_ninth_planet",  "items": { "nav_core": 6, "cryo_module": 6 }, "credits": 10000, "requires": "tech_shuttle" },
     { "id": "c_shadow_express", "event": "halloween", "items": { "ingot": 30 }, "credits": 400, "needStats": { "cleared.shadow_scrap": 8, "train_delivered": 120 }, "cosmetic": "spectral_train" }
   ],
   "objectives": [
@@ -32,6 +34,14 @@
     { "id": "o_station",    "stat": "built.station",          "qty": 2,   "credits": 60 },
     { "id": "o_train",      "stat": "train_delivered",        "qty": 40,  "credits": 200 },
     { "id": "o_cryo",       "stat": "upgrade.tech_cryo",      "qty": 1,   "credits": 150 },
-    { "id": "o_module",     "stat": "produced.cryo_module",   "qty": 3,   "credits": 300 }
+    { "id": "o_module",     "stat": "produced.cryo_module",   "qty": 3,   "credits": 300 },
+    { "id": "o_shuttle",    "stat": "upgrade.tech_shuttle",   "qty": 1,   "credits": 200 },
+    { "id": "o_mars",       "stat": "travels",                "qty": 1,   "credits": 100 },
+    { "id": "o_silicon",    "stat": "built.silicon_extractor","qty": 1,   "credits": 100 },
+    { "id": "o_wafer",      "stat": "produced.wafer",         "qty": 15,  "credits": 300 },
+    { "id": "o_radiator",   "stat": "built.radiator",         "qty": 1,   "credits": 100 },
+    { "id": "o_pad",        "stat": "shipments",              "qty": 1,   "credits": 300 },
+    { "id": "o_nav",        "stat": "produced.nav_core",      "qty": 3,   "credits": 500 },
+    { "id": "o_final",      "stat": "contract.c_ninth_planet","qty": 1,   "credits": 0 }
   ]
 }

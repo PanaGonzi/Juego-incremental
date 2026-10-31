@@ -40,7 +40,7 @@ public sealed class Inventory
     public void Clear() => _items.Clear();
 }
 
-public enum MachineStatus : byte { Idle, Working, NoInput, OutputFull, NoPower, LowPower, Generating, Storing, Ready }
+public enum MachineStatus : byte { Idle, Working, NoInput, OutputFull, NoPower, LowPower, Generating, Storing, Ready, Overheated, Cooling }
 
 public sealed class Machine
 {
@@ -107,6 +107,15 @@ public sealed class RailSegment
     public byte Shape; // 0 recta, 1 curva por (B.X, A.Z), 2 curva por (A.X, B.Z)
     public long LengthMm;
     public int OwnerStation = -1;
+}
+
+/// <summary>Carga en vuelo entre plataformas: pertenece a este registro hasta llegar, nunca a ambos planetas.</summary>
+public sealed class Shipment
+{
+    public int Id;
+    public int ToPlanet;
+    public long ArriveTick;
+    public readonly Inventory Cargo = new();
 }
 
 public enum TrainState : byte { Loading, Moving, Unloading, Waiting }

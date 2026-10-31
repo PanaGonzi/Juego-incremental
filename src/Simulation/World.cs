@@ -25,6 +25,8 @@ public sealed partial class World
     public readonly SortedSet<string> Upgrades = new(StringComparer.Ordinal);
     public readonly SortedSet<string> ContractsDone = new(StringComparer.Ordinal);
     public readonly SortedDictionary<string, long> Stats = new(StringComparer.Ordinal);
+    public readonly SortedDictionary<int, Shipment> Shipments = new();
+    public bool DirtyShipments;
 
     // Índices derivados: se reconstruyen al cargar, nunca se guardan.
     private readonly Dictionary<(int planet, int x, int z), int> _occupied = new();
@@ -72,18 +74,40 @@ public sealed partial class World
             }
             foreach (var n in planet.Nodes)
             {
-                var node = new ResourceNode { Id = w.NextId++, Item = n.Item, Planet = planet.Id, X = n.X, Z = n.Z, YieldPermille = n.YieldPermille };
-                w.Nodes[node.Id] = node;
-                for (var dx = 0; dx < 2; dx++)
-                for (var dz = 0; dz < 2; dz++)
-                {
-                    var d = new Debris { Id = w.NextId++, Def = "ice_crust", Planet = planet.Id, X = n.X + dx, Z = n.Z + dz, CoversNode = node.Id };
-                    d.Hp = content.Balance.Debris[d.Def].Hp;
-                    w.DebrisById[d.Id] = d;
-                }
+                w.AddNodeWithCrust(planet.Id, n);
             }
             w.Reindex();
             foreach (var f in planet.DebrisFields) w.ScatterDebris(planet, f);
+        }
+    }
+
+    private void AddNodeWithCrust(int planet, NodeDef n)
+    {
+        var node = new ResourceNode { Id = NextId++, Item = n.Item, Planet = planet, X = n.X, Z = n.Z, YieldPermille = n.YieldPermille };
+        Nodes[node.Id] = node;
+        for (var dx = 0; dx < 2; dx++)
+        for (var dz = 0; dz < 2; dz++)
+        {
+            // Si algo ocupa ya la celda (mundo migrado), esa celda queda sin costra.
+            if (_debrisCells.ContainsKey((planet, n.X + dx, n.Z + dz))) continue;
+            var d = new Debris { Id = NextId++, Def = "ice_crust", Planet = planet, X = n.X + dx, Z = n.Z + dz, CoversNode = node.Id };
+            d.Hp = Content.Balance.Debris[d.Def].Hp;
+            DebrisById[d.Id] = d;
+        }
+    }
+
+    /// <summary>Añade los yacimientos de contenido nuevo a un mundo guardado antes de que existieran.</summary>
+    public void EnsureNodes(PlanetDef planet)
+    {
+        Reindex();
+        foreach (var n in planet.Nodes)
+        {
+            if (Nodes.Values.Any(x => x.Planet == planet.Id && x.X == n.X && x.Z == n.Z)) continue;
+            foreach (var d in DebrisById.Values.Where(d => d.Planet == planet.Id && d.CoversNode < 0 && d.X >= n.X && d.X <= n.X + 1 && d.Z >= n.Z && d.Z <= n.Z + 1).ToList())
+                DebrisById.Remove(d.Id);
+            Reindex();
+            AddNodeWithCrust(planet.Id, n);
+            Reindex();
         }
     }
 
@@ -466,6 +490,7 @@ public sealed partial class World
         if (!Pay(p, def.Credits, def.Cost)) return CommandResult.Fail("err_cost");
 
         var m = new Machine { Id = NextId++, Def = defId, Planet = p.Planet, X = x, Z = z, Rot = rot, NodeId = nodeId };
+        if (def.Kind == MachineKind.CargoPad) m.StationUnload = true; // plataforma nueva: recibe hasta que se indique lo contrario
         Machines[m.Id] = m;
         foreach (var cell in Footprint(defId, x, z, rot)) _occupied[(p.Planet, cell.x, cell.z)] = m.Id;
         if (nodeId >= 0)
@@ -606,6 +631,7 @@ public sealed partial class World
             case MachineKind.Storage:
             case MachineKind.Terminal:
             case MachineKind.Station:
+            case MachineKind.CargoPad:
                 return Math.Max(0, def.Capacity - m.In.Get(item));
             case MachineKind.Production:
                 var recipe = Content.Recipes[def.Recipe!];
@@ -704,7 +730,7 @@ public sealed partial class World
 
         // Reúne de terminales y depósito del planeta y de la mochila, sin tocar nada hasta confirmar.
         var sources = _machineList
-            .Where(m => m.Planet == p.Planet && Content.Machines[m.Def].Kind is MachineKind.Terminal or MachineKind.Storage or MachineKind.Station)
+            .Where(m => m.Planet == p.Planet && Content.Machines[m.Def].Kind is MachineKind.Terminal or MachineKind.Storage or MachineKind.Station or MachineKind.CargoPad)
             .ToList();
         foreach (var (item, qty) in c.Items)
         {
@@ -776,6 +802,7 @@ public sealed partial class World
         foreach (var m in _machineList) StepMachine(m);
         foreach (var l in _linkList) StepLink(l);
         StepTrains();
+        StepShipments();
         StepTransit();
         if (Tick / B.TicksPerSecond != previousSecond) StepObjectives();
         _inStep = false;
@@ -783,17 +810,38 @@ public sealed partial class World
 
     private readonly Dictionary<int, long> _demand = new();
     private readonly Dictionary<int, long> _supply = new();
+    private readonly Dictionary<int, long> _heat = new();
+    private readonly Dictionary<int, long> _cooling = new();
 
     private void StepPower()
     {
         _demand.Clear();
         _supply.Clear();
+        _heat.Clear();
+        _cooling.Clear();
         foreach (var m in _machineList)
         {
             var def = Content.Machines[m.Def];
             if (def.PowerGen > 0) _supply[m.Planet] = _supply.GetValueOrDefault(m.Planet) + def.PowerGen;
-            if (def.Power > 0 && WantsToRun(m, def)) _demand[m.Planet] = _demand.GetValueOrDefault(m.Planet) + def.Power;
+            var runs = WantsToRun(m, def);
+            if (def.Power > 0 && runs) _demand[m.Planet] = _demand.GetValueOrDefault(m.Planet) + def.Power;
+            if (def.Heat > 0 && runs) _heat[m.Planet] = _heat.GetValueOrDefault(m.Planet) + def.Heat;
+            // Un radiador pasivo enfría siempre; uno criogénico solo mientras consume refrigerante.
+            if (def.Cooling > 0 && (def.Kind == MachineKind.Radiator || m.Processing))
+                _cooling[m.Planet] = _cooling.GetValueOrDefault(m.Planet) + def.Cooling;
         }
+    }
+
+    public long HeatLoad(int planet) => _heat.GetValueOrDefault(planet);
+    public long CoolingCapacity(int planet) => _cooling.GetValueOrDefault(planet);
+
+    /// <summary>Regla de Marte: sin refrigeración suficiente, lo que genera calor rinde menos (mínimo 20 %).</summary>
+    private long ThermalFactor(Machine m, MachineDef def)
+    {
+        if (def.Heat == 0 || !Content.Planets.First(p => p.Id == m.Planet).Thermal) return 1000;
+        var heat = _heat.GetValueOrDefault(m.Planet);
+        if (heat == 0) return 1000;
+        return Math.Clamp(_cooling.GetValueOrDefault(m.Planet) * 1000 / heat, 200, 1000);
     }
 
     public long PowerSupply(int planet) => _supply.GetValueOrDefault(planet);
@@ -844,6 +892,13 @@ public sealed partial class World
             case MachineKind.Shuttle:
                 m.Status = MachineStatus.Ready;
                 break;
+            case MachineKind.Radiator:
+                m.Status = MachineStatus.Cooling;
+                break;
+            case MachineKind.CargoPad:
+                m.Status = MachineStatus.Storing;
+                if (!m.StationUnload) StepCargoPad(m);
+                break;
             case MachineKind.Terminal:
                 m.Status = MachineStatus.Storing;
                 if (m.AutoSell) StepAutoSell(m);
@@ -892,10 +947,11 @@ public sealed partial class World
 
         var satisfaction = def.Power > 0 ? Satisfaction(m.Planet) : 1000;
         if (satisfaction == 0) { m.Status = MachineStatus.NoPower; return; }
-        m.Status = satisfaction < 1000 ? MachineStatus.LowPower : MachineStatus.Working;
+        var thermal = ThermalFactor(m, def);
+        m.Status = satisfaction < 1000 ? MachineStatus.LowPower : thermal < 1000 ? MachineStatus.Overheated : MachineStatus.Working;
 
         var yieldPermille = m.NodeId >= 0 && Nodes.TryGetValue(m.NodeId, out var source) ? source.YieldPermille : 1000;
-        m.Progress += satisfaction * (1000 + Mod("speed." + recipe.Id)) / 1000 * yieldPermille / 1000 * TimeScale;
+        m.Progress += satisfaction * (1000 + Mod("speed." + recipe.Id)) / 1000 * yieldPermille / 1000 * thermal / 1000 * TimeScale;
         if (m.Progress < recipe.Ticks * 1000L) return;
 
         foreach (var (item, qty) in recipe.Outputs)
@@ -931,6 +987,47 @@ public sealed partial class World
         l.Cooldown = B.LinkIntervalTicks;
     }
 
+    /// <summary>Lo enviado sale de la plataforma al crear el envío y entra en destino al llegar: nunca está en dos sitios.</summary>
+    private void StepCargoPad(Machine m)
+    {
+        m.SellCooldown -= TimeScale;
+        if (m.SellCooldown > 0) return;
+        m.SellCooldown = Content.Balance.Cargo.IntervalTicks;
+        var target = _machineList.FirstOrDefault(o => o.Planet != m.Planet && o.Def == m.Def);
+        if (target == null || m.In.Kinds == 0) return;
+        var shipment = new Shipment { Id = NextId++, ToPlanet = target.Planet, ArriveTick = Tick + Content.Balance.Cargo.TravelTicks };
+        var left = Content.Balance.Cargo.UnitsPerShipment;
+        foreach (var kv in m.In.Items.ToList())
+        {
+            if (left == 0) break;
+            var qty = Math.Min(left, kv.Value);
+            m.In.TryRemove(kv.Key, qty);
+            shipment.Cargo.Add(kv.Key, qty);
+            left -= qty;
+        }
+        Shipments[shipment.Id] = shipment;
+        DirtyShipments = true;
+        DirtySimMachines.Add(m.Id);
+        Bump("shipments");
+    }
+
+    private void StepShipments()
+    {
+        if (Shipments.Count == 0) return;
+        foreach (var s in Shipments.Values.Where(s => Tick >= s.ArriveTick).ToList())
+        {
+            // Destino: plataforma receptora, o el depósito si la retiraron durante el vuelo. La carga nunca se pierde.
+            var target = _machineList.FirstOrDefault(m => m.Planet == s.ToPlanet && m.Def == "cargo_pad" && m.StationUnload)
+                ?? _machineList.FirstOrDefault(m => m.Planet == s.ToPlanet && m.Def == "cargo_pad")
+                ?? DepotOf(s.ToPlanet);
+            if (target == null) continue;
+            foreach (var kv in s.Cargo.Items) target.In.Add(kv.Key, kv.Value);
+            Shipments.Remove(s.Id);
+            DirtyShipments = true;
+            DirtySimMachines.Add(target.Id);
+        }
+    }
+
     private void StepObjectives()
     {
         while (ObjectiveIndex < Content.Objectives.Count)
@@ -963,6 +1060,7 @@ public sealed partial class World
         RemovedRailNodes.Clear();
         RemovedRailSegments.Clear();
         RemovedTrains.Clear();
+        DirtyShipments = false;
         DirtyGlobal = true;
         DirtyGlobalSim = false;
     }
@@ -983,6 +1081,7 @@ public sealed partial class World
         }
         foreach (var p in Players.Values) total += p.Bag.Get(item);
         foreach (var t in Trains.Values) total += t.Cargo.Get(item);
+        foreach (var s in Shipments.Values) total += s.Cargo.Get(item);
         return total;
     }
 }

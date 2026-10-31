@@ -265,7 +265,7 @@ public sealed partial class World
     private CommandResult StationMode(PlayerState p, int id, bool unload)
     {
         if (!Machines.TryGetValue(id, out var m) || m.Planet != p.Planet) return CommandResult.Fail("err_gone");
-        if (Content.Machines[m.Def].Kind != MachineKind.Station) return CommandResult.Fail("err_invalid");
+        if (Content.Machines[m.Def].Kind is not (MachineKind.Station or MachineKind.CargoPad)) return CommandResult.Fail("err_invalid");
         m.StationUnload = unload;
         DirtyMachines.Add(id);
         return CommandResult.Success;
