@@ -237,6 +237,13 @@ public partial class AutoTest : Node
             Log($"Renderizador {RenderingServer.GetCurrentRenderingMethod()} GPU {RenderingServer.GetVideoAdapterName()} ventana {DisplayServer.WindowGetSize()}");
 
             await Wait(1.5);
+            if (_args.Count <= 10 && !_args.ContainsKey("scenario") && !_args.ContainsKey("measure") && !_args.ContainsKey("join") && !_args.ContainsKey("host"))
+            {
+                Check(_view.ObjectiveMarkerVisible && _view.ObjectiveDistance > 0, $"marcador del primer objetivo a {_view.ObjectiveDistance:0} m");
+                var firstTarget = W.DebrisById.Values.Where(d => d.Def == "scrap_pile").OrderBy(d => DebrisPos(d).DistanceSquaredTo(_view.PlayerPosition)).First();
+                _view.AimAt(DebrisPos(firstTarget) + Vector3.Up);
+                await Wait(0.2);
+            }
             await Shot("01_inicio");
 
             if (_args.ContainsKey("measure")) await MeasureScenario();

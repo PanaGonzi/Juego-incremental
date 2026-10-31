@@ -351,6 +351,24 @@ public class SimulationTests
     }
 }
 
+public class ObjectiveMarkerTests
+{
+    [Fact]
+    public void Targets_resolve_on_a_new_world_and_pick_the_nearest()
+    {
+        var (w, p) = Fixture.NewWorld();
+        foreach (var o in Fixture.Content.Objectives.Where(o => o.Target != null))
+        {
+            var kind = o.Target!.Split(':')[0];
+            Assert.Contains(kind, new[] { "machine", "node", "debris" });
+        }
+        Assert.NotNull(w.FindObjectiveTarget("machine:recycler", 0, 0, 0));
+        Assert.Null(w.FindObjectiveTarget("machine:recycler", 1, 0, 0));
+        var near = w.FindObjectiveTarget("node:ore", 0, 40000, -12000);
+        Assert.Equal((38000L, -10000L), near);
+    }
+}
+
 public class LocalizationTests
 {
     private static Dictionary<string, string> Table(string lang) =>

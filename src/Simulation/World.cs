@@ -257,6 +257,45 @@ public sealed partial class World
         MarkGlobal();
     }
 
+    /// <summary>Punto más cercano (mm) que cumple el destino de un objetivo en un planeta; solo lectura, para la interfaz.</summary>
+    public (long x, long z)? FindObjectiveTarget(string target, int planet, long fromX, long fromZ)
+    {
+        var parts = target.Split(':');
+        if (parts.Length != 2) return null;
+        var cell = (long)B.CellSizeMm;
+        (long x, long z)? best = null;
+        var bestDistance = long.MaxValue;
+        void Consider(long x, long z)
+        {
+            var dx = (x - fromX) / 1000;
+            var dz = (z - fromZ) / 1000;
+            var d = dx * dx + dz * dz;
+            if (d >= bestDistance) return;
+            bestDistance = d;
+            best = (x, z);
+        }
+        switch (parts[0])
+        {
+            case "machine":
+                foreach (var m in Machines.Values)
+                    if (m.Planet == planet && m.Def == parts[1])
+                    {
+                        var (x, z) = MachineCenterMm(m);
+                        Consider(x, z);
+                    }
+                break;
+            case "node":
+                foreach (var n in Nodes.Values)
+                    if (n.Planet == planet && n.Item == parts[1] && n.OccupiedBy < 0) Consider((n.X + 1) * cell, (n.Z + 1) * cell);
+                break;
+            case "debris":
+                foreach (var d in DebrisById.Values)
+                    if (d.Planet == planet && d.Def == parts[1]) Consider(d.X * cell + cell / 2, d.Z * cell + cell / 2);
+                break;
+        }
+        return best;
+    }
+
     // ---------- Comandos ----------
 
     public CommandResult Apply(PlayerState p, Command c)

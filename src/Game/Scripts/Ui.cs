@@ -307,7 +307,7 @@ public partial class Hud : Control
         }
 
         _objective.Text = w.ObjectiveIndex < w.Content.Objectives.Count
-            ? Loc.T("objective_" + w.Content.Objectives[w.ObjectiveIndex].Id)
+            ? Loc.T("objective_" + w.Content.Objectives[w.ObjectiveIndex].Id) + (_view.ObjectiveDistance > 7 ? $"   ·   {_view.ObjectiveDistance:0} m" : "")
             : Loc.T("objective_done");
 
         var bag = Ui.Amounts(me.Bag.Items);

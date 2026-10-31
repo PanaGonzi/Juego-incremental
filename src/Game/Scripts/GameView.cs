@@ -691,6 +691,46 @@ public partial class GameView : Node3D
         _lastCredits = w.Credits;
     }
 
+    private MeshInstance3D? _objectiveBeam;
+    public bool ObjectiveMarkerVisible => _objectiveBeam is { Visible: true };
+    public float ObjectiveDistance { get; private set; } = -1;
+
+    /// <summary>Haz de luz en el destino del objetivo actual. Si el objetivo no tiene lugar concreto, no se muestra.</summary>
+    private void UpdateObjectiveMarker(World w, PlayerState me)
+    {
+        _objectiveBeam ??= CreateObjectiveBeam();
+        ObjectiveDistance = -1;
+        _objectiveBeam.Visible = false;
+        if (_inFlight || w.ObjectiveIndex >= w.Content.Objectives.Count) return;
+        var target = w.Content.Objectives[w.ObjectiveIndex].Target;
+        if (target == null) return;
+        var from = _body.GlobalPosition;
+        var point = w.FindObjectiveTarget(target, me.Planet, (long)(from.X * 1000), (long)(from.Z * 1000));
+        if (point == null) return;
+        var at = new Vector3(point.Value.x / 1000f, 0, point.Value.z / 1000f);
+        ObjectiveDistance = new Vector2(at.X - from.X, at.Z - from.Z).Length();
+        _objectiveBeam.Visible = ObjectiveDistance > 7;
+        _objectiveBeam.GlobalPosition = at + Vector3.Up * 40;
+    }
+
+    private MeshInstance3D CreateObjectiveBeam()
+    {
+        var beam = new MeshInstance3D
+        {
+            Mesh = new CylinderMesh { TopRadius = 0.25f, BottomRadius = 0.25f, Height = 80, RadialSegments = 8, Rings = 1 },
+            MaterialOverride = new StandardMaterial3D
+            {
+                AlbedoColor = new Color(1f, 0.67f, 0.2f, 0.4f),
+                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                DisableFog = true,
+            },
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        };
+        AddChild(beam);
+        return beam;
+    }
+
     private void UpdateEvent(World w)
     {
         var show = w.ActiveEvents.Contains("halloween") && _viewPlanet == 0;
@@ -1225,6 +1265,7 @@ public partial class GameView : Node3D
 
         AnimateMachines((float)delta);
         UpdateTrains(delta);
+        if (local != null) UpdateObjectiveMarker(client.World!, local);
         UpdateRemote(delta);
         UpdateAudio(delta);
         UpdateTool(delta);

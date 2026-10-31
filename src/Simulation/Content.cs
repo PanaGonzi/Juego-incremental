@@ -92,6 +92,8 @@ public sealed class ObjectiveDef
     public string Stat { get; set; } = "";
     public long Qty { get; set; }
     public long Credits { get; set; }
+    /// <summary>Dónde señalar en el mundo: machine:ID, node:OBJETO o debris:ID.</summary>
+    public string? Target { get; set; }
 }
 
 public sealed class ProgressionDef
