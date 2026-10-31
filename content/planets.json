@@ -1,0 +1,33 @@
+[
+  {
+    "id": 0,
+    "key": "pluto",
+    "halfSizeCells": 90,
+    "startCredits": 100,
+    "spawn": { "x": 0, "z": 14 },
+    "builtins": [
+      { "def": "depot",           "x": -4,  "z": 2 },
+      { "def": "aux_core",        "x": 0,   "z": 3 },
+      { "def": "recycler",        "x": 3,   "z": 3 },
+      { "def": "export_terminal", "x": -10, "z": 3 }
+    ],
+    "nodes": [
+      { "item": "ore", "x": 18,  "z": -6,  "crust": 3 },
+      { "item": "ore", "x": 24,  "z": 0,   "crust": 3 },
+      { "item": "ore", "x": 20,  "z": 8,   "crust": 4 },
+      { "item": "ore", "x": 55,  "z": -40, "crust": 5 },
+      { "item": "ore", "x": 62,  "z": -33, "crust": 5 },
+      { "item": "ice", "x": -22, "z": -12, "crust": 3 },
+      { "item": "ice", "x": -28, "z": -4,  "crust": 3 },
+      { "item": "ice", "x": -55, "z": 30,  "crust": 5 }
+    ],
+    "debrisFields": [
+      { "def": "scrap_pile", "x": 6,   "z": 16,  "radius": 9,  "count": 16, "seed": 11 },
+      { "def": "scrap_pile", "x": -14, "z": 14,  "radius": 10, "count": 14, "seed": 23 },
+      { "def": "scrap_pile", "x": 30,  "z": 20,  "radius": 16, "count": 20, "seed": 37 },
+      { "def": "scrap_pile", "x": 55,  "z": -36, "radius": 20, "count": 24, "seed": 41 },
+      { "def": "ice_block",  "x": -30, "z": 12,  "radius": 12, "count": 14, "seed": 53 },
+      { "def": "ice_block",  "x": -50, "z": -30, "radius": 18, "count": 18, "seed": 61 }
+    ]
+  }
+]

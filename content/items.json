@@ -1,0 +1,10 @@
+[
+  { "id": "scrap",       "price": 1 },
+  { "id": "recovered",   "price": 3 },
+  { "id": "ore",         "price": 1 },
+  { "id": "ingot",       "price": 5 },
+  { "id": "parts",       "price": 16 },
+  { "id": "ice",         "price": 1 },
+  { "id": "coolant",     "price": 6 },
+  { "id": "cryo_module", "price": 80 }
+]

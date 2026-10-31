@@ -1,0 +1,10 @@
+bin/
+obj/
+.godot/
+builds/
+logs/
+*.user
+*.tmp
+.vs/
+.vscode/*.log
+src/Game/.mono/

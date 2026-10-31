@@ -1,0 +1,9 @@
+[
+  { "id": "recycle_scrap", "ticks": 30,  "inputs": { "scrap": 2 },                 "outputs": { "recovered": 1 } },
+  { "id": "extract_ore",   "ticks": 25,  "inputs": {},                             "outputs": { "ore": 1 } },
+  { "id": "extract_ice",   "ticks": 20,  "inputs": {},                             "outputs": { "ice": 1 } },
+  { "id": "smelt_ingot",   "ticks": 40,  "inputs": { "ore": 2 },                   "outputs": { "ingot": 1 } },
+  { "id": "make_parts",    "ticks": 50,  "inputs": { "ingot": 2 },                 "outputs": { "parts": 1 } },
+  { "id": "make_coolant",  "ticks": 40,  "inputs": { "ice": 2 },                   "outputs": { "coolant": 1 } },
+  { "id": "make_cryo",     "ticks": 100, "inputs": { "parts": 2, "coolant": 2 },   "outputs": { "cryo_module": 1 } }
+]

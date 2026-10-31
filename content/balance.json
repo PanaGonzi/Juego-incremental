@@ -1,0 +1,23 @@
+{
+  "cellSizeMm": 2000,
+  "ticksPerSecond": 10,
+  "maxCredits": 1000000000000000,
+  "personalStackLimit": 500,
+  "cutterRangeMm": 9000,
+  "interactRangeMm": 8000,
+  "buildRangeMm": 40000,
+  "cutterCooldownTicks": 2,
+  "linkMaxMm": 14000,
+  "linkIntervalTicks": 3,
+  "recipeBufferFactor": 4,
+  "outputBuffer": 20,
+  "refundPermille": 1000,
+  "sellIntervalTicks": 10,
+  "sellUnitsPerInterval": 4,
+  "offlineCapHours": 8,
+  "debris": {
+    "scrap_pile":  { "hp": 6,  "drop": "scrap", "perHit": 1, "final": 4, "credits": 2, "cells": 1 },
+    "ice_block":   { "hp": 6,  "drop": "ice",   "perHit": 1, "final": 3, "credits": 1, "cells": 1 },
+    "ice_crust":   { "hp": 10, "drop": "ice",   "perHit": 1, "final": 2, "credits": 3, "cells": 1 }
+  }
+}

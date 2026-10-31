@@ -1,0 +1,14 @@
+[
+  { "id": "depot",           "kind": "Storage",    "w": 3, "d": 3, "capacity": 2000, "builtin": true },
+  { "id": "aux_core",        "kind": "Generator",  "w": 2, "d": 2, "powerGen": 30, "builtin": true },
+  { "id": "export_terminal", "kind": "Terminal",   "w": 3, "d": 2, "capacity": 500, "credits": 120, "cost": { "recovered": 20 } },
+  { "id": "recycler",        "kind": "Production", "w": 2, "d": 2, "power": 5,  "credits": 30,  "cost": { "recovered": 5 },  "recipe": "recycle_scrap" },
+  { "id": "ore_extractor",   "kind": "Production", "w": 2, "d": 2, "power": 6,  "credits": 40,  "cost": { "recovered": 8 },  "recipe": "extract_ore", "node": "ore" },
+  { "id": "smelter",         "kind": "Production", "w": 2, "d": 3, "power": 8,  "credits": 60,  "cost": { "recovered": 12 }, "recipe": "smelt_ingot" },
+  { "id": "assembler",       "kind": "Production", "w": 3, "d": 3, "power": 10, "credits": 150, "cost": { "ingot": 15, "recovered": 10 }, "recipe": "make_parts", "unlock": "tech_assembly" },
+  { "id": "ice_extractor",   "kind": "Production", "w": 2, "d": 2, "power": 5,  "credits": 90,  "cost": { "ingot": 8 },      "recipe": "extract_ice", "node": "ice", "unlock": "tech_cryo" },
+  { "id": "chiller",         "kind": "Production", "w": 2, "d": 3, "power": 8,  "credits": 140, "cost": { "ingot": 12 },     "recipe": "make_coolant", "unlock": "tech_cryo" },
+  { "id": "cryo_assembler",  "kind": "Production", "w": 3, "d": 3, "power": 20, "credits": 500, "cost": { "parts": 20, "coolant": 10 }, "recipe": "make_cryo", "unlock": "tech_cryo" },
+  { "id": "rtg_generator",   "kind": "Generator",  "w": 2, "d": 2, "powerGen": 25, "credits": 80, "cost": { "recovered": 15 } },
+  { "id": "storage_crate",   "kind": "Storage",    "w": 2, "d": 2, "capacity": 200, "credits": 25, "cost": { "recovered": 6 } }
+]
