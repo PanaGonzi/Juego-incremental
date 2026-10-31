@@ -288,6 +288,24 @@ public class SimulationTests
     }
 
     [Fact]
+    public void Roles_follow_the_hierarchy()
+    {
+        var (w, owner) = Fixture.NewWorld("owner-key");
+        owner.Role = Role.Owner;
+        var admin = Fixture.AddPlayer(w, "admin-key");
+        var guest = Fixture.AddPlayer(w, "guest-key");
+        Command Set(string key, Role role) => new() { Type = CommandType.SetRole, Text = key, A = (int)role };
+        Assert.True(w.Apply(owner, Set(admin.Key, Role.Admin)).Ok);
+        Assert.True(w.Apply(admin, Set(guest.Key, Role.Visitor)).Ok);
+        Assert.Equal(Role.Visitor, guest.Role);
+        Assert.Equal("err_permission", w.Apply(guest, Set(guest.Key, Role.Builder)).Error);
+        Assert.Equal("err_permission", w.Apply(admin, Set(owner.Key, Role.Visitor)).Error);
+        Assert.Equal("err_permission", w.Apply(admin, Set(admin.Key, Role.Builder)).Error);
+        Assert.Equal("err_permission", w.Apply(admin, Set(guest.Key, Role.Admin)).Error);
+        Assert.True(w.Apply(owner, Set(admin.Key, Role.Builder)).Ok);
+    }
+
+    [Fact]
     public void Extractor_requires_a_revealed_node()
     {
         var (w, p) = Fixture.NewWorld();
@@ -778,6 +796,28 @@ public class SaveTests : IDisposable
         Assert.Contains(loaded.Machines.Values, m => m.Def == "depot" && m.Planet == 1);
         Assert.True(File.Exists(store.PathOf("vieja") + ".v1.bak"));
         Assert.Equal(encoded, File.ReadAllBytes(store.PathOf("vieja") + ".v1.bak"));
+    }
+
+    [Fact]
+    public void Real_save_from_alpha_0_1_0_loads_migrates_and_keeps_playing()
+    {
+        var store = new SaveStore("test", _root);
+        var original = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixtures", "save-v1-alpha-0.1.0.plsave"));
+        Assert.Equal(1, BitConverter.ToInt32(original, 4));
+        store.Write("real", original);
+
+        var world = store.Load("real", Fixture.Content);
+        Assert.Contains(world.Machines.Values, m => m.Def == "smelter");
+        Assert.Contains(world.Machines.Values, m => m.Def == "shuttle_terminal" && m.Planet == 0);
+        Assert.Contains(world.Machines.Values, m => m.Def == "depot" && m.Planet == 1);
+        Assert.Equal(original, File.ReadAllBytes(store.PathOf("real") + ".v1.bak"));
+        var credits = world.Credits;
+        for (var i = 0; i < 300; i++) world.Step();
+        Assert.True(world.Credits >= credits);
+
+        store.Save("real", world);
+        Assert.Equal(WorldCodec.FormatVersion, BitConverter.ToInt32(File.ReadAllBytes(store.PathOf("real")), 4));
+        Assert.Equal(WorldCodec.Hash(world), WorldCodec.Hash(store.Load("real", Fixture.Content)));
     }
 
     [Fact]

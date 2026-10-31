@@ -181,6 +181,25 @@ public class NetworkTests
     }
 
     [Fact]
+    public void Owner_can_kick_guest_but_guest_cannot_kick_owner()
+    {
+        using var h = new NetHarness();
+        var owner = h.Join(KeyA);
+        var guest = h.Join(KeyB);
+        Assert.Equal(Role.Owner, h.Server.World.Players[KeyA].Role);
+        Assert.Equal(Role.Builder, h.Server.World.Players[KeyB].Role);
+        var denied = false;
+        guest.ResultReceived += (_, r) => denied |= r.Error == "err_permission";
+        guest.Send(new Command { Type = CommandType.Kick, Text = KeyA });
+        h.Pump(() => denied);
+        owner.Send(new Command { Type = CommandType.Kick, Text = KeyB });
+        h.Pump(() => guest.State == ClientState.Closed);
+        Assert.Equal("reject_kicked", guest.CloseReason);
+        Assert.Equal(ClientState.InGame, owner.State);
+        Assert.Equal(1, h.Server.ConnectedCount);
+    }
+
+    [Fact]
     public void Same_identity_replaces_previous_session_instead_of_taking_a_slot()
     {
         using var h = new NetHarness();

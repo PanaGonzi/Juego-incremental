@@ -510,6 +510,46 @@ public partial class Hud : Control
         Add(Ui.Btn(Loc.T("panel_close"), ClosePanel));
     }
 
+    public void OpenPlayers()
+    {
+        Open(PlayersPanel);
+    }
+
+    private void PlayersPanel()
+    {
+        var client = _view.Session.Client;
+        var w = client.World!;
+        var me = client.LocalPlayer!;
+        Clear();
+        Add(Ui.Text(Loc.T("hud_players"), 26, Ui.Amber));
+        foreach (var p in w.Players.Values.OrderByDescending(p => p.Connected).ThenBy(p => p.Name).ToList())
+        {
+            var key = p.Key;
+            var row = new HBoxContainer();
+            row.AddThemeConstantOverride("separation", 8);
+            var place = p.TransitTo >= 0 ? Loc.T("shuttle_title") + " " + Loc.T("planet_" + p.TransitTo) : Loc.T("planet_" + p.Planet);
+            var state = p.Connected ? place : Loc.T("player_offline");
+            var label = Ui.Text($"{p.Name} — {Loc.T("role_" + p.Role)} — {state}", 17, p.Connected ? Ui.Ink : Ui.Dim);
+            label.CustomMinimumSize = new Vector2(520, 0);
+            row.AddChild(label);
+            if (me.Role >= Role.Admin && p.Key != me.Key && p.Role < me.Role)
+            {
+                if (p.Role == Role.Visitor)
+                    row.AddChild(Ui.Btn(Loc.T("player_allow_build"), () => client.Send(new Command { Type = CommandType.SetRole, Text = key, A = (int)Role.Builder })));
+                else if (p.Role == Role.Builder)
+                    row.AddChild(Ui.Btn(Loc.T("player_view_only"), () => client.Send(new Command { Type = CommandType.SetRole, Text = key, A = (int)Role.Visitor })));
+                if (me.Role == Role.Owner && p.Role == Role.Builder)
+                    row.AddChild(Ui.Btn(Loc.T("player_make_admin"), () => client.Send(new Command { Type = CommandType.SetRole, Text = key, A = (int)Role.Admin })));
+                if (me.Role == Role.Owner && p.Role == Role.Admin)
+                    row.AddChild(Ui.Btn(Loc.T("player_remove_admin"), () => client.Send(new Command { Type = CommandType.SetRole, Text = key, A = (int)Role.Builder })));
+                if (p.Connected)
+                    row.AddChild(Ui.Btn(Loc.T("player_kick"), () => client.Send(new Command { Type = CommandType.Kick, Text = key })));
+            }
+            Add(row);
+        }
+        Add(Ui.Btn(Loc.T("panel_close"), ClosePanel));
+    }
+
     public void OpenTech()
     {
         Open(TechPanel);

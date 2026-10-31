@@ -702,6 +702,7 @@ public sealed partial class World
     {
         if (!Players.TryGetValue(targetKey, out var target)) return CommandResult.Fail("err_gone");
         if (target.Role == Role.Owner || role == Role.Owner) return CommandResult.Fail("err_permission");
+        if (target.Role >= p.Role) return CommandResult.Fail("err_permission");
         if (role > Role.Admin || role < Role.Visitor) return CommandResult.Fail("err_invalid");
         if (role == Role.Admin && p.Role != Role.Owner) return CommandResult.Fail("err_permission");
         target.Role = role;

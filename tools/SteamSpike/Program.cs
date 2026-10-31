@@ -1,8 +1,12 @@
-using System.Runtime.InteropServices;
+using System.Diagnostics;
+using Pluton.Networking;
+using Pluton.Simulation;
+using Pluton.Steam;
 using Steamworks;
 
 // Prueba técnica: AppID 480 es el ejemplo público de Valve (Spacewar), NO el del producto.
-// Valida binding + SDK + acceso a relays + canal fiable y no fiable, en una sola máquina y cuenta.
+// Sesión real del juego (servidor autoritativo + 12 clientes) sobre Steam Networking Sockets,
+// en una máquina y una cuenta. No demuestra la conexión entre cuentas ni el paso por relays.
 File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "steam_appid.txt"), "480");
 Directory.SetCurrentDirectory(AppContext.BaseDirectory);
 
@@ -14,72 +18,97 @@ if (!SteamAPI.Init())
 Console.WriteLine($"steam_init=OK appid={SteamUtils.GetAppID()} loggedOn={SteamUser.BLoggedOn()}");
 
 SteamNetworkingUtils.InitRelayNetworkAccess();
-var clock = System.Diagnostics.Stopwatch.StartNew();
+var clock = Stopwatch.StartNew();
 SteamRelayNetworkStatus_t status = default;
 while (clock.Elapsed.TotalSeconds < 25)
 {
     SteamAPI.RunCallbacks();
-    var a = SteamNetworkingUtils.GetRelayNetworkStatus(out status);
-    if (a == ESteamNetworkingAvailability.k_ESteamNetworkingAvailability_Current) break;
+    if (SteamNetworkingUtils.GetRelayNetworkStatus(out status) == ESteamNetworkingAvailability.k_ESteamNetworkingAvailability_Current) break;
     Thread.Sleep(100);
 }
 Console.WriteLine($"relay_status={status.m_eAvail} seconds={clock.Elapsed.TotalSeconds:F1} debug='{status.m_debugMsg}'");
 
-// Par de sockets por la pila real de Steam Networking Sockets, usando loopback de red.
-var idA = new SteamNetworkingIdentity();
-var idB = new SteamNetworkingIdentity();
-var pair = SteamNetworkingSockets.CreateSocketPair(out var a1, out var b1, true, ref idA, ref idB);
-Console.WriteLine($"socket_pair={pair}");
-var failures = 0;
-if (pair)
+const int clients = 12;
+var content = ContentDb.Load(ContentDb.LocateDirectory());
+var serverEnds = new List<HSteamNetConnection>();
+var clientEnds = new List<HSteamNetConnection>();
+for (var i = 0; i < clients; i++)
 {
-    foreach (var (label, flags) in new[] { ("reliable", 8), ("unreliable", 0) })
+    var idA = new SteamNetworkingIdentity();
+    var idB = new SteamNetworkingIdentity();
+    if (!SteamNetworkingSockets.CreateSocketPair(out var a, out var b, true, ref idA, ref idB))
     {
-        var payload = System.Text.Encoding.UTF8.GetBytes("pluton-" + label);
-        var h = GCHandle.Alloc(payload, GCHandleType.Pinned);
-        var send = SteamNetworkingSockets.SendMessageToConnection(a1, h.AddrOfPinnedObject(), (uint)payload.Length, flags, out _);
-        h.Free();
-        var got = false;
-        var messages = new IntPtr[8];
-        var t = System.Diagnostics.Stopwatch.StartNew();
-        while (t.ElapsedMilliseconds < 3000 && !got)
-        {
-            SteamAPI.RunCallbacks();
-            var n = SteamNetworkingSockets.ReceiveMessagesOnConnection(b1, messages, messages.Length);
-            for (var i = 0; i < n; i++)
-            {
-                var msg = SteamNetworkingMessage_t.FromIntPtr(messages[i]);
-                var buffer = new byte[msg.m_cbSize];
-                Marshal.Copy(msg.m_pData, buffer, 0, msg.m_cbSize);
-                got |= System.Text.Encoding.UTF8.GetString(buffer) == "pluton-" + label;
-                SteamNetworkingMessage_t.Release(messages[i]);
-            }
-            Thread.Sleep(5);
-        }
-        Console.WriteLine($"channel={label} send={send} received={got} ms={t.ElapsedMilliseconds}");
-        if (!got) failures++;
+        Console.WriteLine("RESULTADO socket_pair=FALLO");
+        SteamAPI.Shutdown();
+        return 2;
     }
-    SteamNetworkingSockets.CloseConnection(a1, 0, "fin", false);
-    SteamNetworkingSockets.CloseConnection(b1, 0, "fin", false);
+    serverEnds.Add(a);
+    clientEnds.Add(b);
 }
 
-// Lobby de amigos: se crea y se abandona de inmediato para confirmar la llamada.
-var lobbyDone = false;
-var result = EResult.k_EResultFail;
-ulong lobby = 0;
-using (var cr = CallResult<LobbyCreated_t>.Create((r, io) => { lobbyDone = true; result = r.m_eResult; lobby = r.m_ulSteamIDLobby; }))
+var world = World.CreateNew(content);
+var server = new Pluton.Networking.GameServer(world, SteamTransport.FromConnections(serverEnds), new ServerOptions { Log = m => Console.WriteLine("[servidor] " + m), CheckEveryTicks = 20 });
+var players = new List<GameClient>();
+for (var i = 0; i < clients; i++)
+    players.Add(new GameClient(content, SteamTransport.FromConnections(new[] { clientEnds[i] }), $"steam-test-identity-{i:D4}", $"steam{i:D2}"));
+
+var ok = 0;
+var failed = 0;
+foreach (var p in players) p.ResultReceived += (_, r) => { if (r.Ok) ok++; else failed++; };
+
+void Pump(int ms, Action? each = null)
 {
-    cr.Set(SteamMatchmaking.CreateLobby(ELobbyType.k_ELobbyTypePrivate, 12));
-    var t = System.Diagnostics.Stopwatch.StartNew();
-    while (!lobbyDone && t.Elapsed.TotalSeconds < 10)
+    var t = Stopwatch.StartNew();
+    while (t.ElapsedMilliseconds < ms)
     {
-        SteamAPI.RunCallbacks();
-        Thread.Sleep(50);
+        server.Tick();
+        foreach (var p in players) p.Poll();
+        each?.Invoke();
+        Thread.Sleep(5);
     }
 }
-Console.WriteLine($"lobby_private_12 done={lobbyDone} result={result}");
-if (lobby != 0) SteamMatchmaking.LeaveLobby(new CSteamID(lobby));
 
+var joinClock = Stopwatch.StartNew();
+Pump(4000);
+var joined = players.Count(p => p.State == ClientState.InGame);
+Console.WriteLine($"clientes_en_partida={joined}/{clients} conectados_servidor={server.ConnectedCount} ms={joinClock.ElapsedMilliseconds}");
+
+// Competencia real por escombros, con movimiento por el canal no fiable.
+var rng = new Random(7);
+foreach (var p in players)
+{
+    var debris = world.DebrisById.Values.Where(d => d.Planet == 0).OrderBy(_ => rng.Next()).First();
+    var me = world.Players[p.Key];
+    me.X = debris.X * 2f;
+    me.Z = debris.Z * 2f;
+}
+var sinceAction = 0;
+Pump(15000, () =>
+{
+    if (++sinceAction % 20 != 0) return;
+    foreach (var p in players)
+    {
+        if (p.World == null || p.LocalPlayer == null) continue;
+        var me = world.Players[p.Key];
+        var target = p.World.DebrisById.Values.Where(d => d.Planet == 0).OrderBy(d => (d.X * 2f - me.X) * (d.X * 2f - me.X) + (d.Z * 2f - me.Z) * (d.Z * 2f - me.Z)).FirstOrDefault();
+        if (target == null) continue;
+        me.X = target.X * 2f;
+        me.Z = target.Z * 2f;
+        p.SendMove(me.X, 1, me.Z, 0);
+        p.Send(new Command { Type = CommandType.CutDebris, A = target.Id });
+    }
+});
+
+var mismatches = players.Sum(p => p.HashMismatches);
+var checks = players.Sum(p => p.HashChecks);
+Console.WriteLine($"acciones ok={ok} rechazadas={failed} firmas={checks} divergencias={mismatches} creditos={world.Credits} enviado_kib={server.Transport.BytesSent / 1024} recibido_kib={server.Transport.BytesReceived / 1024}");
+
+foreach (var p in players.Take(1)) p.Disconnect();
+Pump(1500);
+Console.WriteLine($"tras_desconectar_uno conectados={server.ConnectedCount}");
+var pass = joined == clients && mismatches == 0 && checks > 0 && ok > 0 && server.ConnectedCount == clients - 1;
+foreach (var p in players) p.Dispose();
+server.Dispose();
 SteamAPI.Shutdown();
-Console.WriteLine($"RESULTADO failures={failures}");
-return failures;
+Console.WriteLine($"RESULTADO {(pass ? "CORRECTO" : "FALLO")}");
+return pass ? 0 : 3;

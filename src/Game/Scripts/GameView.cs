@@ -942,6 +942,11 @@ public partial class GameView : Node3D
             if (_hud.PanelOpen) _hud.ClosePanel(); else _hud.OpenTech();
             return;
         }
+        if (e.IsActionPressed("players"))
+        {
+            if (_hud.PanelOpen) _hud.ClosePanel(); else _hud.OpenPlayers();
+            return;
+        }
         if (_hud.PanelOpen || _inFlight) return;
 
         if (e.IsActionPressed("tool_cutter")) SetTool(Tool.Cutter);
@@ -1579,6 +1584,7 @@ public static class Controls
         Key("pause", Godot.Key.Escape);
         Key("chat", Godot.Key.Enter);
         Key("tech", Godot.Key.Tab);
+        Key("players", Godot.Key.P);
         Key("tool_cutter", Godot.Key.Key1);
         Key("tool_build", Godot.Key.Key2, Godot.Key.B);
         Key("tool_link", Godot.Key.Key3, Godot.Key.L);
