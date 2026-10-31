@@ -433,7 +433,7 @@ public partial class Hud : Control
             Add(Ui.Text($"{Loc.T("panel_input")}: {Ui.Amounts(m.In.Items)}", 17));
             Add(Ui.Text($"{Loc.T("panel_output")}: {Ui.Amounts(m.Out.Items)}", 17));
         }
-        else if (def.Kind != MachineKind.Generator)
+        else if (def.Kind is not (MachineKind.Generator or MachineKind.Shuttle))
         {
             Add(Ui.Text($"{Loc.T("panel_contents")} (máx. {def.Capacity} por tipo):", 17));
             Add(Ui.Text(Ui.Amounts(m.In.Items), 17));
@@ -460,6 +460,17 @@ public partial class Hud : Control
                 row.AddChild(Ui.Btn(Loc.T("train_remove"), () => client.Send(new Command { Type = CommandType.RemoveTrain, A = trainId })));
                 Add(row);
             }
+        }
+
+        if (def.Kind == MachineKind.Shuttle)
+        {
+            if (!w.Upgrades.Contains("tech_shuttle")) Add(Ui.Text(Loc.T("shuttle_locked"), 16, Ui.Bad));
+            else
+                foreach (var planet in w.Content.Planets.Where(pl => pl.Id != m.Planet))
+                {
+                    var destination = planet.Id;
+                    Add(Ui.Btn($"{Loc.T("shuttle_go")} {Loc.T("planet_" + planet.Id)}", () => client.Send(new Command { Type = CommandType.Travel, A = destination })));
+                }
         }
 
         if (def.Kind == MachineKind.Terminal)

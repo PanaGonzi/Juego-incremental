@@ -10,7 +10,8 @@ public sealed class ServerOptions
     public string Password = "";
     public string? HostKey;
     public int FlushEveryTicks = 2;
-    public int CheckEveryTicks = 50;
+    public int CheckEveryTicks = 100;
+    public int SimFlushEveryTicks = 10;
     public int PositionsEveryTicks = 1;
     public int AutosaveSeconds = 120;
     public string SaveSlot = "";
@@ -49,6 +50,7 @@ public sealed class GameServer : IDisposable
     private readonly List<(int peer, long atMs)> _closing = new();
     private readonly PacketWriter _pw = new();
     private readonly MemoryStream _deltaStream = new();
+    private readonly MemoryStream _compressed = new();
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private long _lastAutosaveMs;
     private Task? _saveTask;
@@ -357,15 +359,21 @@ public sealed class GameServer : IDisposable
         _transport.Poll();
         ProcessClosing();
         if (!Paused) World.Step();
-        if (World.Tick % _opt.FlushEveryTicks == 0 || _pendingJoin.Count > 0) FlushDeltas();
         if (_pendingJoin.Count > 0) SendSnapshots();
+        else if (World.Tick % _opt.FlushEveryTicks == 0) FlushDeltas();
         if (World.Tick % _opt.PositionsEveryTicks == 0) SendPositions();
         if (World.Tick % _opt.CheckEveryTicks == 0) SendCheck();
         Autosave();
     }
 
-    private void FlushDeltas()
+    private void FlushDeltas(bool everything = false)
     {
+        // Lo cambiado por la simulación espera a su ciclo; lo pedido por un jugador sale de inmediato.
+        if (everything || World.Tick % _opt.SimFlushEveryTicks == 0 || _opt.FlushEveryTicks >= _opt.SimFlushEveryTicks)
+        {
+            World.DirtyMachines.UnionWith(World.DirtySimMachines);
+            World.DirtySimMachines.Clear();
+        }
         if (World.DirtyMachines.Count == 0 && World.DirtyDebris.Count == 0 && World.DirtyNodes.Count == 0 &&
             World.DirtyLinks.Count == 0 && World.DirtyPlayers.Count == 0 && !World.DirtyGlobal &&
             World.RemovedMachines.Count == 0 && World.RemovedDebris.Count == 0 && World.RemovedLinks.Count == 0 &&
@@ -409,6 +417,16 @@ public sealed class GameServer : IDisposable
         }
         var buffer = _deltaStream.GetBuffer();
         var length = (int)_deltaStream.Length;
+        // Se comprime una vez y se reutiliza para todos: el coste no crece con los clientes.
+        if (length > 200)
+        {
+            _compressed.SetLength(0);
+            _compressed.WriteByte((byte)MsgType.DeltaCompressed);
+            using (var deflate = new System.IO.Compression.DeflateStream(_compressed, System.IO.Compression.CompressionLevel.Fastest, leaveOpen: true))
+                deflate.Write(buffer, 1, length - 1);
+            buffer = _compressed.GetBuffer();
+            length = (int)_compressed.Length;
+        }
         foreach (var s in _sessions.Values)
             if (s.Synced) _transport.Send(s.Peer, buffer, length, Channel.Reliable);
 
@@ -432,6 +450,7 @@ public sealed class GameServer : IDisposable
     private void SendSnapshots()
     {
         // Justo tras vaciar los cambios: la instantánea corresponde a este tick y lo siguiente llega como delta.
+        FlushDeltas(everything: true);
         var bytes = WorldCodec.Serialize(World);
         if (bytes.Length > Protocol.MaxSnapshotBytes) throw new InvalidOperationException("Instantánea demasiado grande");
         LastSnapshotBytes = bytes.Length;
@@ -491,7 +510,7 @@ public sealed class GameServer : IDisposable
 
     private void SendCheck()
     {
-        FlushDeltas();
+        FlushDeltas(everything: true);
         var hash = WorldCodec.Hash(World);
         var w = _pw.Begin(MsgType.Check);
         w.Write(World.Tick);

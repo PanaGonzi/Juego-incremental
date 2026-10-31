@@ -69,6 +69,24 @@ public partial class GameView : Node3D
     private MeshInstance3D _beam = null!;
     private GpuParticles3D _sparks = null!;
     private ShaderMaterial _ground = null!;
+    private ShaderMaterial _sky = null!;
+    private int _viewPlanet = -1;
+
+    // Trayecto en lanzadera: continuo, sin pantalla de carga. La niebla oculta el relevo de entornos.
+    private Node3D? _shuttle;
+    private MeshInstance3D? _globe;
+    private bool _inFlight;
+    private double _flightTime;
+    private double _flightTotal;
+    private int _flightTo;
+    private bool _flightSwapped;
+    private Label3D? _flightLabel;
+    private const float FlightAltitude = 420f;
+    private const float BaseFog = 0.0022f;
+    public int ViewPlanet => _viewPlanet;
+    public bool InFlight => _inFlight;
+    public int RenderedDebris => _debris.Count;
+    public int RenderedMachines => _machines.Count;
     private Control? _loading;
     private readonly List<AudioStreamPlayer3D> _hums = new();
     private double _humTimer;
@@ -158,6 +176,7 @@ public partial class GameView : Node3D
     private void BuildEnvironment()
     {
         var sky = new ShaderMaterial { Shader = new Shader { Code = SkyShader } };
+        _sky = sky;
         var env = new Godot.Environment
         {
             BackgroundMode = Godot.Environment.BGMode.Sky,
@@ -291,6 +310,8 @@ public partial class GameView : Node3D
         shader_type spatial;
         render_mode cull_back;
         uniform float grid_strength = 0.0;
+        uniform vec3 low_color = vec3(0.115,0.075,0.062);
+        uniform vec3 high_color = vec3(0.50,0.54,0.61);
         varying vec3 wp;
         const mat2 ROT = mat2(vec2(0.8,0.6),vec2(-0.6,0.8));
         vec2 grad(vec2 i){ vec3 p3 = fract(vec3(i.xyx)*vec3(0.1031,0.1030,0.0973)); p3 += dot(p3,p3.yzx+33.33); float a = fract((p3.x+p3.y)*p3.z)*6.2831853; return vec2(cos(a),sin(a)); }
@@ -303,10 +324,8 @@ public partial class GameView : Node3D
           float big = fbm(wp.xz*0.016,4);
           float mid = fbm(wp.xz*0.11,4);
           float fine = fbm(wp.xz*1.3,3);
-          vec3 tholin = vec3(0.115,0.075,0.062);
-          vec3 frost = vec3(0.50,0.54,0.61);
           float ice = smoothstep(0.46,0.60, big*0.58+mid*0.42);
-          vec3 c = mix(tholin, frost, ice);
+          vec3 c = mix(low_color, high_color, ice);
           c *= 0.88 + (fine-0.5)*0.45;
           ALBEDO = c;
           ROUGHNESS = mix(0.95,0.5,ice);
@@ -320,6 +339,8 @@ public partial class GameView : Node3D
 
     private const string SkyShader = """
         shader_type sky;
+        uniform float moon = 1.0;
+        uniform vec3 horizon = vec3(0.012,0.016,0.034);
         float hash(vec3 p){ return fract(sin(dot(p, vec3(127.1,311.7,74.7))) * 43758.5453); }
         float hash2(vec2 p){ return fract(sin(dot(p, vec2(41.3,289.1))) * 43758.5453); }
         float vnoise(vec2 p){ vec2 i=floor(p); vec2 f=fract(p); f=f*f*(3.0-2.0*f);
@@ -334,7 +355,7 @@ public partial class GameView : Node3D
         }
         void sky(){
           vec3 d = normalize(EYEDIR);
-          vec3 c = mix(vec3(0.0016,0.0022,0.0052), vec3(0.012,0.016,0.034), pow(1.0-clamp(d.y,0.0,1.0),9.0));
+          vec3 c = mix(vec3(0.0016,0.0022,0.0052), horizon, pow(1.0-clamp(d.y,0.0,1.0),9.0));
           float band = pow(1.0-abs(dot(d,normalize(vec3(0.3,0.55,-0.75)))),7.0);
           c += vec3(0.02,0.018,0.034)*band;
           c += vec3(0.85,0.92,1.0)*(stars(d,170.0,0.975)+stars(d,330.0,0.986)*0.5)*(1.0-pow(1.0-clamp(d.y+0.02,0.0,1.0),12.0));
@@ -344,7 +365,7 @@ public partial class GameView : Node3D
           // Caronte: disco con terminador coherente con el Sol.
           vec3 mc = normalize(vec3(-0.34,0.34,-0.88)); float mr = 0.085;
           float cosd = dot(d,mc);
-          if (cosd > 0.0){
+          if (cosd > 0.0 && moon > 0.5){
             vec3 u = normalize(cross(vec3(0,1,0),mc)); vec3 v = cross(mc,u);
             vec2 q = vec2(dot(d,u),dot(d,v))/mr; float r2 = dot(q,q);
             if (r2 < 1.0){
@@ -394,9 +415,154 @@ public partial class GameView : Node3D
         _head.Rotation = Vector3.Zero;
         _body.Rotation = new Vector3(0, _yaw, 0);
         _worldDirty = true;
+        SetPlanetLook(me.TransitTo >= 0 ? me.TransitTo : me.Planet);
+        if (me.TransitTo >= 0) StartFlight(me);
         _lastCredits = Session.Client.World!.Credits;
         _objectiveSeen = Session.Client.World.ObjectiveIndex;
         UpdateMouseMode();
+    }
+
+    // ---------- Planetas y lanzadera ----------
+
+    private void SetPlanetLook(int planet)
+    {
+        _viewPlanet = planet;
+        var mars = planet == 1;
+        _ground.SetShaderParameter("low_color", mars ? new Vector3(0.20f, 0.075f, 0.04f) : new Vector3(0.115f, 0.075f, 0.062f));
+        _ground.SetShaderParameter("high_color", mars ? new Vector3(0.50f, 0.26f, 0.13f) : new Vector3(0.50f, 0.54f, 0.61f));
+        _sky.SetShaderParameter("moon", mars ? 0f : 1f);
+        _sky.SetShaderParameter("horizon", mars ? new Vector3(0.11f, 0.05f, 0.03f) : new Vector3(0.012f, 0.016f, 0.034f));
+        _sun.LightColor = mars ? new Color(1f, 0.88f, 0.74f) : new Color(0.86f, 0.9f, 1f);
+        _sun.LightEnergy = mars ? 1.7f : 1.25f;
+        _env.Environment.FogLightColor = mars ? new Color(0.5f, 0.28f, 0.17f) : new Color(0.22f, 0.28f, 0.42f);
+    }
+
+    /// <summary>Retira la representación del planeta anterior; su simulación sigue en el servidor.</summary>
+    private void ClearWorldView()
+    {
+        foreach (var id in _machines.Keys.ToList()) FreeMachine(id);
+        foreach (var mesh in _debris.Values) mesh.QueueFree();
+        _debris.Clear();
+        foreach (var body in _debrisBodies.Values)
+        {
+            _pickables.Remove(body.GetInstanceId());
+            body.QueueFree();
+        }
+        _debrisBodies.Clear();
+        foreach (var mesh in _links.Values) mesh.QueueFree();
+        _links.Clear();
+        foreach (var mesh in _nodes.Values) mesh.QueueFree();
+        _nodes.Clear();
+        foreach (var mesh in _rails.Values) mesh.QueueFree();
+        _rails.Clear();
+        foreach (var t in _trains.Values)
+        {
+            t.Loco.QueueFree();
+            t.Wagon.QueueFree();
+        }
+        _trains.Clear();
+        foreach (var r in _remote.Values) r.Root.QueueFree();
+        _remote.Clear();
+    }
+
+    private void StartFlight(PlayerState me)
+    {
+        var balance = Session.Client.World!.Content.Balance;
+        _inFlight = true;
+        _flightTo = me.TransitTo;
+        _flightTotal = balance.TravelTicks / (double)balance.TicksPerSecond;
+        _flightTime = Math.Clamp((Session.Client.World.Tick - me.TransitStartTick) / (double)balance.TicksPerSecond, 0, _flightTotal);
+        _flightSwapped = _viewPlanet == _flightTo;
+        SetTool(Tool.Cutter);
+        _hud.ClosePanel();
+
+        _shuttle = new Node3D { Position = _body.GlobalPosition with { Y = 0.5f } };
+        _shuttle.AddChild(new MeshInstance3D { Mesh = Models.ShuttleCabin(), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        _flightLabel = new Label3D
+        {
+            Text = $"{Loc.T("shuttle_title")} {Loc.T("planet_" + _flightTo)}",
+            Position = new Vector3(0, 1.75f, -2.35f),
+            PixelSize = 0.003f,
+            FontSize = 40,
+            OutlineSize = 6,
+            Modulate = Ui.Amber,
+        };
+        _shuttle.AddChild(_flightLabel);
+        var interior = new OmniLight3D { LightColor = new Color(1f, 0.85f, 0.65f), LightEnergy = 0.7f, OmniRange = 7, Position = new Vector3(0, 2.2f, 0) };
+        _shuttle.AddChild(interior);
+        AddChild(_shuttle);
+
+        var mars = _flightTo == 1;
+        _globe = new MeshInstance3D
+        {
+            Mesh = new SphereMesh { Radius = 1, Height = 2, RadialSegments = 48, Rings = 24 },
+            MaterialOverride = new StandardMaterial3D
+            {
+                AlbedoColor = mars ? new Color(0.62f, 0.3f, 0.16f) : new Color(0.6f, 0.56f, 0.52f),
+                Roughness = 1,
+                DisableFog = true,
+                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            },
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            Visible = false,
+        };
+        AddChild(_globe);
+    }
+
+    private static float Smooth(double t) => Mathf.SmoothStep(0f, 1f, (float)Math.Clamp(t, 0, 1));
+
+    /// <summary>Despegue, crucero y descenso guiados por un único reloj; sin esperas añadidas ni cortes.</summary>
+    private void UpdateFlight(double delta)
+    {
+        var client = Session.Client;
+        var me = client.LocalPlayer!;
+        _flightTime += delta;
+        var p = _flightTime / _flightTotal;
+        var arrived = me.TransitTo < 0 && me.Planet == _flightTo;
+        if (p >= 1 && !arrived) p = 0.999; // destino aún no confirmado: el trayecto continúa, sin pantalla
+
+        var y = p < 0.5 ? 0.5f + Smooth(p / 0.32) * FlightAltitude : 0.5f + (1 - Smooth((p - 0.68) / 0.32)) * FlightAltitude;
+        var fog = BaseFog + (0.03f - BaseFog) * (p < 0.5 ? Smooth((p - 0.12) / 0.2) : 1 - Smooth((p - 0.68) / 0.2));
+        _env.Environment.FogDensity = fog;
+        var position = _shuttle!.Position;
+        if (!_flightSwapped && p >= 0.5)
+        {
+            // Crucero con el suelo ya oculto: relevo de entorno. El nuevo aparece al disiparse la niebla.
+            _flightSwapped = true;
+            ClearWorldView();
+            SetPlanetLook(_flightTo);
+            _worldDirty = true;
+            var planet = client.World!.Content.Planets.First(pl => pl.Id == _flightTo);
+            var cell = client.World.Content.Balance.CellSizeMm / 1000f;
+            position.X = planet.Spawn.X * cell;
+            position.Z = planet.Spawn.Z * cell;
+        }
+        position.Y = y;
+        _shuttle.Position = position;
+        _body.GlobalPosition = position + new Vector3(0, 0.05f, 0.9f);
+        _body.Velocity = Vector3.Zero;
+
+        var globeAmount = Smooth((p - 0.28) / 0.3);
+        var globeOut = 1 - Smooth((p - 0.62) / 0.1);
+        _globe!.Visible = globeAmount * globeOut > 0.01f;
+        if (_globe.Visible)
+        {
+            _globe.Position = position + new Vector3(0, -70 + 60 * (float)p, -900);
+            var r = 40 + 330 * globeAmount;
+            _globe.Scale = new Vector3(r, r, r);
+            ((StandardMaterial3D)_globe.MaterialOverride).AlbedoColor = ((StandardMaterial3D)_globe.MaterialOverride).AlbedoColor with { A = globeOut };
+        }
+
+        if (p >= 1 && arrived)
+        {
+            _inFlight = false;
+            _env.Environment.FogDensity = BaseFog;
+            _body.GlobalPosition = new Vector3(me.X, 0.2f, me.Z);
+            _shuttle.QueueFree();
+            _shuttle = null;
+            _globe.QueueFree();
+            _globe = null;
+        }
     }
 
     // ---------- Sincronización de representación ----------
@@ -407,6 +573,7 @@ public partial class GameView : Node3D
         var seen = new HashSet<int>();
         foreach (var m in w.Machines.Values)
         {
+            if (m.Planet != _viewPlanet) continue;
             seen.Add(m.Id);
             var key = $"{m.Def}|{m.X}|{m.Z}|{m.Rot}";
             if (!_machines.TryGetValue(m.Id, out var node) || node.Key != key)
@@ -435,6 +602,7 @@ public partial class GameView : Node3D
         seen.Clear();
         foreach (var d in w.DebrisById.Values)
         {
+            if (d.Planet != _viewPlanet) continue;
             seen.Add(d.Id);
             if (!_debris.TryGetValue(d.Id, out var mesh))
             {
@@ -460,7 +628,7 @@ public partial class GameView : Node3D
 
         foreach (var n in w.Nodes.Values)
         {
-            if (!n.Revealed || _nodes.ContainsKey(n.Id)) continue;
+            if (n.Planet != _viewPlanet || !n.Revealed || _nodes.ContainsKey(n.Id)) continue;
             var mesh = new MeshInstance3D { Mesh = Models.NodeMesh(n.Item), Position = new Vector3((n.X + 1) * Cell, 0, (n.Z + 1) * Cell) };
             AddChild(mesh);
             _nodes[n.Id] = mesh;
@@ -469,6 +637,7 @@ public partial class GameView : Node3D
         seen.Clear();
         foreach (var l in w.Links.Values)
         {
+            if (l.Planet != _viewPlanet) continue;
             seen.Add(l.Id);
             if (!w.Machines.TryGetValue(l.From, out var a) || !w.Machines.TryGetValue(l.To, out var b)) continue;
             if (!_links.TryGetValue(l.Id, out var mesh))
@@ -487,6 +656,7 @@ public partial class GameView : Node3D
         seen.Clear();
         foreach (var s in w.RailSegments.Values)
         {
+            if (s.Planet != _viewPlanet) continue;
             seen.Add(s.Id);
             if (_rails.ContainsKey(s.Id) || !w.RailNodes.TryGetValue(s.A, out var ra) || !w.RailNodes.TryGetValue(s.B, out var rb)) continue;
             var mesh = new MeshInstance3D { Mesh = Models.RailMesh(t => RailPoint(ra, rb, s.Shape, t), s.LengthMm / 1000f) };
@@ -502,6 +672,7 @@ public partial class GameView : Node3D
         seen.Clear();
         foreach (var t in w.Trains.Values)
         {
+            if (t.Planet != _viewPlanet) continue;
             seen.Add(t.Id);
             if (!_trains.ContainsKey(t.Id)) _trains[t.Id] = CreateTrainNode();
         }
@@ -782,7 +953,7 @@ public partial class GameView : Node3D
             if (_hud.PanelOpen) _hud.ClosePanel(); else _hud.OpenTech();
             return;
         }
-        if (_hud.PanelOpen) return;
+        if (_hud.PanelOpen || _inFlight) return;
 
         if (e.IsActionPressed("tool_cutter")) SetTool(Tool.Cutter);
         else if (e.IsActionPressed("tool_build")) OpenBuildMenu();
@@ -995,6 +1166,18 @@ public partial class GameView : Node3D
         _head.Rotation = new Vector3(_pitch, 0, 0);
         _body.Rotation = new Vector3(0, _yaw, 0);
 
+        var local = client.LocalPlayer;
+        if (!_inFlight && local is { TransitTo: >= 0 }) StartFlight(local);
+        if (!_inFlight && local != null && local.Planet != _viewPlanet)
+        {
+            // Llegó mientras se reconectaba u otra causa: se alinea sin dejarlo en el vacío.
+            ClearWorldView();
+            SetPlanetLook(local.Planet);
+            _body.GlobalPosition = new Vector3(local.X, 0.2f, local.Z);
+            _worldDirty = true;
+        }
+        if (_inFlight) UpdateFlight(delta);
+
         AnimateMachines((float)delta);
         UpdateTrains(delta);
         UpdateRemote(delta);
@@ -1002,7 +1185,7 @@ public partial class GameView : Node3D
         UpdateTool(delta);
 
         _moveTimer -= delta;
-        if (_moveTimer <= 0)
+        if (_moveTimer <= 0 && !_inFlight)
         {
             _moveTimer = 0.05;
             var p = _body.GlobalPosition;
@@ -1072,7 +1255,7 @@ public partial class GameView : Node3D
 
     public override void _PhysicsProcess(double delta)
     {
-        if (!_worldReady) return;
+        if (!_worldReady || _inFlight) return;
         var dt = (float)delta;
         var dir = Vector3.Zero;
         var typing = _hud.ChatOpen || _hud.PanelOpen || _paused;
@@ -1259,7 +1442,7 @@ public partial class GameView : Node3D
         var client = Session.Client;
         var w = client.World!;
         var me = client.LocalPlayer!;
-        var blocked = _hud.PanelOpen || _hud.ChatOpen || _paused;
+        var blocked = _hud.PanelOpen || _hud.ChatOpen || _paused || _inFlight;
         var status = "";
         var statusColor = Ui.Ink;
         var prompt = "";
@@ -1376,6 +1559,7 @@ public partial class GameView : Node3D
     }
 
     public void SetRailShape(byte shape) => _railShape = shape;
+    public double FlightProgress => _inFlight ? _flightTime / _flightTotal : 0;
     public (string kind, int id) AimTarget => _aim;
     public Vector3? FirstRemotePlayer => _remote.Count > 0 ? _remote.Values.First().Root.GlobalPosition : null;
     public Vector3 PlayerPosition => _body.GlobalPosition;

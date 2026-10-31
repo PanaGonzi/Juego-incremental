@@ -20,7 +20,7 @@ public enum MsgType : byte
     // Cliente a servidor
     Hello = 1, Command = 2, Move = 3, ChatSend = 4, SaveRequest = 5,
     // Servidor a cliente
-    Welcome = 20, Reject = 21, SnapshotChunk = 22, SnapshotDone = 23, Delta = 24,
+    Welcome = 20, Reject = 21, SnapshotChunk = 22, SnapshotDone = 23, Delta = 24, DeltaCompressed = 31,
     Result = 25, Positions = 26, Chat = 27, Check = 28, Correct = 29, Notice = 30,
 }
 

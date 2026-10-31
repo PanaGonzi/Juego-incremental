@@ -303,9 +303,10 @@ public class NetworkTests
         h.Settle(300);
 
         var late = h.Join(KeyB);
-        h.Settle(400);
-        Assert.Equal(WorldCodec.Hash(world), WorldCodec.Hash(late.World!));
-        Assert.Equal(WorldCodec.Hash(world), WorldCodec.Hash(a.World!));
+        h.Pump(() => late.HashChecks >= 2 && a.HashChecks >= 2, 20000);
+        Assert.Equal(0, late.HashMismatches);
+        Assert.Equal(0, a.HashMismatches);
+        Assert.Equal(ClientState.InGame, late.State);
     }
 
     [Fact]

@@ -23,8 +23,9 @@ public sealed class GameClient : IDisposable
     public World? World { get; private set; }
     public int LocalNum { get; private set; }
     public long LastPositionsTick { get; private set; }
-    public int HashMismatches { get; private set; }
-    public int HashChecks { get; private set; }
+    private int _hashMismatches, _hashChecks;
+    public int HashMismatches => Volatile.Read(ref _hashMismatches);
+    public int HashChecks => Volatile.Read(ref _hashChecks);
     public int PendingCount => _pending.Count;
 
     public event Action<uint, CommandResult>? ResultReceived;
@@ -147,6 +148,17 @@ public sealed class GameClient : IDisposable
             case MsgType.Delta:
                 if (World != null) { ApplyDelta(r); DeltaApplied?.Invoke(); }
                 break;
+            case MsgType.DeltaCompressed:
+                if (World != null)
+                {
+                    using var inflated = new System.IO.Compression.DeflateStream(new MemoryStream(data, 1, length - 1), System.IO.Compression.CompressionMode.Decompress);
+                    using var plain = new MemoryStream();
+                    inflated.CopyTo(plain);
+                    plain.Position = 0;
+                    ApplyDelta(new BinaryReader(plain));
+                    DeltaApplied?.Invoke();
+                }
+                break;
             case MsgType.Result:
                 var id = r.ReadUInt32();
                 var ok = r.ReadBoolean();
@@ -172,8 +184,14 @@ public sealed class GameClient : IDisposable
                 r.ReadInt64();
                 if (World != null)
                 {
-                    HashChecks++;
-                    if (r.ReadString() != WorldCodec.Hash(World)) HashMismatches++;
+                    // Se copia el estado en este hilo; el resumen se calcula aparte para no afectar al frame.
+                    var expected = r.ReadString();
+                    var bytes = WorldCodec.HashableBytes(World);
+                    Task.Run(() =>
+                    {
+                        if (expected != WorldCodec.HashOf(bytes)) Interlocked.Increment(ref _hashMismatches);
+                        Interlocked.Increment(ref _hashChecks);
+                    });
                 }
                 break;
         }
@@ -202,32 +220,36 @@ public sealed class GameClient : IDisposable
     private void ApplyDelta(BinaryReader r)
     {
         var world = World!;
+        var upgrades = world.Upgrades.Count;
         WorldCodec.ReadGlobal(r, world);
+        var structural = world.Upgrades.Count != upgrades;
         var n = r.Read7BitEncodedInt();
-        for (var i = 0; i < n; i++)
-        {
-            var m = WorldCodec.ReadMachine(r);
-            world.Machines[m.Id] = m;
-        }
+        for (var i = 0; i < n; i++) structural |= world.ApplyReplicatedMachine(WorldCodec.ReadMachine(r));
         n = r.Read7BitEncodedInt();
+        structural |= n > 0;
         for (var i = 0; i < n; i++) world.Machines.Remove(r.ReadInt32());
         n = r.Read7BitEncodedInt();
+        structural |= n > 0;
         for (var i = 0; i < n; i++)
         {
             var l = WorldCodec.ReadLink(r);
             world.Links[l.Id] = l;
         }
         n = r.Read7BitEncodedInt();
+        structural |= n > 0;
         for (var i = 0; i < n; i++) world.Links.Remove(r.ReadInt32());
         n = r.Read7BitEncodedInt();
         for (var i = 0; i < n; i++)
         {
             var d = WorldCodec.ReadDebris(r);
+            structural |= !world.DebrisById.ContainsKey(d.Id);
             world.DebrisById[d.Id] = d;
         }
         n = r.Read7BitEncodedInt();
+        structural |= n > 0;
         for (var i = 0; i < n; i++) world.DebrisById.Remove(r.ReadInt32());
         n = r.Read7BitEncodedInt();
+        structural |= n > 0;
         for (var i = 0; i < n; i++)
         {
             var node = WorldCodec.ReadNode(r);
@@ -240,30 +262,36 @@ public sealed class GameClient : IDisposable
             world.Players[p.Key] = p;
         }
         n = r.Read7BitEncodedInt();
+        structural |= n > 0;
         for (var i = 0; i < n; i++)
         {
             var node = WorldCodec.ReadRailNode(r);
             world.RailNodes[node.Id] = node;
         }
         n = r.Read7BitEncodedInt();
+        structural |= n > 0;
         for (var i = 0; i < n; i++) world.RailNodes.Remove(r.ReadInt32());
         n = r.Read7BitEncodedInt();
+        structural |= n > 0;
         for (var i = 0; i < n; i++)
         {
             var s = WorldCodec.ReadRailSegment(r);
             world.RailSegments[s.Id] = s;
         }
         n = r.Read7BitEncodedInt();
+        structural |= n > 0;
         for (var i = 0; i < n; i++) world.RailSegments.Remove(r.ReadInt32());
         n = r.Read7BitEncodedInt();
         for (var i = 0; i < n; i++)
         {
             var t = WorldCodec.ReadTrain(r);
+            structural |= !world.Trains.ContainsKey(t.Id);
             world.Trains[t.Id] = t;
         }
         n = r.Read7BitEncodedInt();
+        structural |= n > 0;
         for (var i = 0; i < n; i++) world.Trains.Remove(r.ReadInt32());
-        world.Reindex();
+        if (structural) world.Reindex();
     }
 
     private void ReadPositions(BinaryReader r)

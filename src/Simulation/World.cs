@@ -150,6 +150,29 @@ public sealed partial class World
         RecomputeMods();
     }
 
+    /// <summary>
+    /// Sustituye una máquina replicada. Sin cambio de sitio no hace falta reindexar: reconstruir índices
+    /// en cada delta costaba tiempo de frame con fábricas grandes.
+    /// </summary>
+    public bool ApplyReplicatedMachine(Machine m)
+    {
+        if (!Machines.TryGetValue(m.Id, out var old) || old.X != m.X || old.Z != m.Z || old.Rot != m.Rot || old.NodeId != m.NodeId)
+        {
+            Machines[m.Id] = m;
+            return true;
+        }
+        Machines[m.Id] = m;
+        var index = Array.BinarySearch(_machineList, old, MachineById.Instance);
+        if (index >= 0) _machineList[index] = m;
+        return false;
+    }
+
+    private sealed class MachineById : IComparer<Machine>
+    {
+        public static readonly MachineById Instance = new();
+        public int Compare(Machine? a, Machine? b) => a!.Id.CompareTo(b!.Id);
+    }
+
     private void RecomputeMods()
     {
         _mods.Clear();
@@ -439,6 +462,7 @@ public sealed partial class World
         Machines.Remove(id);
         _machineList = Machines.Values.ToArray();
         DirtyMachines.Remove(id);
+        DirtySimMachines.Remove(id);
         RemovedMachines.Add((m.Planet, id));
         return CommandResult.Success;
     }
@@ -761,7 +785,7 @@ public sealed partial class World
                 StepProduction(m, def);
                 break;
         }
-        if (m.Status != previous) DirtyMachines.Add(m.Id);
+        if (m.Status != previous) DirtySimMachines.Add(m.Id);
     }
 
     private void StepAutoSell(Machine m)
@@ -780,7 +804,7 @@ public sealed partial class World
             AddCredits(earned);
             Bump("sold_credits", earned);
             budget -= qty;
-            DirtyMachines.Add(m.Id);
+            DirtySimMachines.Add(m.Id);
         }
     }
 
@@ -794,7 +818,7 @@ public sealed partial class World
             foreach (var (item, qty) in recipe.Inputs) m.In.TryRemove(item, qty);
             m.Processing = true;
             m.Progress = 0;
-            DirtyMachines.Add(m.Id);
+            DirtySimMachines.Add(m.Id);
         }
 
         var satisfaction = def.Power > 0 ? Satisfaction(m.Planet) : 1000;
@@ -812,7 +836,7 @@ public sealed partial class World
         }
         m.Processing = false;
         m.Progress = 0;
-        DirtyMachines.Add(m.Id);
+        DirtySimMachines.Add(m.Id);
     }
 
     private void StepLink(Link l)
@@ -828,8 +852,8 @@ public sealed partial class World
             var item = kv.Key;
             source.TryRemove(item, qty);
             b.In.Add(item, qty);
-            DirtyMachines.Add(a.Id);
-            DirtyMachines.Add(b.Id);
+            DirtySimMachines.Add(a.Id);
+            DirtySimMachines.Add(b.Id);
             l.Cooldown = B.LinkIntervalTicks;
             return;
         }

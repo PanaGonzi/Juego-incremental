@@ -35,7 +35,7 @@
   {
     "id": 1,
     "key": "mars",
-    "halfSizeCells": 60,
+    "halfSizeCells": 90,
     "startCredits": 0,
     "spawn": { "x": 0, "z": 10 },
     "builtins": [

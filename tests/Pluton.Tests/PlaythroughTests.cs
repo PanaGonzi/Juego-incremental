@@ -281,9 +281,10 @@ public class CoopCycleTests
         Run(a, new Command { Type = CommandType.Sell, A = terminal.Id, Text = "recovered", Amount = units });
         Assert.Equal(before + units * world.SellPrice("recovered"), world.Credits);
 
-        h.Settle(300);
-        Assert.Equal(WorldCodec.Hash(world), WorldCodec.Hash(a.World!));
-        Assert.Equal(WorldCodec.Hash(world), WorldCodec.Hash(b.World!));
+        // Con la fábrica en marcha solo es válida la firma enviada tras vaciar los cambios.
+        var checksA = a.HashChecks;
+        var checksB = b.HashChecks;
+        h.Pump(() => a.HashChecks >= checksA + 2 && b.HashChecks >= checksB + 2, 20000);
         Assert.Equal(0, a.HashMismatches);
         Assert.Equal(0, b.HashMismatches);
         // Lo fabricado + lo restante no supera la chatarra original según la receta.

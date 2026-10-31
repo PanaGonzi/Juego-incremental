@@ -17,6 +17,7 @@ public static class Models
             case "panel": Pbr(m, new Color(0.42f, 0.47f, 0.53f), 0.45f, 0.55f); break;
             case "dark": Pbr(m, new Color(0.07f, 0.08f, 0.1f), 0.5f, 0.7f); break;
             case "rock": Pbr(m, new Color(0.2f, 0.17f, 0.16f), 0f, 0.95f); break;
+            case "redrock": Pbr(m, new Color(0.42f, 0.19f, 0.11f), 0f, 0.92f); break;
             case "rust": Pbr(m, new Color(0.33f, 0.2f, 0.13f), 0.55f, 0.85f); break;
             case "rustlight": Pbr(m, new Color(0.47f, 0.37f, 0.28f), 0.5f, 0.75f); break;
             case "stripe": Pbr(m, new Color(0.9f, 0.62f, 0.1f), 0.15f, 0.6f); break;
@@ -300,6 +301,28 @@ public static class Models
                 m.Height = 3.4f;
                 m.LampPos = new Vector3(-0.5f, 1.2f, 0.3f);
                 break;
+            case "shuttle_terminal":
+                b.Box("dark", 0, 0.15f, 0, 7.9f, 0.3f, 7.9f);
+                b.Box("panel", 0, 0.34f, 0, 7.2f, 0.08f, 7.2f);
+                foreach (var (x, z) in new[] { (-3.4f, -3.4f), (3.4f, -3.4f), (-3.4f, 3.4f), (3.4f, 3.4f) })
+                {
+                    b.Cyl("panel", x, 1f, z, 0.1f, 1.4f);
+                    b.Ball("amber", x, 1.8f, z, 0.14f);
+                }
+                b.Box("stripe", 0, 0.4f, 3.3f, 6.4f, 0.03f, 0.2f);
+                b.Box("stripe", 0, 0.4f, -3.3f, 6.4f, 0.03f, 0.2f);
+                // Lanzadera posada
+                b.Box("hull", 0, 1.9f, 0, 2.8f, 2.2f, 5.2f);
+                b.Seams(0, 1.9f, 0, 2.8f, 2.2f, 5.2f);
+                b.Box("cyan", 0, 2.4f, 2.62f, 2f, 0.8f, 0.05f);
+                b.Box("panel", 0, 3.1f, -0.5f, 1.4f, 0.3f, 3.2f);
+                b.Box("hull", -2.1f, 1.3f, -1.2f, 1.6f, 0.2f, 2.4f);
+                b.Box("hull", 2.1f, 1.3f, -1.2f, 1.6f, 0.2f, 2.4f);
+                b.Cyl("copper", -0.8f, 1.9f, -2.8f, 0.45f, 0.7f, 90);
+                b.Cyl("copper", 0.8f, 1.9f, -2.8f, 0.45f, 0.7f, 90);
+                m.Height = 3.4f;
+                m.LampPos = new Vector3(0, 3.4f, 0);
+                break;
             case "storage_crate":
                 b.Plinth(4, 4);
                 b.Box("hull", 0, 1f, 0, 3.2f, 1.6f, 3.2f);
@@ -330,6 +353,11 @@ public static class Models
             for (var i = 0; i < 7; i++)
                 b.Box(i % 3 == 0 ? "rustlight" : "rust", R(-0.7f, 0.7f), R(0.15f, 0.7f), R(-0.7f, 0.7f), R(0.3f, 1.1f), R(0.08f, 0.5f), R(0.2f, 0.9f), R(0, 180), R(-35, 35), R(-35, 35));
             b.Cyl("hull", R(-0.4f, 0.4f), 0.5f, R(-0.4f, 0.4f), 0.1f, 1.5f, R(50, 85), R(-30, 30), sides: 6);
+        }
+        else if (def == "red_rock")
+        {
+            for (var i = 0; i < 4; i++)
+                b.Ball("redrock", R(-0.5f, 0.5f), R(0.3f, 0.6f), R(-0.5f, 0.5f), R(0.4f, 0.75f), 5, 3, R(0.7f, 1.2f), R(0, 90));
         }
         else if (def == "ice_block")
         {
@@ -431,6 +459,29 @@ public static class Models
         foreach (var z in new[] { -2.2f, 2.2f })
         foreach (var x in new[] { -0.75f, 0.75f })
             b.Cyl("dark", x, 0.32f, z, 0.32f, 0.14f, 0, 90, 10);
+        mesh = b.Commit();
+        DebrisCache[key] = mesh;
+        return mesh;
+    }
+
+    /// <summary>Cabina que rodea la cámara durante el trayecto. El frente queda abierto como ventanal.</summary>
+    public static ArrayMesh ShuttleCabin()
+    {
+        const string key = "cabin";
+        if (DebrisCache.TryGetValue(key, out var mesh)) return mesh;
+        var b = new Builder();
+        b.Box("dark", 0, -0.05f, 0, 3.2f, 0.1f, 5f);
+        b.Box("hull", 0, 2.6f, 0, 3.2f, 0.12f, 5f);
+        b.Box("hull", -1.6f, 1.3f, 0.3f, 0.1f, 2.5f, 4.4f);
+        b.Box("hull", 1.6f, 1.3f, 0.3f, 0.1f, 2.5f, 4.4f);
+        b.Box("hull", 0, 1.3f, 2.5f, 3.2f, 2.5f, 0.1f);
+        b.Box("panel", 0, 0.35f, -2.3f, 3.1f, 0.7f, 0.5f, 0, 25);
+        b.Box("panel", -1.5f, 1.3f, -2.4f, 0.14f, 2.5f, 0.14f);
+        b.Box("panel", 1.5f, 1.3f, -2.4f, 0.14f, 2.5f, 0.14f);
+        b.Box("panel", 0, 2.5f, -2.4f, 3.1f, 0.14f, 0.14f);
+        b.Box("amber", -0.7f, 0.68f, -2.2f, 0.5f, 0.05f, 0.3f, 0, 25);
+        b.Box("cyan", 0.5f, 0.68f, -2.2f, 0.9f, 0.05f, 0.3f, 0, 25);
+        b.Box("dark", 0, 0.45f, 0.5f, 1.1f, 0.9f, 0.9f);
         mesh = b.Commit();
         DebrisCache[key] = mesh;
         return mesh;

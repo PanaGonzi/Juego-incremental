@@ -317,6 +317,26 @@ public class SimulationTests
     }
 }
 
+public class ScenarioTests
+{
+    [Theory]
+    [InlineData("small")]
+    [InlineData("medium")]
+    public void Measurement_worlds_run_and_conserve(string name)
+    {
+        var w = Scenarios.Build(Fixture.Content, name);
+        var size = Scenarios.Sizes[name];
+        Assert.InRange(w.Machines.Count, size.Machines, size.Machines + 20);
+        Assert.Equal(size.Trains, w.Trains.Count);
+        Assert.InRange(w.RailSegments.Count, size.RailSegments, size.RailSegments + size.Trains * 2 + 2);
+        for (var i = 0; i < 3000; i++) w.Step();
+        Assert.True(w.Stats["sold_credits"] > 0 || w.Stats["produced.parts"] > 0);
+        Assert.True(w.Stats.GetValueOrDefault("train_delivered") > 0);
+        var loaded = WorldCodec.Deserialize(Fixture.Content, WorldCodec.Serialize(w));
+        Assert.Equal(WorldCodec.Hash(w), WorldCodec.Hash(loaded));
+    }
+}
+
 public class TravelTests
 {
     private static (World w, PlayerState p) AtPad()

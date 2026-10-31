@@ -32,6 +32,13 @@ else
     Log($"Mundo nuevo '{slot}'");
 }
 
+if (args2.TryGetValue("load-test-scenario", out var scenario))
+{
+    // Ensayo: reemplaza el mundo por uno de medición. No se guarda sobre partidas normales porque exige su propio perfil.
+    world = Scenarios.Build(content, scenario);
+    Log($"Escenario {scenario}: {world.Machines.Count} máquinas, {world.Trains.Count} trenes, {world.RailSegments.Count} tramos, instantánea {WorldCodec.Serialize(world).Length / 1024} KiB");
+}
+
 if (loadTestUnlock)
 {
     // Solo para ensayos de carga: habilita los viajes sin jugar la progresión.

@@ -164,6 +164,17 @@ public partial class AutoTest : Node
                 var parts = join.Split(':');
                 _main.StartJoin(parts[0], int.Parse(parts[1]), "");
             }
+            else if (_args.TryGetValue("measure", out var measured))
+            {
+                _main.StartSession(GameSession.Local(_main, Scenarios.Build(_main.Content, measured), "autotest-" + measured, null, _main.Prefs));
+            }
+            else if (_args.GetValueOrDefault("scenario") == "travel")
+            {
+                var world = World.CreateNew(_main.Content);
+                world.Upgrades.Add("tech_shuttle");
+                world.Reindex();
+                _main.StartSession(GameSession.Local(_main, world, "autotest-travel", null, _main.Prefs));
+            }
             else if (_args.GetValueOrDefault("scenario") == "rail")
             {
                 _main.StartSession(GameSession.Local(_main, RailWorld(), "autotest-rail", null, _main.Prefs));
@@ -179,7 +190,9 @@ public partial class AutoTest : Node
             await Wait(1.5);
             await Shot("01_inicio");
 
-            if (_args.GetValueOrDefault("scenario") == "rail") await RailScenario();
+            if (_args.ContainsKey("measure")) await MeasureScenario();
+            else if (_args.GetValueOrDefault("scenario") == "rail") await RailScenario();
+            else if (_args.GetValueOrDefault("scenario") == "travel") await TravelScenario();
             else if (_args.ContainsKey("join") || _args.ContainsKey("host")) await JoinedScenario();
             else await FullLoop();
         }
@@ -396,6 +409,112 @@ public partial class AutoTest : Node
         Check(W.Stats.GetValueOrDefault("built.smelter") == 1, "fábrica conservada");
         await Wait(1.5);
         await Shot("11_reanudado");
+    }
+
+    /// <summary>Mide render y simulación local en un mundo grande, cerca de la fábrica y mirando a lo lejos.</summary>
+    private async Task MeasureScenario()
+    {
+        var v = _view!;
+        var seconds = double.Parse(_args.GetValueOrDefault("seconds", "20"));
+        DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
+        Engine.MaxFps = 0;
+        await Wait(4);
+        Log($"Mundo: {W.Machines.Count} máquinas, {W.Trains.Count} trenes, {W.RailSegments.Count} tramos; representadas {v.RenderedMachines} máquinas; VSync desactivada");
+        foreach (var (name, walk, aim) in new[]
+        {
+            ("denso", new Vector3(0, 0, 40), new Vector3(10, 1, 70)),
+            ("vias", new Vector3(0, 0, -20), new Vector3(0, 1, -60)),
+            ("panoramica", new Vector3(-60, 0, 0), new Vector3(60, 1, 60)),
+        })
+        {
+            await WalkTo(walk, 25);
+            v.AimAt(aim);
+            await Wait(1);
+            _frames.Clear();
+            _measuring = true;
+            await Wait(seconds);
+            _measuring = false;
+            Summarize(_frames, out var text);
+            var info = $"objetos={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalObjectsInFrame)} dibujos={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalDrawCallsInFrame)} vídeo={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.VideoMemUsed) / 1048576} MB memoria={WorkingSetMb()} MB";
+            Log($"{name}: {text} {info}");
+            await Shot("measure_" + name);
+        }
+        var ticks = v.Session.Runner!.DrainTickTimes();
+        if (ticks.Length > 0)
+        {
+            Array.Sort(ticks);
+            Log($"Servidor local: tick medio {ticks.Average():F2} ms, p99 {ticks[(int)(ticks.Length * 0.99)]:F2}, máx {ticks[^1]:F2}, tardíos {v.Session.Runner.TicksLate}");
+        }
+        Check(v.Session.Client.HashMismatches == 0, $"sin divergencias ({v.Session.Client.HashChecks} comprobaciones)");
+        _frames.Clear();
+    }
+
+    private static void Summarize(List<float> frames, out string text)
+    {
+        var sorted = frames.OrderBy(f => f).ToList();
+        var over33 = sorted.Count(f => f > 33.3f);
+        var over100 = sorted.Count(f => f > 100f);
+        text = sorted.Count == 0 ? "sin frames" : $"frames={sorted.Count} media={sorted.Average():F2} p99={sorted[(int)(sorted.Count * 0.99)]:F2} máx={sorted[^1]:F2} ms >33ms={over33} >100ms={over100}";
+    }
+
+    private static long WorkingSetMb() => System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / 1048576;
+
+    /// <summary>Viajes de ida y vuelta con evidencia de continuidad, tirones y memoria.</summary>
+    private async Task TravelScenario()
+    {
+        var v = _view!;
+        var legs = int.Parse(_args.GetValueOrDefault("legs", "8"));
+        var pad = W.Machines.Values.First(m => m.Def == "shuttle_terminal" && m.Planet == 0);
+        var scrapWas = 0L;
+        await UseOn(pad, () => { });
+        v.OpenMachinePanel(pad.Id);
+        await Wait(0.4);
+        await Shot("travel_01_panel");
+        v.ClosePanelForTest();
+        var recycler = W.Machines.Values.First(m => m.Def == "recycler");
+        v.Session.Runner!.Server.World.Machines[recycler.Id].In.Add("scrap", 20);
+        scrapWas = v.Session.Runner.Server.World.Stats.GetValueOrDefault("produced.recovered");
+
+        for (var leg = 0; leg < legs; leg++)
+        {
+            GC.Collect();
+            var memBefore = WorkingSetMb();
+            var from = Me.Planet;
+            var to = from == 0 ? 1 : 0;
+            var here = W.Machines.Values.First(m => m.Def == "shuttle_terminal" && m.Planet == from);
+            var c = CenterOf(here);
+            await WalkTo(c + new Vector3(0, -1.2f, 7));
+            _frames.Clear();
+            _measuring = true;
+            v.Session.Client.Send(new Command { Type = CommandType.Travel, A = to });
+            Check(await Until(() => v.InFlight, 3), $"tramo {leg}: despega {from}→{to}");
+            if (leg < 2)
+            {
+                v.AimAt(c + new Vector3(0, 1000, -900));
+                await Until(() => v.FlightProgress > 0.15, 10);
+                v.AimAt(_view!.PlayerPosition + new Vector3(0, -2f, -6));
+                await Shot($"travel_l{leg}_a_despegue");
+                await Until(() => v.FlightProgress > 0.45, 15);
+                await Shot($"travel_l{leg}_b_crucero");
+                await Until(() => v.FlightProgress > 0.62, 15);
+                await Shot($"travel_l{leg}_c_destino");
+                await Until(() => v.FlightProgress > 0.85, 15);
+                await Shot($"travel_l{leg}_d_descenso");
+            }
+            var landed = await Until(() => !v.InFlight, 40);
+            _measuring = false;
+            Check(landed && Me.Planet == to && v.ViewPlanet == to, $"tramo {leg}: llega al planeta {to}");
+            Summarize(_frames, out var stats);
+            Check(v.RenderedMachines > 0 && v.RenderedDebris > 0, $"tramo {leg}: entorno activo con {v.RenderedMachines} máquinas y {v.RenderedDebris} escombros");
+            await Wait(0.5);
+            Check(v.PlayerPosition.Y > -0.1f && v.PlayerPosition.Y < 4f, $"tramo {leg}: en el suelo, y={v.PlayerPosition.Y:F2}");
+            Log($"tramo {leg}: {stats}; memoria {memBefore} → {WorkingSetMb()} MB, vídeo {RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.VideoMemUsed) / 1048576} MB");
+            if (leg < 2) await Shot($"travel_l{leg}_e_llegada");
+        }
+        var produced = v.Session.Runner!.Server.World.Stats.GetValueOrDefault("produced.recovered") - scrapWas;
+        Check(produced > 0, $"Plutón siguió produciendo con el jugador fuera: {produced}");
+        Check(v.Session.Client.HashMismatches == 0, $"sin divergencias ({v.Session.Client.HashChecks} comprobaciones)");
+        _frames.Clear();
     }
 
     /// <summary>Mundo preparado solo para esta prueba: evita repetir toda la progresión hasta el ferrocarril.</summary>

@@ -446,8 +446,12 @@ public static class WorldCodec
         }
     }
 
-    /// <summary>Firma del estado económico y estructural; excluye datos volátiles como posición o progreso.</summary>
-    public static string Hash(World world)
+    public static string Hash(World world) => HashOf(HashableBytes(world));
+
+    public static string HashOf(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes))[..16];
+
+    /// <summary>Estado económico y estructural; excluye datos volátiles como posición o progreso.</summary>
+    public static byte[] HashableBytes(World world)
     {
         using var ms = new MemoryStream();
         using var w = new BinaryWriter(ms);
@@ -461,6 +465,6 @@ public static class WorldCodec
         foreach (var s in world.RailSegments.Values) WriteRailSegment(w, s);
         foreach (var t in world.Trains.Values) WriteTrain(w, t, forHash: true);
         w.Flush();
-        return Convert.ToHexString(SHA256.HashData(ms.GetBuffer().AsSpan(0, (int)ms.Length)))[..16];
+        return ms.ToArray();
     }
 }

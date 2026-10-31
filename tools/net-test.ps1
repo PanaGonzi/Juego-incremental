@@ -11,6 +11,7 @@ param(
     [int]$Port = 27790,
     [string]$Tag = '',
     [int]$Travelers = 0,
+    [string]$Scenario = '',
     [string]$BinDir = '',
     [switch]$Abuser
 )
@@ -33,8 +34,10 @@ $Server = if ($BinDir) { "$BinDir\server\Pluton.Server.exe" } else { "$Repo\src\
 $Bot = if ($BinDir) { "$BinDir\bot\Pluton.BotClient.exe" } else { "$Repo\tools\BotClient\bin\Release\net10.0\Pluton.BotClient.exe" }
 $Content = "$Repo\content"
 
+$extraServer = @()
+if ($Scenario -ne '') { $extraServer = @('--load-test-scenario', $Scenario) }
 $srv = Start-Process $Server -PassThru -NoNewWindow -RedirectStandardOutput "$Out\server.log" -RedirectStandardError "$Out\server.err" `
-    -ArgumentList @('--port', $Port, '--world', 'test', '--profile', 'test', '--data-root', "`"$DataRoot`"", '--metrics', "`"$Out\metrics.csv`"", '--load-test-unlock', '--content', "`"$Content`"", '--autosave', '30', '--stop-file', "`"$Out\stop.txt`"")
+    -ArgumentList (@('--port', $Port, '--world', 'test', '--profile', 'test', '--data-root', "`"$DataRoot`"", '--metrics', "`"$Out\metrics.csv`"", '--load-test-unlock', '--content', "`"$Content`"", '--autosave', '30', '--stop-file', "`"$Out\stop.txt`"") + $extraServer)
 Start-Sleep -Milliseconds 800
 
 $procs = @()

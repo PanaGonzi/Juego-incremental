@@ -54,6 +54,8 @@ public sealed partial class World
     public readonly SortedDictionary<int, RailSegment> RailSegments = new();
     public readonly SortedDictionary<int, Train> Trains = new();
 
+    /// <summary>Máquinas cambiadas por la simulación, sin acción de jugador: se replican a menor frecuencia.</summary>
+    public readonly HashSet<int> DirtySimMachines = new();
     public readonly HashSet<int> DirtyRailNodes = new();
     public readonly HashSet<int> DirtyRailSegments = new();
     public readonly HashSet<int> DirtyTrains = new();
@@ -444,7 +446,7 @@ public sealed partial class World
             station.In.TryRemove(kv.Key, qty);
             t.Cargo.Add(kv.Key, qty);
             budget -= qty;
-            DirtyMachines.Add(station.Id);
+            DirtySimMachines.Add(station.Id);
             DirtyTrains.Add(t.Id);
         }
         if (t.Cargo.Total >= R.TrainCapacity) { Depart(t); return; }
@@ -483,7 +485,7 @@ public sealed partial class World
         }
         if (moved)
         {
-            DirtyMachines.Add(station.Id);
+            DirtySimMachines.Add(station.Id);
             DirtyTrains.Add(t.Id);
         }
         if (t.Cargo.Total == 0) { Depart(t); return; }
