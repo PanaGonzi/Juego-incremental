@@ -59,6 +59,8 @@ public sealed partial class World
     public readonly HashSet<int> DirtyRailNodes = new();
     public readonly HashSet<int> DirtyRailSegments = new();
     public readonly HashSet<int> DirtyTrains = new();
+    public readonly HashSet<int> DirtySimTrains = new();
+    public readonly HashSet<int> DirtyTrainPaths = new();
     public readonly List<int> RemovedRailNodes = new();
     public readonly List<int> RemovedRailSegments = new();
     public readonly List<int> RemovedTrains = new();
@@ -266,6 +268,7 @@ public sealed partial class World
         Trains[t.Id] = t;
         _trainList = Trains.Values.ToArray();
         DirtyTrains.Add(t.Id);
+        DirtyTrainPaths.Add(t.Id);
         Bump("built.train");
         return CommandResult.Success;
     }
@@ -282,6 +285,8 @@ public sealed partial class World
         Trains.Remove(id);
         _trainList = Trains.Values.ToArray();
         DirtyTrains.Remove(id);
+        DirtySimTrains.Remove(id);
+        DirtyTrainPaths.Remove(id);
         RemovedTrains.Add(id);
         return CommandResult.Success;
     }
@@ -346,6 +351,7 @@ public sealed partial class World
         }
         t.Path.Clear();
         t.Path.AddRange(path);
+        DirtyTrainPaths.Add(t.Id);
         t.PathIndex = 0;
         t.PosMm = 0;
         t.State = TrainState.Moving;
@@ -399,7 +405,7 @@ public sealed partial class World
     private void StepMoving(Train t)
     {
         t.PosMm += R.TrainSpeedMmPerTick;
-        if (Tick % 20 == 0) DirtyTrains.Add(t.Id);
+        if (Tick % 20 == 0) DirtySimTrains.Add(t.Id);
         while (t.State == TrainState.Moving)
         {
             if (!RailSegments.TryGetValue(t.Path[t.PathIndex], out var s))
@@ -447,7 +453,7 @@ public sealed partial class World
             t.Cargo.Add(kv.Key, qty);
             budget -= qty;
             DirtySimMachines.Add(station.Id);
-            DirtyTrains.Add(t.Id);
+            DirtySimTrains.Add(t.Id);
         }
         if (t.Cargo.Total >= R.TrainCapacity) { Depart(t); return; }
         if (t.Cargo.Total == 0)
@@ -486,7 +492,7 @@ public sealed partial class World
         if (moved)
         {
             DirtySimMachines.Add(station.Id);
-            DirtyTrains.Add(t.Id);
+            DirtySimTrains.Add(t.Id);
         }
         if (t.Cargo.Total == 0) { Depart(t); return; }
         SetWait(t, moved ? "" : "wait_station_full");

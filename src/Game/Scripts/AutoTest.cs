@@ -21,6 +21,7 @@ public partial class AutoTest : Node
     private bool _measuring;
     private int _failures;
     private ulong _lastUsec;
+    private readonly List<string> _spikes = new();
 
     public AutoTest(Main main, Dictionary<string, string> args)
     {
@@ -41,7 +42,12 @@ public partial class AutoTest : Node
     {
         _clock += delta;
         var now = Time.GetTicksUsec();
-        if (_measuring && _lastUsec != 0) _frames.Add((now - _lastUsec) / 1000f);
+        if (_measuring && _lastUsec != 0)
+        {
+            var frameMs = (now - _lastUsec) / 1000f;
+            _frames.Add(frameMs);
+            if (frameMs > 33.3f) _spikes.Add($"{_clock:F2}s:{frameMs:F0}ms");
+        }
         _lastUsec = now;
     }
 
@@ -431,12 +437,20 @@ public partial class AutoTest : Node
             v.AimAt(aim);
             await Wait(1);
             _frames.Clear();
+            v.MaxSyncMs = 0;
+            var gen0 = GC.CollectionCount(0);
+            var gen1 = GC.CollectionCount(1);
+            var gen2 = GC.CollectionCount(2);
+            var pause = GC.GetTotalPauseDuration();
             _measuring = true;
             await Wait(seconds);
             _measuring = false;
             Summarize(_frames, out var text);
+            Log($"{name} GC: gen0={GC.CollectionCount(0) - gen0} gen1={GC.CollectionCount(1) - gen1} gen2={GC.CollectionCount(2) - gen2} pausa total={(GC.GetTotalPauseDuration() - pause).TotalMilliseconds:F1} ms, última pausa={GC.GetGCMemoryInfo().PauseDurations[0].TotalMilliseconds:F1} ms; SyncWorld máx={v.MaxSyncMs:F1} ms");
             var info = $"objetos={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalObjectsInFrame)} dibujos={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalDrawCallsInFrame)} vídeo={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.VideoMemUsed) / 1048576} MB memoria={WorkingSetMb()} MB";
             Log($"{name}: {text} {info}");
+            Log($"{name} picos: {string.Join(" ", _spikes)}");
+            _spikes.Clear();
             await Shot("measure_" + name);
         }
         var ticks = v.Session.Runner!.DrainTickTimes();

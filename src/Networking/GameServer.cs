@@ -373,6 +373,10 @@ public sealed class GameServer : IDisposable
         {
             World.DirtyMachines.UnionWith(World.DirtySimMachines);
             World.DirtySimMachines.Clear();
+            World.DirtyTrains.UnionWith(World.DirtySimTrains);
+            World.DirtySimTrains.Clear();
+            World.DirtyGlobal |= World.DirtyGlobalSim;
+            World.DirtyGlobalSim = false;
         }
         if (World.DirtyMachines.Count == 0 && World.DirtyDebris.Count == 0 && World.DirtyNodes.Count == 0 &&
             World.DirtyLinks.Count == 0 && World.DirtyPlayers.Count == 0 && !World.DirtyGlobal &&
@@ -385,7 +389,8 @@ public sealed class GameServer : IDisposable
         using (var w = new BinaryWriter(_deltaStream, System.Text.Encoding.UTF8, leaveOpen: true))
         {
             w.Write((byte)MsgType.Delta);
-            WorldCodec.WriteGlobal(w, World);
+            w.Write(World.DirtyGlobal);
+            if (World.DirtyGlobal) WorldCodec.WriteGlobal(w, World);
             w.Write7BitEncodedInt(World.DirtyMachines.Count);
             foreach (var id in World.DirtyMachines) WorldCodec.WriteMachine(w, World.Machines[id]);
             w.Write7BitEncodedInt(World.RemovedMachines.Count);
@@ -411,7 +416,7 @@ public sealed class GameServer : IDisposable
             w.Write7BitEncodedInt(World.RemovedRailSegments.Count);
             foreach (var id in World.RemovedRailSegments) w.Write(id);
             w.Write7BitEncodedInt(World.DirtyTrains.Count);
-            foreach (var id in World.DirtyTrains) WorldCodec.WriteTrain(w, World.Trains[id]);
+            foreach (var id in World.DirtyTrains) WorldCodec.WriteTrain(w, World.Trains[id], withPath: World.DirtyTrainPaths.Contains(id));
             w.Write7BitEncodedInt(World.RemovedTrains.Count);
             foreach (var id in World.RemovedTrains) w.Write(id);
         }
@@ -440,6 +445,7 @@ public sealed class GameServer : IDisposable
         World.RemovedLinks.Clear();
         World.DirtyRailNodes.Clear();
         World.DirtyRailSegments.Clear();
+        foreach (var id in World.DirtyTrains) World.DirtyTrainPaths.Remove(id);
         World.DirtyTrains.Clear();
         World.RemovedRailNodes.Clear();
         World.RemovedRailSegments.Clear();

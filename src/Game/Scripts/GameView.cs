@@ -85,6 +85,7 @@ public partial class GameView : Node3D
     private const float BaseFog = 0.0022f;
     public int ViewPlanet => _viewPlanet;
     public bool InFlight => _inFlight;
+    public float MaxSyncMs;
     public int RenderedDebris => _debris.Count;
     public int RenderedMachines => _machines.Count;
     private Control? _loading;
@@ -1160,7 +1161,9 @@ public partial class GameView : Node3D
         if (_worldDirty)
         {
             _worldDirty = false;
+            var t0 = Time.GetTicksUsec();
             SyncWorld();
+            MaxSyncMs = Math.Max(MaxSyncMs, (Time.GetTicksUsec() - t0) / 1000f);
         }
 
         _head.Rotation = new Vector3(_pitch, 0, 0);

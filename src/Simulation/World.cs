@@ -37,6 +37,8 @@ public sealed partial class World
     public readonly HashSet<int> DirtyLinks = new();
     public readonly HashSet<string> DirtyPlayers = new(StringComparer.Ordinal);
     public bool DirtyGlobal = true;
+    public bool DirtyGlobalSim;
+    private bool _inStep;
 
     public World(ContentDb content) { Content = content; }
 
@@ -207,16 +209,22 @@ public sealed partial class World
         return dx * dx + dz * dz <= (double)rangeMm * rangeMm;
     }
 
+    private void MarkGlobal()
+    {
+        if (_inStep) DirtyGlobalSim = true;
+        else DirtyGlobal = true;
+    }
+
     public void Bump(string stat, long by = 1)
     {
         Stats[stat] = Stats.GetValueOrDefault(stat) + by;
-        DirtyGlobal = true;
+        MarkGlobal();
     }
 
     private void AddCredits(long amount)
     {
         Credits = Math.Min(B.MaxCredits, Credits + amount);
-        DirtyGlobal = true;
+        MarkGlobal();
     }
 
     // ---------- Comandos ----------
@@ -705,6 +713,7 @@ public sealed partial class World
 
     public void Step()
     {
+        _inStep = true;
         Tick++;
         StepPower();
         foreach (var m in _machineList) StepMachine(m);
@@ -712,6 +721,7 @@ public sealed partial class World
         StepTrains();
         StepTransit();
         if (Tick % B.TicksPerSecond == 0) StepObjectives();
+        _inStep = false;
     }
 
     private readonly Dictionary<int, long> _demand = new();
@@ -868,7 +878,7 @@ public sealed partial class World
             if (Stats.GetValueOrDefault(o.Stat) < o.Qty) return;
             AddCredits(o.Credits);
             ObjectiveIndex++;
-            DirtyGlobal = true;
+            MarkGlobal();
         }
     }
 

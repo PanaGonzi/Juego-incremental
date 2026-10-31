@@ -198,7 +198,7 @@ public static class WorldCodec
         OwnerStation = r.ReadInt32(),
     };
 
-    public static void WriteTrain(BinaryWriter w, Train t, bool forHash = false)
+    public static void WriteTrain(BinaryWriter w, Train t, bool forHash = false, bool withPath = true)
     {
         w.Write(t.Id);
         w.Write7BitEncodedInt(t.Planet);
@@ -209,8 +209,12 @@ public static class WorldCodec
         w.Write(t.WaitReason);
         WriteInv(w, t.Cargo);
         if (forHash) return;
-        w.Write7BitEncodedInt(t.Path.Count);
-        foreach (var id in t.Path) w.Write(id);
+        w.Write(withPath);
+        if (withPath)
+        {
+            w.Write7BitEncodedInt(t.Path.Count);
+            foreach (var id in t.Path) w.Write(id);
+        }
         w.Write7BitEncodedInt(t.PathIndex);
         w.Write(t.CurrentNode);
         w.Write(t.Forward);
@@ -218,7 +222,8 @@ public static class WorldCodec
         w.Write7BitEncodedInt(t.Timer);
     }
 
-    public static Train ReadTrain(BinaryReader r)
+    /// <param name="previous">Tren ya conocido, del que se conserva la ruta si no viene en el mensaje.</param>
+    public static Train ReadTrain(BinaryReader r, Func<int, Train?>? previous = null)
     {
         var t = new Train
         {
@@ -231,8 +236,15 @@ public static class WorldCodec
             WaitReason = r.ReadString(),
         };
         ReadInv(r, t.Cargo);
-        var n = r.Read7BitEncodedInt();
-        for (var i = 0; i < n; i++) t.Path.Add(r.ReadInt32());
+        if (r.ReadBoolean())
+        {
+            var n = r.Read7BitEncodedInt();
+            for (var i = 0; i < n; i++) t.Path.Add(r.ReadInt32());
+        }
+        else if (previous?.Invoke(t.Id) is { } known)
+        {
+            t.Path.AddRange(known.Path);
+        }
         t.PathIndex = r.Read7BitEncodedInt();
         t.CurrentNode = r.ReadInt32();
         t.Forward = r.ReadBoolean();

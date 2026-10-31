@@ -221,7 +221,7 @@ public sealed class GameClient : IDisposable
     {
         var world = World!;
         var upgrades = world.Upgrades.Count;
-        WorldCodec.ReadGlobal(r, world);
+        if (r.ReadBoolean()) WorldCodec.ReadGlobal(r, world);
         var structural = world.Upgrades.Count != upgrades;
         var n = r.Read7BitEncodedInt();
         for (var i = 0; i < n; i++) structural |= world.ApplyReplicatedMachine(WorldCodec.ReadMachine(r));
@@ -284,7 +284,7 @@ public sealed class GameClient : IDisposable
         n = r.Read7BitEncodedInt();
         for (var i = 0; i < n; i++)
         {
-            var t = WorldCodec.ReadTrain(r);
+            var t = WorldCodec.ReadTrain(r, id => world.Trains.GetValueOrDefault(id));
             structural |= !world.Trains.ContainsKey(t.Id);
             world.Trains[t.Id] = t;
         }
