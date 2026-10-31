@@ -216,22 +216,24 @@ static void Act(GameClient client, string behaviour, Random rng, float x, float 
             var recycler = Find("recycler");
             plan.Target = Center(recycler);
             if (!Near(plan.Target!.Value, 6)) break;
-            client.Send(new Command { Type = CommandType.Insert, A = recycler.Id });
-            client.Send(new Command { Type = CommandType.Link, A = recycler.Id, B = Find("depot").Id });
+            if (me.Bag.Get("scrap") > 0) client.Send(new Command { Type = CommandType.Insert, A = recycler.Id, Text = "scrap" });
+            if (!world.Links.Values.Any(l => l.From == recycler.Id))
+                client.Send(new Command { Type = CommandType.Link, A = recycler.Id, B = Find("depot").Id });
             plan.Step++;
             break;
         case 2:
             var depot = Find("depot");
             plan.Target = Center(depot);
             if (!Near(plan.Target!.Value, 6)) break;
-            client.Send(new Command { Type = CommandType.Extract, A = depot.Id });
+            if (depot.In.Get("recovered") > 0) client.Send(new Command { Type = CommandType.Extract, A = depot.Id, Text = "recovered" });
+            if (depot.In.Get("scrap") > 0 && me.Bag.Get("scrap") < 30) client.Send(new Command { Type = CommandType.Extract, A = depot.Id, Text = "scrap" });
             plan.Step++;
             break;
         case 3:
             var terminal = Find("export_terminal");
             plan.Target = Center(terminal);
             if (!Near(plan.Target!.Value, 6)) break;
-            client.Send(new Command { Type = CommandType.Insert, A = terminal.Id });
+            if (me.Bag.Get("recovered") > 0) client.Send(new Command { Type = CommandType.Insert, A = terminal.Id, Text = "recovered" });
             foreach (var kv in terminal.In.Items.ToList())
                 client.Send(new Command { Type = CommandType.Sell, A = terminal.Id, Text = kv.Key, Amount = kv.Value });
             plan.Step++;

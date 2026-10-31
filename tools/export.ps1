@@ -32,6 +32,7 @@ dotnet publish "$Repo\src\Server\Pluton.Server.csproj" -c Release -r win-x64 --s
 if ($LASTEXITCODE -ne 0) { throw 'Falló la publicación del servidor' }
 Copy-Item "$Repo\content" "$Out\server\content" -Recurse
 
+Copy-Item "$Repo\THIRD_PARTY_NOTICES.txt" "$Out\THIRD_PARTY_NOTICES.txt"
 $commit = git -C $Repo rev-parse --short HEAD
 $dirty = if (git -C $Repo status --porcelain) { ' (con cambios sin confirmar)' } else { '' }
 "PLUTON alfa $Version`ncommit $commit$dirty`nfecha $(Get-Date -Format s)" | Set-Content "$Out\VERSION.txt" -Encoding utf8

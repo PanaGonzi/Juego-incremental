@@ -1,5 +1,9 @@
 # Cambios
 
+## 0.4.0 (protocolo 4, guardado 4; migra 1, 2 y 3)
+
+Marte jugable: silicio, obleas, núcleos de navegación, regla de calor con radiadores y radiador criogénico, plataformas de carga interplanetaria con envíos persistentes. Campaña completa hasta el Proyecto Noveno Planeta. Transferencia por tipo de objeto en los paneles. Avisos de licencias en el paquete.
+
 ## 0.3.0 (protocolo 3, guardado 3; migra 1 y 2)
 
 Evento «El Expreso de las Sombras» por datos, con activación manual sin tocar el reloj y tren espectral permanente. Progreso sin conexión acotado a 8 h. Reserva de vías para varios trenes. Panel de jugadores con permisos y expulsión. Inglés, selector de idioma y controles reasignables. Transporte de Steam Networking Sockets implementado, sin integrar en el menú.
