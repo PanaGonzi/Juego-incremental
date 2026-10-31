@@ -18,7 +18,7 @@ public partial class GameView : Node3D
         public Node3D? Rotor;
         public Node3D? Piston;
         public Vector3 PistonRest;
-        public Label3D Warn = null!;
+        public MeshInstance3D Warn = null!;
         public string Key = "";
         public MachineStatus Status;
         public float Phase;
@@ -86,6 +86,7 @@ public partial class GameView : Node3D
     public int ViewPlanet => _viewPlanet;
     public bool InFlight => _inFlight;
     public float MaxSyncMs;
+    public float MaxPollMs;
     public int RenderedDebris => _debris.Count;
     public int RenderedMachines => _machines.Count;
     private Control? _loading;
@@ -586,16 +587,7 @@ public partial class GameView : Node3D
             if (node.Status != m.Status)
             {
                 node.Status = m.Status;
-                var warn = m.Status switch
-                {
-                    MachineStatus.NoPower => "⚡",
-                    MachineStatus.LowPower => "⚡",
-                    MachineStatus.OutputFull => "▣",
-                    MachineStatus.NoInput => "…",
-                    _ => "",
-                };
-                node.Warn.Text = warn;
-                node.Warn.Modulate = m.Status is MachineStatus.NoPower or MachineStatus.LowPower ? Ui.Bad : Ui.Amber;
+                node.Warn.Mesh = Models.StatusIcon(m.Status);
             }
         }
         foreach (var id in _machines.Keys.Where(k => !seen.Contains(k)).ToList()) FreeMachine(id);
@@ -839,16 +831,12 @@ public partial class GameView : Node3D
         root.AddChild(body);
         _pickables[body.GetInstanceId()] = ("machine", m.Id);
 
-        node.Warn = new Label3D
+        node.Warn = new MeshInstance3D
         {
-            Text = "",
-            Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-            FontSize = 96,
-            PixelSize = 0.012f,
             Position = new Vector3(0, model.Height + 0.7f, 0),
-            OutlineSize = 16,
+            Scale = new Vector3(1.3f, 1.3f, 1.3f),
             VisibilityRangeEnd = 45,
-            NoDepthTest = false,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         };
         root.AddChild(node.Warn);
         AddChild(root);
@@ -1145,7 +1133,9 @@ public partial class GameView : Node3D
     {
         _time += delta;
         var client = Session.Client;
+        var pollStart = Time.GetTicksUsec();
         client.Poll();
+        MaxPollMs = Math.Max(MaxPollMs, (Time.GetTicksUsec() - pollStart) / 1000f);
         if (Session.Runner?.Fault is { } fault)
         {
             GD.PrintErr("Fallo del servidor local: " + fault);

@@ -161,7 +161,12 @@ public partial class AutoTest : Node
         try
         {
             await Wait(0.2);
-            if (_args.TryGetValue("host", out var hostPort))
+            if (_args.TryGetValue("measure", out var measured))
+            {
+                int? measurePort = _args.TryGetValue("host", out var mp) ? int.Parse(mp) : null;
+                _main.StartSession(GameSession.Local(_main, Scenarios.Build(_main.Content, measured), "autotest-" + measured, measurePort, _main.Prefs));
+            }
+            else if (_args.TryGetValue("host", out var hostPort))
             {
                 _main.StartHost("autotest-host", true, int.Parse(hostPort));
             }
@@ -169,10 +174,6 @@ public partial class AutoTest : Node
             {
                 var parts = join.Split(':');
                 _main.StartJoin(parts[0], int.Parse(parts[1]), "");
-            }
-            else if (_args.TryGetValue("measure", out var measured))
-            {
-                _main.StartSession(GameSession.Local(_main, Scenarios.Build(_main.Content, measured), "autotest-" + measured, null, _main.Prefs));
             }
             else if (_args.GetValueOrDefault("scenario") == "travel")
             {
@@ -425,6 +426,12 @@ public partial class AutoTest : Node
         DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
         Engine.MaxFps = 0;
         await Wait(4);
+        if (_args.TryGetValue("expect-players", out var expect))
+        {
+            var want = int.Parse(expect);
+            Check(await Until(() => W.Players.Values.Count(p => p.Connected) >= want, 60), $"{want} jugadores conectados");
+            await Wait(3);
+        }
         Log($"Mundo: {W.Machines.Count} máquinas, {W.Trains.Count} trenes, {W.RailSegments.Count} tramos; representadas {v.RenderedMachines} máquinas; VSync desactivada");
         foreach (var (name, walk, aim) in new[]
         {
@@ -438,6 +445,8 @@ public partial class AutoTest : Node
             await Wait(1);
             _frames.Clear();
             v.MaxSyncMs = 0;
+            v.MaxPollMs = 0;
+            var structuralBefore = v.Session.Client.StructuralDeltas;
             var gen0 = GC.CollectionCount(0);
             var gen1 = GC.CollectionCount(1);
             var gen2 = GC.CollectionCount(2);
@@ -446,7 +455,7 @@ public partial class AutoTest : Node
             await Wait(seconds);
             _measuring = false;
             Summarize(_frames, out var text);
-            Log($"{name} GC: gen0={GC.CollectionCount(0) - gen0} gen1={GC.CollectionCount(1) - gen1} gen2={GC.CollectionCount(2) - gen2} pausa total={(GC.GetTotalPauseDuration() - pause).TotalMilliseconds:F1} ms, última pausa={GC.GetGCMemoryInfo().PauseDurations[0].TotalMilliseconds:F1} ms; SyncWorld máx={v.MaxSyncMs:F1} ms");
+            Log($"{name} GC: gen0={GC.CollectionCount(0) - gen0} gen1={GC.CollectionCount(1) - gen1} gen2={GC.CollectionCount(2) - gen2} pausa total={(GC.GetTotalPauseDuration() - pause).TotalMilliseconds:F1} ms, última pausa={GC.GetGCMemoryInfo().PauseDurations[0].TotalMilliseconds:F1} ms; SyncWorld máx={v.MaxSyncMs:F1} ms; Poll máx={v.MaxPollMs:F1} ms; deltas estructurales={v.Session.Client.StructuralDeltas - structuralBefore}");
             var info = $"objetos={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalObjectsInFrame)} dibujos={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalDrawCallsInFrame)} vídeo={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.VideoMemUsed) / 1048576} MB memoria={WorkingSetMb()} MB";
             Log($"{name}: {text} {info}");
             Log($"{name} picos: {string.Join(" ", _spikes)}");
@@ -457,7 +466,8 @@ public partial class AutoTest : Node
         if (ticks.Length > 0)
         {
             Array.Sort(ticks);
-            Log($"Servidor local: tick medio {ticks.Average():F2} ms, p99 {ticks[(int)(ticks.Length * 0.99)]:F2}, máx {ticks[^1]:F2}, tardíos {v.Session.Runner.TicksLate}");
+            var transport = v.Session.Runner.Server.Transport;
+            Log($"Servidor local: tick medio {ticks.Average():F2} ms, p99 {ticks[(int)(ticks.Length * 0.99)]:F2}, máx {ticks[^1]:F2}, tardíos {v.Session.Runner.TicksLate}; {v.Session.Runner.Server.ConnectedCount} conectados; enviado {transport.BytesSent / 1048576.0:F1} MiB, recibido {transport.BytesReceived / 1048576.0:F1} MiB en {_clock:F0} s");
         }
         Check(v.Session.Client.HashMismatches == 0, $"sin divergencias ({v.Session.Client.HashChecks} comprobaciones)");
         _frames.Clear();

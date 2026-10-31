@@ -487,6 +487,65 @@ public static class Models
         return mesh;
     }
 
+    private static StandardMaterial3D IconMaterial(Color color) => new()
+    {
+        AlbedoColor = color,
+        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+        BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
+        BillboardKeepScale = true,
+    };
+
+    private static readonly StandardMaterial3D IconBad = IconMaterial(new Color(1f, 0.35f, 0.25f));
+    private static readonly StandardMaterial3D IconWarn = IconMaterial(new Color(1f, 0.72f, 0.2f));
+
+    /// <summary>Iconos de estado con forma propia, para no comunicar solo con color. Se comparten entre máquinas.</summary>
+    public static ArrayMesh? StatusIcon(Pluton.Simulation.MachineStatus status)
+    {
+        var key = "icon_" + status;
+        if (DebrisCache.TryGetValue(key, out var mesh)) return mesh;
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        void Quad(float x, float y, float w, float h, float rotDeg = 0)
+        {
+            var q = new QuadMesh { Size = new Vector2(w, h) };
+            st.AppendFrom(q, 0, new Transform3D(Basis.FromEuler(new Vector3(0, 0, Mathf.DegToRad(rotDeg))), new Vector3(x, y, 0)));
+        }
+        StandardMaterial3D material;
+        switch (status)
+        {
+            case Pluton.Simulation.MachineStatus.NoPower:
+            case Pluton.Simulation.MachineStatus.LowPower:
+                // Rayo
+                Quad(0.07f, 0.2f, 0.16f, 0.46f, -20);
+                Quad(-0.07f, -0.2f, 0.16f, 0.46f, -20);
+                Quad(0, 0, 0.42f, 0.13f, 12);
+                material = IconBad;
+                break;
+            case Pluton.Simulation.MachineStatus.OutputFull:
+                // Caja llena con marco
+                Quad(0, 0.3f, 0.66f, 0.08f);
+                Quad(0, -0.3f, 0.66f, 0.08f);
+                Quad(-0.3f, 0, 0.08f, 0.66f);
+                Quad(0.3f, 0, 0.08f, 0.66f);
+                Quad(0, 0, 0.36f, 0.36f);
+                material = IconWarn;
+                break;
+            case Pluton.Simulation.MachineStatus.NoInput:
+                // Tres puntos: esperando material
+                Quad(-0.26f, 0, 0.15f, 0.15f);
+                Quad(0, 0, 0.15f, 0.15f);
+                Quad(0.26f, 0, 0.15f, 0.15f);
+                material = IconWarn;
+                break;
+            default:
+                return null;
+        }
+        st.SetMaterial(material);
+        mesh = st.Commit();
+        DebrisCache[key] = mesh;
+        return mesh;
+    }
+
     public static ArrayMesh Astronaut()
     {
         const string key = "astronaut";

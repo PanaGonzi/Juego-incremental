@@ -27,6 +27,7 @@ public sealed class GameClient : IDisposable
     public int HashMismatches => Volatile.Read(ref _hashMismatches);
     public int HashChecks => Volatile.Read(ref _hashChecks);
     public int PendingCount => _pending.Count;
+    public int StructuralDeltas { get; private set; }
 
     public event Action<uint, CommandResult>? ResultReceived;
     public event Action<string, string>? ChatReceived;
@@ -291,7 +292,11 @@ public sealed class GameClient : IDisposable
         n = r.Read7BitEncodedInt();
         structural |= n > 0;
         for (var i = 0; i < n; i++) world.Trains.Remove(r.ReadInt32());
-        if (structural) world.Reindex();
+        if (structural)
+        {
+            StructuralDeltas++;
+            world.Reindex();
+        }
     }
 
     private void ReadPositions(BinaryReader r)
