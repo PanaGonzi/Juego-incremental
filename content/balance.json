@@ -9,7 +9,7 @@
   "cutterCooldownTicks": 2,
   "linkMaxMm": 14000,
   "linkIntervalTicks": 3,
-  "recipeBufferFactor": 4,
+  "recipeBufferFactor": 10,
   "outputBuffer": 20,
   "refundPermille": 1000,
   "sellIntervalTicks": 10,

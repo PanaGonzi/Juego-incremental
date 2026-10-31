@@ -1,0 +1,10 @@
+recurso,procedencia,autor_herramienta,licencia,atribucion,modificaciones,redistribuido
+Modelos de máquinas y escombros,src/Game/Scripts/Models.cs,Generados por código (Claude Opus 5.5),Propio del proyecto,No requerida,—,Sí
+Audio de efectos,src/Game/Scripts/Models.cs (Sfx),Sintetizado por código (Claude Opus 5.5),Propio del proyecto,No requerida,—,Sí
+Shaders de cielo y terreno,src/Game/Scripts/GameView.cs,Claude Opus 5.5,Propio del proyecto,No requerida,—,Sí
+Godot Engine 4.7.2,godotengine.org,Godot contributors,MIT,Incluir aviso de licencia en créditos,Sin modificar,Sí
+Fuente por defecto de Godot,Incluida en Godot,Open Sans / Godot,Apache-2.0 u OFL según versión (revisar antes de RC),Revisar,Sin modificar,Sí
+.NET Runtime 10,microsoft.com,Microsoft,MIT,Incluir aviso,Sin modificar,Sí
+LiteNetLib 2.1.5,NuGet,RevenantX,MIT,Incluir aviso,Sin modificar,Sí
+Steamworks.NET 2025.165.0,github.com/rlabrecque/Steamworks.NET,Riley Labrecque,MIT,Incluir aviso,Solo prueba técnica; aún no se redistribuye,No
+steam_api64.dll,Steamworks SDK vía Steamworks.NET,Valve,Acuerdo de Steamworks,Según acuerdo,Fuera de Git; aún no se redistribuye,No

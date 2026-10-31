@@ -1,4 +1,4 @@
-# Ensayo con procesos independientes: un servidor dedicado y N clientes con el protocolo real.
+﻿# Ensayo con procesos independientes: un servidor dedicado y N clientes con el protocolo real.
 # Uso: tools\net-test.ps1 -Clients 12 -Seconds 60 [-Latency 100 -Jitter 10 -Loss 2] [-Reconnect 20] [-Extra 1] [-Tag nombre] [-Abuser]
 param(
     [int]$Clients = 2,

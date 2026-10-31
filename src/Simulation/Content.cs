@@ -88,7 +88,6 @@ public sealed class NodeDef
     public string Item { get; set; } = "";
     public int X { get; set; }
     public int Z { get; set; }
-    public int Crust { get; set; }
 }
 
 public sealed class DebrisFieldDef

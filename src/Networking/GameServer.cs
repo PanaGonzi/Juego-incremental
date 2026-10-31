@@ -52,7 +52,7 @@ public sealed class GameServer : IDisposable
     private long _lastAutosaveMs;
     private Task? _saveTask;
 
-    public bool Paused;
+    public volatile bool Paused;
     public int ConnectedCount => _sessions.Values.Count(s => s.Player != null);
     public long CommandsApplied { get; private set; }
     public long CommandsRejected { get; private set; }

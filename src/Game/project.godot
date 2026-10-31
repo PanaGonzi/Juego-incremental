@@ -1,0 +1,36 @@
+; PLUTON — NOVENO PLANETA
+config_version=5
+
+[application]
+
+config/name="PLUTON - Noveno Planeta"
+config/version="0.1.0"
+run/main_scene="res://Scenes/Main.tscn"
+config/features=PackedStringArray("4.7", "C#", "Forward Plus")
+run/max_fps=0
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0.03, 0.04, 0.07, 1)
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/mode=0
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/vsync/vsync_mode=1
+
+[dotnet]
+
+project/assembly_name="Pluton.Game"
+
+[physics]
+
+common/physics_ticks_per_second=60
+3d/physics_engine="Jolt Physics"
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
+anti_aliasing/quality/msaa_3d=2
+environment/defaults/default_clear_color=Color(0.02, 0.03, 0.05, 1)

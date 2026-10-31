@@ -1,4 +1,4 @@
-# Preparación idempotente del entorno de PLUTON. Instala a nivel de usuario, sin elevación.
+﻿# Preparación idempotente del entorno de PLUTON. Instala a nivel de usuario, sin elevación.
 # Uso: powershell -ExecutionPolicy Bypass -File tools\setup.ps1
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -59,6 +59,16 @@ if (-not (Test-Path (Join-Path $TemplatesDir 'version.txt'))) {
     New-Item -ItemType Directory -Force $TemplatesDir | Out-Null
     Copy-Item (Join-Path $tmp 'templates\*') $TemplatesDir -Recurse -Force
     Remove-Item $tmp -Recurse -Force
+}
+
+# Steamworks.NET: binding + steam_api64 de la misma versión (fuera de Git, tiene licencia propia del SDK)
+$SteamworksVersion = '2025.165.0'
+$SteamworksDir = Join-Path $Downloads 'steamworksnet'
+if (-not (Test-Path (Join-Path $SteamworksDir 'extracted\Windows-x64\steam_api64.dll'))) {
+    New-Item -ItemType Directory -Force $SteamworksDir | Out-Null
+    $zip = Join-Path $SteamworksDir "Steamworks.NET-Standalone_$SteamworksVersion.zip"
+    Invoke-WebRequest "https://github.com/rlabrecque/Steamworks.NET/releases/download/$SteamworksVersion/Steamworks.NET-Standalone_$SteamworksVersion.zip" -OutFile $zip
+    Expand-Archive $zip -DestinationPath (Join-Path $SteamworksDir 'extracted') -Force
 }
 
 Write-Host "dotnet : $(& (Join-Path $DotnetDir 'dotnet.exe') --version)"

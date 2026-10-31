@@ -12,14 +12,14 @@
       { "def": "export_terminal", "x": -10, "z": 3 }
     ],
     "nodes": [
-      { "item": "ore", "x": 18,  "z": -6,  "crust": 3 },
-      { "item": "ore", "x": 24,  "z": 0,   "crust": 3 },
-      { "item": "ore", "x": 20,  "z": 8,   "crust": 4 },
-      { "item": "ore", "x": 55,  "z": -40, "crust": 5 },
-      { "item": "ore", "x": 62,  "z": -33, "crust": 5 },
-      { "item": "ice", "x": -22, "z": -12, "crust": 3 },
-      { "item": "ice", "x": -28, "z": -4,  "crust": 3 },
-      { "item": "ice", "x": -55, "z": 30,  "crust": 5 }
+      { "item": "ore", "x": 18,  "z": -6 },
+      { "item": "ore", "x": 24,  "z": -6 },
+      { "item": "ore", "x": 21,  "z": 0 },
+      { "item": "ore", "x": 55,  "z": -40 },
+      { "item": "ore", "x": 62,  "z": -33 },
+      { "item": "ice", "x": -22, "z": -12 },
+      { "item": "ice", "x": -28, "z": -4 },
+      { "item": "ice", "x": -55, "z": 30 }
     ],
     "debrisFields": [
       { "def": "scrap_pile", "x": 6,   "z": 16,  "radius": 9,  "count": 16, "seed": 11 },
