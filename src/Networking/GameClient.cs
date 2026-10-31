@@ -239,6 +239,30 @@ public sealed class GameClient : IDisposable
             var p = WorldCodec.ReadPlayer(r);
             world.Players[p.Key] = p;
         }
+        n = r.Read7BitEncodedInt();
+        for (var i = 0; i < n; i++)
+        {
+            var node = WorldCodec.ReadRailNode(r);
+            world.RailNodes[node.Id] = node;
+        }
+        n = r.Read7BitEncodedInt();
+        for (var i = 0; i < n; i++) world.RailNodes.Remove(r.ReadInt32());
+        n = r.Read7BitEncodedInt();
+        for (var i = 0; i < n; i++)
+        {
+            var s = WorldCodec.ReadRailSegment(r);
+            world.RailSegments[s.Id] = s;
+        }
+        n = r.Read7BitEncodedInt();
+        for (var i = 0; i < n; i++) world.RailSegments.Remove(r.ReadInt32());
+        n = r.Read7BitEncodedInt();
+        for (var i = 0; i < n; i++)
+        {
+            var t = WorldCodec.ReadTrain(r);
+            world.Trains[t.Id] = t;
+        }
+        n = r.Read7BitEncodedInt();
+        for (var i = 0; i < n; i++) world.Trains.Remove(r.ReadInt32());
         world.Reindex();
     }
 

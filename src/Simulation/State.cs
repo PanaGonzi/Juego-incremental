@@ -50,6 +50,8 @@ public sealed class Machine
     public int X, Z, Rot;
     public bool Builtin;
     public int NodeId = -1;
+    public int RailA = -1, RailB = -1;
+    public bool StationUnload;
     public readonly Inventory In = new();
     public readonly Inventory Out = new();
     public bool Processing;
@@ -87,6 +89,43 @@ public sealed class ResourceNode
     public int X, Z;
     public bool Revealed;
     public int OccupiedBy = -1;
+    public int YieldPermille = 1000;
+}
+
+public sealed class RailNode
+{
+    public int Id;
+    public int Planet;
+    public int X, Z; // esquinas de celda
+}
+
+public sealed class RailSegment
+{
+    public int Id;
+    public int Planet;
+    public int A, B;
+    public byte Shape; // 0 recta, 1 curva por (B.X, A.Z), 2 curva por (A.X, B.Z)
+    public long LengthMm;
+    public int OwnerStation = -1;
+}
+
+public enum TrainState : byte { Loading, Moving, Unloading, Waiting }
+
+public sealed class Train
+{
+    public int Id;
+    public int Planet;
+    public int StationA, StationB;
+    public bool HeadingToB = true;
+    public TrainState State = TrainState.Loading;
+    public string WaitReason = "";
+    public readonly Inventory Cargo = new();
+    public readonly List<int> Path = new();
+    public int PathIndex;
+    public int CurrentNode = -1;
+    public bool Forward = true; // sentido A→B en el tramo actual
+    public long PosMm;
+    public int Timer;
 }
 
 public enum Role : byte { Visitor, Builder, Admin, Owner }
@@ -108,6 +147,7 @@ public enum CommandType : byte
 {
     CutDebris, Place, Remove, Move, Link, Unlink, Insert, Extract, Sell, SetAutoSell,
     FulfillContract, BuyUpgrade, SetRole, Kick,
+    PlaceRail, RemoveRail, StationMode, CreateTrain, RemoveTrain,
 }
 
 /// <summary>Intención de un jugador. Todo lo que contiene se valida antes de aplicarse.</summary>

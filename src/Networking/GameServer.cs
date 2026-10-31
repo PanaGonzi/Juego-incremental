@@ -357,7 +357,9 @@ public sealed class GameServer : IDisposable
     {
         if (World.DirtyMachines.Count == 0 && World.DirtyDebris.Count == 0 && World.DirtyNodes.Count == 0 &&
             World.DirtyLinks.Count == 0 && World.DirtyPlayers.Count == 0 && !World.DirtyGlobal &&
-            World.RemovedMachines.Count == 0 && World.RemovedDebris.Count == 0 && World.RemovedLinks.Count == 0)
+            World.RemovedMachines.Count == 0 && World.RemovedDebris.Count == 0 && World.RemovedLinks.Count == 0 &&
+            World.DirtyRailNodes.Count == 0 && World.DirtyRailSegments.Count == 0 && World.DirtyTrains.Count == 0 &&
+            World.RemovedRailNodes.Count == 0 && World.RemovedRailSegments.Count == 0 && World.RemovedTrains.Count == 0)
             return;
 
         _deltaStream.SetLength(0);
@@ -381,6 +383,18 @@ public sealed class GameServer : IDisposable
             foreach (var id in World.DirtyNodes) WorldCodec.WriteNode(w, World.Nodes[id]);
             w.Write7BitEncodedInt(World.DirtyPlayers.Count);
             foreach (var key in World.DirtyPlayers) WorldCodec.WritePlayer(w, World.Players[key]);
+            w.Write7BitEncodedInt(World.DirtyRailNodes.Count);
+            foreach (var id in World.DirtyRailNodes) WorldCodec.WriteRailNode(w, World.RailNodes[id]);
+            w.Write7BitEncodedInt(World.RemovedRailNodes.Count);
+            foreach (var id in World.RemovedRailNodes) w.Write(id);
+            w.Write7BitEncodedInt(World.DirtyRailSegments.Count);
+            foreach (var id in World.DirtyRailSegments) WorldCodec.WriteRailSegment(w, World.RailSegments[id]);
+            w.Write7BitEncodedInt(World.RemovedRailSegments.Count);
+            foreach (var id in World.RemovedRailSegments) w.Write(id);
+            w.Write7BitEncodedInt(World.DirtyTrains.Count);
+            foreach (var id in World.DirtyTrains) WorldCodec.WriteTrain(w, World.Trains[id]);
+            w.Write7BitEncodedInt(World.RemovedTrains.Count);
+            foreach (var id in World.RemovedTrains) w.Write(id);
         }
         var buffer = _deltaStream.GetBuffer();
         var length = (int)_deltaStream.Length;
@@ -395,6 +409,12 @@ public sealed class GameServer : IDisposable
         World.RemovedMachines.Clear();
         World.RemovedDebris.Clear();
         World.RemovedLinks.Clear();
+        World.DirtyRailNodes.Clear();
+        World.DirtyRailSegments.Clear();
+        World.DirtyTrains.Clear();
+        World.RemovedRailNodes.Clear();
+        World.RemovedRailSegments.Clear();
+        World.RemovedTrains.Clear();
         World.DirtyGlobal = false;
     }
 

@@ -7,7 +7,7 @@ namespace Pluton.Simulation;
 /// </summary>
 public static class WorldCodec
 {
-    public const int FormatVersion = 1;
+    public const int FormatVersion = 2;
 
     private static void WriteInv(BinaryWriter w, Inventory inv)
     {
@@ -42,6 +42,9 @@ public static class WorldCodec
         w.Write((byte)m.Rot);
         w.Write(m.Builtin);
         w.Write(m.NodeId);
+        w.Write(m.RailA);
+        w.Write(m.RailB);
+        w.Write(m.StationUnload);
         WriteInv(w, m.In);
         WriteInv(w, m.Out);
         w.Write(m.Processing);
@@ -59,7 +62,7 @@ public static class WorldCodec
         }
     }
 
-    public static Machine ReadMachine(BinaryReader r)
+    public static Machine ReadMachine(BinaryReader r, int version = FormatVersion)
     {
         var m = new Machine
         {
@@ -72,6 +75,12 @@ public static class WorldCodec
             Builtin = r.ReadBoolean(),
             NodeId = r.ReadInt32(),
         };
+        if (version >= 2)
+        {
+            m.RailA = r.ReadInt32();
+            m.RailB = r.ReadInt32();
+            m.StationUnload = r.ReadBoolean();
+        }
         ReadInv(r, m.In);
         ReadInv(r, m.Out);
         m.Processing = r.ReadBoolean();
@@ -133,17 +142,104 @@ public static class WorldCodec
         w.Write(n.X);
         w.Write(n.Z);
         w.Write(n.Revealed);
+        w.Write7BitEncodedInt(n.YieldPermille);
     }
 
-    public static ResourceNode ReadNode(BinaryReader r) => new()
+    public static ResourceNode ReadNode(BinaryReader r, int version = FormatVersion)
+    {
+        var n = new ResourceNode
+        {
+            Id = r.ReadInt32(),
+            Item = r.ReadString(),
+            Planet = r.Read7BitEncodedInt(),
+            X = r.ReadInt32(),
+            Z = r.ReadInt32(),
+            Revealed = r.ReadBoolean(),
+        };
+        if (version >= 2) n.YieldPermille = r.Read7BitEncodedInt();
+        return n;
+    }
+
+    public static void WriteRailNode(BinaryWriter w, RailNode n)
+    {
+        w.Write(n.Id);
+        w.Write7BitEncodedInt(n.Planet);
+        w.Write(n.X);
+        w.Write(n.Z);
+    }
+
+    public static RailNode ReadRailNode(BinaryReader r) => new()
     {
         Id = r.ReadInt32(),
-        Item = r.ReadString(),
         Planet = r.Read7BitEncodedInt(),
         X = r.ReadInt32(),
         Z = r.ReadInt32(),
-        Revealed = r.ReadBoolean(),
     };
+
+    public static void WriteRailSegment(BinaryWriter w, RailSegment s)
+    {
+        w.Write(s.Id);
+        w.Write7BitEncodedInt(s.Planet);
+        w.Write(s.A);
+        w.Write(s.B);
+        w.Write(s.Shape);
+        w.Write7BitEncodedInt64(s.LengthMm);
+        w.Write(s.OwnerStation);
+    }
+
+    public static RailSegment ReadRailSegment(BinaryReader r) => new()
+    {
+        Id = r.ReadInt32(),
+        Planet = r.Read7BitEncodedInt(),
+        A = r.ReadInt32(),
+        B = r.ReadInt32(),
+        Shape = r.ReadByte(),
+        LengthMm = r.Read7BitEncodedInt64(),
+        OwnerStation = r.ReadInt32(),
+    };
+
+    public static void WriteTrain(BinaryWriter w, Train t, bool forHash = false)
+    {
+        w.Write(t.Id);
+        w.Write7BitEncodedInt(t.Planet);
+        w.Write(t.StationA);
+        w.Write(t.StationB);
+        w.Write(t.HeadingToB);
+        w.Write((byte)t.State);
+        w.Write(t.WaitReason);
+        WriteInv(w, t.Cargo);
+        if (forHash) return;
+        w.Write7BitEncodedInt(t.Path.Count);
+        foreach (var id in t.Path) w.Write(id);
+        w.Write7BitEncodedInt(t.PathIndex);
+        w.Write(t.CurrentNode);
+        w.Write(t.Forward);
+        w.Write7BitEncodedInt64(t.PosMm);
+        w.Write7BitEncodedInt(t.Timer);
+    }
+
+    public static Train ReadTrain(BinaryReader r)
+    {
+        var t = new Train
+        {
+            Id = r.ReadInt32(),
+            Planet = r.Read7BitEncodedInt(),
+            StationA = r.ReadInt32(),
+            StationB = r.ReadInt32(),
+            HeadingToB = r.ReadBoolean(),
+            State = (TrainState)r.ReadByte(),
+            WaitReason = r.ReadString(),
+        };
+        ReadInv(r, t.Cargo);
+        var n = r.Read7BitEncodedInt();
+        for (var i = 0; i < n; i++) t.Path.Add(r.ReadInt32());
+        t.PathIndex = r.Read7BitEncodedInt();
+        t.CurrentNode = r.ReadInt32();
+        t.Forward = r.ReadBoolean();
+        t.PosMm = r.Read7BitEncodedInt64();
+        t.Timer = r.Read7BitEncodedInt();
+        return t;
+    }
 
     public static void WritePlayer(BinaryWriter w, PlayerState p, bool forHash = false)
     {
@@ -237,6 +333,12 @@ public static class WorldCodec
         foreach (var n in world.Nodes.Values) WriteNode(w, n);
         w.Write7BitEncodedInt(world.Players.Count);
         foreach (var p in world.Players.Values) WritePlayer(w, p);
+        w.Write7BitEncodedInt(world.RailNodes.Count);
+        foreach (var n in world.RailNodes.Values) WriteRailNode(w, n);
+        w.Write7BitEncodedInt(world.RailSegments.Count);
+        foreach (var s in world.RailSegments.Values) WriteRailSegment(w, s);
+        w.Write7BitEncodedInt(world.Trains.Count);
+        foreach (var t in world.Trains.Values) WriteTrain(w, t);
         w.Flush();
         return ms.ToArray();
     }
@@ -255,7 +357,7 @@ public static class WorldCodec
         var n = r.Read7BitEncodedInt();
         for (var i = 0; i < n; i++)
         {
-            var m = ReadMachine(r);
+            var m = ReadMachine(r, formatVersion);
             if (!content.Machines.ContainsKey(m.Def)) throw new InvalidDataException($"Máquina desconocida: {m.Def}");
             world.Machines[m.Id] = m;
         }
@@ -275,7 +377,7 @@ public static class WorldCodec
         n = r.Read7BitEncodedInt();
         for (var i = 0; i < n; i++)
         {
-            var node = ReadNode(r);
+            var node = ReadNode(r, formatVersion);
             world.Nodes[node.Id] = node;
         }
         n = r.Read7BitEncodedInt();
@@ -285,8 +387,47 @@ public static class WorldCodec
             p.Connected = false;
             world.Players[p.Key] = p;
         }
+        if (formatVersion >= 2)
+        {
+            n = r.Read7BitEncodedInt();
+            for (var i = 0; i < n; i++)
+            {
+                var node = ReadRailNode(r);
+                world.RailNodes[node.Id] = node;
+            }
+            n = r.Read7BitEncodedInt();
+            for (var i = 0; i < n; i++)
+            {
+                var s = ReadRailSegment(r);
+                world.RailSegments[s.Id] = s;
+            }
+            n = r.Read7BitEncodedInt();
+            for (var i = 0; i < n; i++)
+            {
+                var t = ReadTrain(r);
+                world.Trains[t.Id] = t;
+            }
+        }
+        else
+        {
+            MigrateFromV1(world);
+        }
         world.Reindex();
         return world;
+    }
+
+    /// <summary>
+    /// v1 → v2: tres objetivos nuevos tras «o_parts» y rendimiento de yacimientos según el contenido actual.
+    /// </summary>
+    private static void MigrateFromV1(World world)
+    {
+        const int insertedAfter = 9;
+        if (world.ObjectiveIndex > insertedAfter) world.ObjectiveIndex += 3;
+        foreach (var node in world.Nodes.Values)
+            foreach (var planet in world.Content.Planets)
+                foreach (var def in planet.Nodes)
+                    if (planet.Id == node.Planet && def.X == node.X && def.Z == node.Z)
+                        node.YieldPermille = def.YieldPermille;
     }
 
     /// <summary>Firma del estado económico y estructural; excluye datos volátiles como posición o progreso.</summary>
@@ -300,6 +441,9 @@ public static class WorldCodec
         foreach (var d in world.DebrisById.Values) WriteDebris(w, d);
         foreach (var n in world.Nodes.Values) WriteNode(w, n);
         foreach (var p in world.Players.Values) WritePlayer(w, p, forHash: true);
+        foreach (var n in world.RailNodes.Values) WriteRailNode(w, n);
+        foreach (var s in world.RailSegments.Values) WriteRailSegment(w, s);
+        foreach (var t in world.Trains.Values) WriteTrain(w, t, forHash: true);
         w.Flush();
         return Convert.ToHexString(SHA256.HashData(ms.GetBuffer().AsSpan(0, (int)ms.Length)))[..16];
     }

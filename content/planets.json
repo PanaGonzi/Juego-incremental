@@ -15,8 +15,9 @@
       { "item": "ore", "x": 18,  "z": -6 },
       { "item": "ore", "x": 24,  "z": -6 },
       { "item": "ore", "x": 21,  "z": 0 },
-      { "item": "ore", "x": 55,  "z": -40 },
-      { "item": "ore", "x": 62,  "z": -33 },
+      { "item": "ore", "x": 55,  "z": -40, "yieldPermille": 2500 },
+      { "item": "ore", "x": 62,  "z": -40, "yieldPermille": 2500 },
+      { "item": "ore", "x": 58,  "z": -33, "yieldPermille": 2500 },
       { "item": "ice", "x": -22, "z": -12 },
       { "item": "ice", "x": -28, "z": -4 },
       { "item": "ice", "x": -55, "z": 30 }

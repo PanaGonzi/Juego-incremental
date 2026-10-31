@@ -42,6 +42,7 @@ while (total.Elapsed.TotalSeconds < seconds)
     var sessionEnd = reconnectEvery > 0 ? total.Elapsed.TotalSeconds + reconnectEvery : double.MaxValue;
     var connected = false;
     float x = 0, z = 0, angle = (float)(rng.NextDouble() * Math.PI * 2);
+    var plan = new BotPlan();
     client.PositionCorrected += (cx, _, cz) => { x = cx; z = cz; };
     long nextMove = 0, nextAction = 0;
 
@@ -66,11 +67,18 @@ while (total.Elapsed.TotalSeconds < seconds)
             if (now >= nextMove)
             {
                 nextMove = now + 50;
-                // Recorre el área inicial a velocidad legal.
-                angle += (float)((rng.NextDouble() - 0.5) * 0.4);
-                x += MathF.Cos(angle) * 0.3f;
-                z += MathF.Sin(angle) * 0.3f;
-                if (Math.Abs(x) > 60 || Math.Abs(z) > 60) angle += MathF.PI;
+                // Camina hacia su objetivo a velocidad legal.
+                if (plan.Target is { } goal)
+                {
+                    var gx = goal.x - x;
+                    var gz = goal.z - z;
+                    var len = MathF.Sqrt(gx * gx + gz * gz);
+                    if (len > 3.5f)
+                    {
+                        x += gx / len * 0.55f;
+                        z += gz / len * 0.55f;
+                    }
+                }
                 client.SendMove(x, 1f, z, angle);
                 moves++;
             }
@@ -78,7 +86,7 @@ while (total.Elapsed.TotalSeconds < seconds)
             if (now >= nextAction)
             {
                 nextAction = now + 250 + rng.Next(250);
-                Act(client, behaviour, rng, ref x, ref z);
+                Act(client, behaviour, rng, ref x, ref z, plan);
                 if (rng.Next(200) == 0) { client.SendChat("hola desde " + protocolLabel); chats++; }
             }
         }
@@ -108,71 +116,93 @@ void Report() => Console.WriteLine(
     $"{protocolLabel} connects={connects} avgConnectMs={(connects == 0 ? 0 : connectMsSum / connects)} ok={ok} failed={failed} moves={moves} chats={chats} " +
     $"reconnects={reconnects} hashChecks={checks} hashMismatch={mismatches} maxRttMs={maxRtt} closeReason={closeReason}");
 
-static void Act(GameClient client, string behaviour, Random rng, ref float x, ref float z)
+static void Act(GameClient client, string behaviour, Random rng, ref float x, ref float z, BotPlan plan)
 {
     var world = client.World!;
     var me = client.LocalPlayer!;
     var cell = world.Content.Balance.CellSizeMm / 1000f;
 
-    switch (behaviour)
+    if (behaviour == "abuser")
     {
-        case "cutter":
-            // Disputa el escombro más cercano; varios bots compiten por los mismos.
+        // Valores absurdos: el servidor debe rechazarlos sin caerse.
+        client.Send(new Command { Type = CommandType.Sell, A = int.MaxValue, Text = "scrap", Amount = long.MaxValue });
+        client.Send(new Command { Type = CommandType.Place, Text = "no_existe", A = int.MinValue, B = int.MaxValue });
+        client.Send(new Command { Type = CommandType.SetRole, Text = me.Key, A = (int)Role.Owner });
+        client.Send(new Command { Type = CommandType.PlaceRail, A = int.MinValue, B = 0, C = int.MaxValue, D = 0, Amount = 99 });
+        client.SendMove(float.NaN, float.PositiveInfinity, 0, 0);
+        client.SendMove(99999f, 1f, 99999f, 0);
+        return;
+    }
+
+    // Ciclo de jugador: limpiar, reciclar, llevar al depósito y vender. Compite por lo mismo que los demás.
+    Machine Find(string def) => world.Machines.Values.First(m => m.Def == def);
+    bool Near((float x, float z) target, float range) => (target.x - x) * (target.x - x) + (target.z - z) * (target.z - z) < range * range;
+    (float x, float z) Center(Machine m)
+    {
+        var (mx, mz) = world.MachineCenterMm(m);
+        return (mx / 1000f, mz / 1000f);
+    }
+
+    switch (plan.Step % 5)
+    {
+        case 0:
             Debris? best = null;
             var bestDist = float.MaxValue;
             foreach (var d in world.DebrisById.Values)
             {
-                var dx = d.X * cell - x;
-                var dz = d.Z * cell - z;
+                var dx = (d.X + 0.5f) * cell - x;
+                var dz = (d.Z + 0.5f) * cell - z;
                 var dist = dx * dx + dz * dz;
                 if (dist < bestDist) { bestDist = dist; best = d; }
             }
-            if (best == null) break;
-            if (bestDist > 36)
-            {
-                // Se acerca a velocidad legal; el servidor rechazará un salto mayor.
-                var len = MathF.Sqrt(bestDist);
-                var step = Math.Min(len - 3, 3f);
-                x += (best.X * cell - x) / len * step;
-                z += (best.Z * cell - z) / len * step;
-                client.SendMove(x, 1f, z, 0);
-                break;
-            }
+            if (best == null || me.Bag.Get("scrap") >= 30) { plan.Step++; break; }
+            if (bestDist > 36) { plan.Target = ((best.X + 0.5f) * cell, (best.Z + 0.5f) * cell); break; }
             client.Send(new Command { Type = CommandType.CutDebris, A = best.Id });
             break;
-
-        case "worker":
+        case 1:
+            var recycler = Find("recycler");
+            plan.Target = Center(recycler);
+            if (!Near(plan.Target, 6)) break;
+            client.Send(new Command { Type = CommandType.Insert, A = recycler.Id });
+            client.Send(new Command { Type = CommandType.Link, A = recycler.Id, B = Find("depot").Id });
+            plan.Step++;
+            break;
+        case 2:
+            var depot = Find("depot");
+            plan.Target = Center(depot);
+            if (!Near(plan.Target, 6)) break;
+            client.Send(new Command { Type = CommandType.Extract, A = depot.Id });
+            plan.Step++;
+            break;
+        case 3:
+            var terminal = Find("export_terminal");
+            plan.Target = Center(terminal);
+            if (!Near(plan.Target, 6)) break;
+            client.Send(new Command { Type = CommandType.Insert, A = terminal.Id });
+            foreach (var kv in terminal.In.Items.ToList())
+                client.Send(new Command { Type = CommandType.Sell, A = terminal.Id, Text = kv.Key, Amount = kv.Value });
+            plan.Step++;
+            break;
         default:
-            var roll = rng.Next(100);
-            if (roll < 30 && me.Bag.Total > 0)
+            // Construye y desmonta en una zona disputada por varios bots.
+            var own = world.Machines.Values.Where(m => m.Def == "storage_crate").ToList();
+            if (own.Count > 4)
             {
-                var near = world.Machines.Values.ElementAt(rng.Next(world.Machines.Count));
-                client.Send(new Command { Type = CommandType.Insert, A = near.Id });
-            }
-            else if (roll < 60)
-            {
-                var m = world.Machines.Values.ElementAt(rng.Next(world.Machines.Count));
-                client.Send(new Command { Type = CommandType.Extract, A = m.Id });
-            }
-            else if (roll < 80 && world.DebrisById.Count > 0)
-            {
-                var d = world.DebrisById.Values.ElementAt(rng.Next(world.DebrisById.Count));
-                client.Send(new Command { Type = CommandType.CutDebris, A = d.Id });
+                var old = own[rng.Next(own.Count)];
+                plan.Target = Center(old);
+                if (Near(plan.Target, 20)) client.Send(new Command { Type = CommandType.Remove, A = old.Id });
             }
             else
             {
-                // Intenta colocar y a veces retirar, compitiendo por créditos y celdas.
-                client.Send(new Command { Type = CommandType.Place, Text = "storage_crate", A = (int)(x / cell) + rng.Next(-6, 6), B = (int)(z / cell) + rng.Next(-6, 6), C = rng.Next(4) });
+                client.Send(new Command { Type = CommandType.Place, Text = "storage_crate", A = (int)(x / cell) + rng.Next(-8, 8), B = (int)(z / cell) + rng.Next(-8, 8), C = rng.Next(4) });
             }
-            break;
-
-        case "abuser":
-            // Valores absurdos: el servidor debe rechazarlos sin caerse.
-            client.Send(new Command { Type = CommandType.Sell, A = int.MaxValue, Text = "scrap", Amount = long.MaxValue });
-            client.Send(new Command { Type = CommandType.Place, Text = "no_existe", A = int.MinValue, B = int.MaxValue });
-            client.Send(new Command { Type = CommandType.SetRole, Text = me.Key, A = (int)Role.Owner });
-            client.SendMove(float.NaN, float.PositiveInfinity, 0, 0);
-            client.SendMove(99999f, 1f, 99999f, 0);
+            plan.Step++;
             break;
     }
+}
+
+sealed class BotPlan
+{
+    public int Step;
+    public (float x, float z)? Target;
 }

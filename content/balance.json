@@ -15,6 +15,17 @@
   "sellIntervalTicks": 10,
   "sellUnitsPerInterval": 4,
   "offlineCapHours": 8,
+  "rail": {
+    "creditsPerCell": 2,
+    "maxStraightCells": 24,
+    "maxCurveCells": 10,
+    "trainCredits": 250,
+    "trainCost": { "ingot": 15, "parts": 5 },
+    "trainSpeedMmPerTick": 1400,
+    "trainCapacity": 60,
+    "transferUnitsPerTick": 2,
+    "maxLoadWaitTicks": 150
+  },
   "debris": {
     "scrap_pile":  { "hp": 6,  "drop": "scrap", "perHit": 1, "final": 4, "credits": 2, "cells": 1 },
     "ice_block":   { "hp": 6,  "drop": "ice",   "perHit": 1, "final": 3, "credits": 1, "cells": 1 },

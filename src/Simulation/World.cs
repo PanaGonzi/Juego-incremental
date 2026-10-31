@@ -1,7 +1,7 @@
 namespace Pluton.Simulation;
 
 /// <summary>Estado autoritativo compartido y sus reglas. No conoce Godot, red ni disco.</summary>
-public sealed class World
+public sealed partial class World
 {
     public readonly ContentDb Content;
     public long Tick;
@@ -55,7 +55,7 @@ public sealed class World
             }
             foreach (var n in planet.Nodes)
             {
-                var node = new ResourceNode { Id = w.NextId++, Item = n.Item, Planet = planet.Id, X = n.X, Z = n.Z };
+                var node = new ResourceNode { Id = w.NextId++, Item = n.Item, Planet = planet.Id, X = n.X, Z = n.Z, YieldPermille = n.YieldPermille };
                 w.Nodes[node.Id] = node;
                 for (var dx = 0; dx < 2; dx++)
                 for (var dz = 0; dz < 2; dz++)
@@ -116,6 +116,7 @@ public sealed class World
         }
         _machineList = Machines.Values.ToArray();
         _linkList = Links.Values.ToArray();
+        ReindexRail();
         RecomputeMods();
     }
 
@@ -192,6 +193,11 @@ public sealed class World
             CommandType.FulfillContract => Fulfill(p, c.Text),
             CommandType.BuyUpgrade => Buy(p, c.Text),
             CommandType.SetRole => SetRole(p, c.Text, (Role)c.A),
+            CommandType.PlaceRail => PlaceRail(p, c.A, c.B, c.C, c.D, c.Amount),
+            CommandType.RemoveRail => RemoveRail(p, c.A),
+            CommandType.StationMode => StationMode(p, c.A, c.B != 0),
+            CommandType.CreateTrain => CreateTrain(p, c.A, c.B),
+            CommandType.RemoveTrain => RemoveTrain(p, c.A),
             _ => CommandResult.Fail("err_invalid"),
         };
     }
@@ -248,6 +254,13 @@ public sealed class World
             if (Math.Abs(cell.x) >= half || Math.Abs(cell.z) >= half) return "err_bounds";
             if (_occupied.TryGetValue((planet, cell.x, cell.z), out var occupant) && occupant != ignoreMachine) return "err_blocked";
             if (_debrisCells.ContainsKey((planet, cell.x, cell.z))) return "err_debris";
+            if (RailBlocksCell(planet, cell.x, cell.z) && ignoreMachine < 0) return "err_blocked";
+        }
+        if (def.Kind == MachineKind.Station)
+        {
+            var (a, b) = StationRailEnds(defId, x, z, rot);
+            var error = CheckRail(planet, a.x, a.z, b.x, b.z, 0, out _);
+            if (error != null) return error;
         }
         if (def.Node != null)
         {
@@ -316,6 +329,7 @@ public sealed class World
             Nodes[nodeId].OccupiedBy = m.Id;
             DirtyNodes.Add(nodeId);
         }
+        if (def.Kind == MachineKind.Station) AttachStation(m);
         _machineList = Machines.Values.ToArray();
         DirtyMachines.Add(m.Id);
         Bump("built." + defId);
@@ -328,6 +342,8 @@ public sealed class World
         if (m.Builtin) return CommandResult.Fail("err_builtin");
         var (cx, cz) = MachineCenterMm(m);
         if (!InRange(p, cx, cz, B.BuildRangeMm)) return CommandResult.Fail("err_range");
+        foreach (var t in Trains.Values)
+            if (t.StationA == id || t.StationB == id) return CommandResult.Fail("err_rail_occupied");
         var depot = DepotOf(m.Planet);
         if (depot == null) return CommandResult.Fail("err_invalid");
 
@@ -353,6 +369,7 @@ public sealed class World
             node.OccupiedBy = -1;
             DirtyNodes.Add(node.Id);
         }
+        foreach (var s in RailSegments.Values.Where(s => s.OwnerStation == id).ToList()) RemoveSegment(s);
         Machines.Remove(id);
         _machineList = Machines.Values.ToArray();
         DirtyMachines.Remove(id);
@@ -363,7 +380,7 @@ public sealed class World
     private CommandResult Move(PlayerState p, int id, int x, int z, int rot)
     {
         if (!Machines.TryGetValue(id, out var m) || m.Planet != p.Planet) return CommandResult.Fail("err_gone");
-        if (m.Builtin) return CommandResult.Fail("err_builtin");
+        if (m.Builtin || Content.Machines[m.Def].Kind == MachineKind.Station) return CommandResult.Fail("err_builtin");
         rot = ((rot % 4) + 4) % 4;
         var error = CheckPlacement(p.Planet, m.Def, x, z, rot, id, out var nodeId);
         if (error != null) return CommandResult.Fail(error);
@@ -443,6 +460,7 @@ public sealed class World
         {
             case MachineKind.Storage:
             case MachineKind.Terminal:
+            case MachineKind.Station:
                 return Math.Max(0, def.Capacity - m.In.Get(item));
             case MachineKind.Production:
                 var recipe = Content.Recipes[def.Recipe!];
@@ -538,7 +556,7 @@ public sealed class World
 
         // Reúne de terminales y depósito del planeta y de la mochila, sin tocar nada hasta confirmar.
         var sources = _machineList
-            .Where(m => m.Planet == p.Planet && Content.Machines[m.Def].Kind is MachineKind.Terminal or MachineKind.Storage)
+            .Where(m => m.Planet == p.Planet && Content.Machines[m.Def].Kind is MachineKind.Terminal or MachineKind.Storage or MachineKind.Station)
             .ToList();
         foreach (var (item, qty) in c.Items)
         {
@@ -601,6 +619,7 @@ public sealed class World
         StepPower();
         foreach (var m in _machineList) StepMachine(m);
         foreach (var l in _linkList) StepLink(l);
+        StepTrains();
         if (Tick % B.TicksPerSecond == 0) StepObjectives();
     }
 
@@ -661,6 +680,7 @@ public sealed class World
                 m.Status = MachineStatus.Generating;
                 break;
             case MachineKind.Storage:
+            case MachineKind.Station:
                 m.Status = MachineStatus.Storing;
                 break;
             case MachineKind.Terminal:
@@ -711,7 +731,8 @@ public sealed class World
         if (satisfaction == 0) { m.Status = MachineStatus.NoPower; return; }
         m.Status = satisfaction < 1000 ? MachineStatus.LowPower : MachineStatus.Working;
 
-        m.Progress += satisfaction * (1000 + Mod("speed." + recipe.Id)) / 1000;
+        var yieldPermille = m.NodeId >= 0 && Nodes.TryGetValue(m.NodeId, out var source) ? source.YieldPermille : 1000;
+        m.Progress += satisfaction * (1000 + Mod("speed." + recipe.Id)) / 1000 * yieldPermille / 1000;
         if (m.Progress < recipe.Ticks * 1000L) return;
 
         foreach (var (item, qty) in recipe.Outputs)
@@ -772,6 +793,7 @@ public sealed class World
             }
         }
         foreach (var p in Players.Values) total += p.Bag.Get(item);
+        foreach (var t in Trains.Values) total += t.Cargo.Get(item);
         return total;
     }
 }

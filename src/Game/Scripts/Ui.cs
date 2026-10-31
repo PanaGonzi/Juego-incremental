@@ -152,7 +152,7 @@ public partial class Hud : Control
         hotbar.GrowVertical = GrowDirection.Begin;
         hotbar.OffsetBottom = -16;
         AddChild(hotbar);
-        foreach (var (key, label) in new[] { ("1", "tool_cutter"), ("2 / B", "tool_build"), ("3 / L", "tool_link"), ("4 / X", "tool_remove") })
+        foreach (var (key, label) in new[] { ("1", "tool_cutter"), ("2 / B", "tool_build"), ("3 / L", "tool_link"), ("4 / X", "tool_remove"), ("5 / T", "tool_rail") })
         {
             var slot = new PanelContainer { MouseFilter = MouseFilterEnum.Ignore };
             var box = new VBoxContainer();
@@ -437,6 +437,29 @@ public partial class Hud : Control
         {
             Add(Ui.Text($"{Loc.T("panel_contents")} (máx. {def.Capacity} por tipo):", 17));
             Add(Ui.Text(Ui.Amounts(m.In.Items), 17));
+        }
+
+        if (def.Kind == MachineKind.Station)
+        {
+            Add(Ui.Text(Loc.T(m.StationUnload ? "station_mode_unload" : "station_mode_load"), 17, Ui.Ink));
+            Add(Ui.Btn(Loc.T("station_toggle"), () => client.Send(new Command { Type = CommandType.StationMode, A = id, B = m.StationUnload ? 0 : 1 })));
+            foreach (var other in w.Machines.Values.Where(o => o.Id != id && o.Planet == m.Planet && w.Content.Machines[o.Def].Kind == MachineKind.Station).ToList())
+            {
+                var (ox, oz) = w.MachineCenterMm(other);
+                var otherId = other.Id;
+                var affordTrain = w.CanAfford(client.LocalPlayer!, w.Content.Balance.Rail.TrainCredits, w.Content.Balance.Rail.TrainCost);
+                Add(Ui.Btn($"{Loc.T("station_train_to")} ({ox / 1000}, {oz / 1000}) — {Ui.Cost(w.Content.Balance.Rail.TrainCredits, w.Content.Balance.Rail.TrainCost)}{(affordTrain ? "" : " · " + Loc.T("cost_missing"))}",
+                    () => client.Send(new Command { Type = CommandType.CreateTrain, A = id, B = otherId })));
+            }
+            foreach (var t in w.Trains.Values.Where(t => t.StationA == id || t.StationB == id).ToList())
+            {
+                var trainId = t.Id;
+                var row = new HBoxContainer();
+                var reason = t.WaitReason.Length > 0 ? $": {Loc.T(t.WaitReason)}" : "";
+                row.AddChild(Ui.Text($"{Loc.T("train_label")} — {Loc.T("train_state_" + t.State)}{reason} · {Ui.Amounts(t.Cargo.Items)}", 16));
+                row.AddChild(Ui.Btn(Loc.T("train_remove"), () => client.Send(new Command { Type = CommandType.RemoveTrain, A = trainId })));
+                Add(row);
+            }
         }
 
         if (def.Kind == MachineKind.Terminal)

@@ -164,6 +164,10 @@ public partial class AutoTest : Node
                 var parts = join.Split(':');
                 _main.StartJoin(parts[0], int.Parse(parts[1]), "");
             }
+            else if (_args.GetValueOrDefault("scenario") == "rail")
+            {
+                _main.StartSession(GameSession.Local(_main, RailWorld(), "autotest-rail", null, _main.Prefs));
+            }
             else
             {
                 _main.StartSolo("autotest-" + DateTime.Now.ToString("HHmmss"), true);
@@ -175,7 +179,8 @@ public partial class AutoTest : Node
             await Wait(1.5);
             await Shot("01_inicio");
 
-            if (_args.ContainsKey("join") || _args.ContainsKey("host")) await JoinedScenario();
+            if (_args.GetValueOrDefault("scenario") == "rail") await RailScenario();
+            else if (_args.ContainsKey("join") || _args.ContainsKey("host")) await JoinedScenario();
             else await FullLoop();
         }
         catch (Exception e)
@@ -391,6 +396,114 @@ public partial class AutoTest : Node
         Check(W.Stats.GetValueOrDefault("built.smelter") == 1, "fábrica conservada");
         await Wait(1.5);
         await Shot("11_reanudado");
+    }
+
+    /// <summary>Mundo preparado solo para esta prueba: evita repetir toda la progresión hasta el ferrocarril.</summary>
+    private World RailWorld()
+    {
+        var w = World.CreateNew(_main.Content);
+        w.Upgrades.Add("tech_assembly");
+        w.Upgrades.Add("tech_rail");
+        w.Credits = 20000;
+        var depot = w.Machines.Values.First(m => m.Def == "depot");
+        depot.In.Add("recovered", 200);
+        depot.In.Add("ingot", 100);
+        depot.In.Add("parts", 30);
+        foreach (var d in w.DebrisById.Values.Where(d => d.Z is > -30 and < 2 && d.X is > -5 and < 45).ToList()) w.DebrisById.Remove(d.Id);
+        w.Reindex();
+        return w;
+    }
+
+    private async Task<bool> PlaceRailAt(int x1, int z1, int x2, int z2, byte shape, string shot)
+    {
+        var v = _view!;
+        var before = W.Stats.GetValueOrDefault("built.rail");
+        var a = new Vector3(x1 * 2f, 0, z1 * 2f);
+        var b = new Vector3(x2 * 2f, 0, z2 * 2f);
+        var dir = (b - a).Normalized();
+        await WalkTo(a - dir * 6 + new Vector3(dir.Z, 0, -dir.X) * 5);
+        v.SetTool(Tool.Rail);
+        v.SetRailShape(shape);
+        v.AimAt(a);
+        await Wait(0.2);
+        v.Primary();
+        await WalkTo((a + b) / 2 - dir * 6 + new Vector3(dir.Z, 0, -dir.X) * 7);
+        v.AimAt(b);
+        await Wait(0.25);
+        if (shot.Length > 0) await Shot(shot);
+        v.Primary();
+        var ok = await Until(() => W.Stats.GetValueOrDefault("built.rail") > before, 3);
+        v.SetTool(Tool.Cutter);
+        return ok;
+    }
+
+    private async Task RailScenario()
+    {
+        var v = _view!;
+        Check(await Build("station", 2, -14), "estación A colocada con la herramienta");
+        var a = W.Machines.Values.Last(m => m.Def == "station");
+        Check(await Build("station", 28, -14), "estación B colocada con la herramienta");
+        var b = W.Machines.Values.Last(m => m.Def == "station");
+        await Shot("rail_01_estaciones");
+        Check(await PlaceRailAt(6, -12, 16, -12, 0, "rail_02_previa"), "tramo recto colocado");
+        Check(await PlaceRailAt(16, -12, 22, -18, 1, "rail_03_curva"), "tramo curvo colocado");
+        Check(await PlaceRailAt(22, -18, 28, -12, 2, ""), "segundo tramo curvo colocado");
+        await Wait(0.5);
+        await Shot("rail_04_trazado");
+
+        var client = v.Session.Client;
+        client.Send(new Command { Type = CommandType.StationMode, A = b.Id, B = 1 });
+        client.Send(new Command { Type = CommandType.CreateTrain, A = a.Id, B = b.Id });
+        Check(await Until(() => W.Trains.Count == 1, 3), "tren creado desde el depósito");
+        var trainId = W.Trains.Keys.First();
+        await Wait(0.5);
+        Check(W.Trains[trainId].WaitReason == "wait_no_cargo", "el tren explica que espera carga");
+        // Carga real: el jugador deposita en la estación de origen desde su mochila.
+        var depot = W.Machines.Values.First(m => m.Def == "depot");
+        await UseOn(depot, () => client.Send(new Command { Type = CommandType.Extract, A = depot.Id }));
+        await Wait(0.5);
+        await UseOn(a, () => client.Send(new Command { Type = CommandType.Insert, A = a.Id }));
+        await Wait(0.5);
+        var loaded = W.Machines[a.Id].In.Total;
+        Check(loaded > 0, $"carga depositada en origen: {loaded}");
+
+        v.OpenMachinePanel(a.Id);
+        await Wait(0.5);
+        await Shot("rail_05_panel_estacion");
+        v.ClosePanelForTest();
+        await Wait(1.5);
+        await Shot("rail_06_cargando");
+        Check(await Until(() => W.Trains[trainId].State == TrainState.Moving, 25), "el tren sale de la estación");
+        await Wait(4);
+        if (W.Trains[trainId].Path.Count > 1)
+        {
+            var mid = new Vector3(19 * 2f, 1.5f, -14 * 2f);
+            await WalkTo(mid + new Vector3(-10, -1.5f, 10), 6);
+            v.AimAt(mid);
+        }
+        await Wait(0.3);
+        await Shot("rail_07_en_ruta");
+        var delivered = await Until(() => W.Stats.GetValueOrDefault("train_delivered") > 0, 40);
+        Check(delivered, $"entrega por tren: {W.Stats.GetValueOrDefault("train_delivered")}");
+        await Shot("rail_08_descarga");
+        _measuring = true;
+        var ok = await Until(() => W.Machines[b.Id].In.Total >= Math.Min(loaded, W.Content.Balance.Rail.TrainCapacity), 60);
+        _measuring = false;
+        Check(ok, $"carga recibida en destino: {W.Machines[b.Id].In.Total}");
+        Check(v.Session.Client.HashMismatches == 0, $"sin divergencias ({v.Session.Client.HashChecks} comprobaciones)");
+
+        _view.Session.Client.RequestSave();
+        await Wait(1);
+        var slot = v.Session.Slot;
+        var trains = W.Trains.Count;
+        _main.EndSession("");
+        await Wait(0.5);
+        _main.StartSolo(slot, false);
+        _view = _main.GetChildren().OfType<GameView>().First(x => !x.IsQueuedForDeletion());
+        Check(await Until(() => _view.Session.Client.State == Pluton.Networking.ClientState.InGame, 20), "reanudar con vías y tren");
+        Check(W.Trains.Count == trains && W.RailSegments.Count >= 5, $"vías {W.RailSegments.Count} y trenes {W.Trains.Count} conservados");
+        await Wait(1.5);
+        await Shot("rail_09_reanudado");
     }
 
     private async Task<bool> LinkMachines(Machine a, Machine b)

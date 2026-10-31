@@ -82,7 +82,15 @@ public sealed class SaveStore
         var path = PathOf(slot);
         try
         {
-            return Decode(File.ReadAllBytes(path), content);
+            var data = File.ReadAllBytes(path);
+            var version = BitConverter.ToInt32(data, 4);
+            if (version < WorldCodec.FormatVersion && data.Length > 8)
+            {
+                // La partida antigua se conserva intacta antes de reescribirla en el formato nuevo.
+                var copy = $"{path}.v{version}.bak";
+                if (!File.Exists(copy)) File.WriteAllBytes(copy, data);
+            }
+            return Decode(data, content);
         }
         catch (NewerFormatException)
         {

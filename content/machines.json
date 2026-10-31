@@ -10,5 +10,6 @@
   { "id": "chiller",         "kind": "Production", "w": 2, "d": 3, "power": 8,  "credits": 140, "cost": { "ingot": 12 },     "recipe": "make_coolant", "unlock": "tech_cryo" },
   { "id": "cryo_assembler",  "kind": "Production", "w": 3, "d": 3, "power": 20, "credits": 500, "cost": { "parts": 20, "coolant": 10 }, "recipe": "make_cryo", "unlock": "tech_cryo" },
   { "id": "rtg_generator",   "kind": "Generator",  "w": 2, "d": 2, "powerGen": 25, "credits": 80, "cost": { "recovered": 15 } },
-  { "id": "storage_crate",   "kind": "Storage",    "w": 2, "d": 2, "capacity": 200, "credits": 25, "cost": { "recovered": 6 } }
+  { "id": "storage_crate",   "kind": "Storage",    "w": 2, "d": 2, "capacity": 200, "credits": 25, "cost": { "recovered": 6 } },
+  { "id": "station",         "kind": "Station",    "w": 4, "d": 2, "capacity": 400, "credits": 120, "cost": { "recovered": 15, "ingot": 5 }, "unlock": "tech_rail" }
 ]

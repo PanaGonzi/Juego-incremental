@@ -4,7 +4,7 @@ using Pluton.Simulation;
 
 namespace Pluton.Game;
 
-public enum Tool { Cutter, Build, Link, Remove }
+public enum Tool { Cutter, Build, Link, Remove, Rail }
 
 /// <summary>Representa el mundo replicado y convierte la entrada del jugador en intenciones. Nunca modifica el mundo.</summary>
 public partial class GameView : Node3D
@@ -39,6 +39,24 @@ public partial class GameView : Node3D
     private readonly Dictionary<int, MeshInstance3D> _links = new();
     private readonly Dictionary<int, MeshInstance3D> _nodes = new();
     private readonly Dictionary<int, RemotePlayer> _remote = new();
+    private readonly Dictionary<int, MeshInstance3D> _rails = new();
+
+    private sealed class TrainNode
+    {
+        public Node3D Loco = null!;
+        public Node3D Wagon = null!;
+        public MeshInstance3D Cargo = null!;
+        public Label3D Label = null!;
+        public long Distance;
+        public int LastSegment = -1;
+    }
+
+    private readonly Dictionary<int, TrainNode> _trains = new();
+    private int _railStartX, _railStartZ;
+    private bool _railPlacing;
+    private byte _railShape;
+    private MeshInstance3D? _railGhost;
+    private string _railGhostKey = "";
     private readonly Dictionary<ulong, (string kind, int id)> _pickables = new();
     private readonly Dictionary<int, StaticBody3D> _debrisBodies = new();
 
@@ -466,6 +484,34 @@ public partial class GameView : Node3D
             _links.Remove(id);
         }
 
+        seen.Clear();
+        foreach (var s in w.RailSegments.Values)
+        {
+            seen.Add(s.Id);
+            if (_rails.ContainsKey(s.Id) || !w.RailNodes.TryGetValue(s.A, out var ra) || !w.RailNodes.TryGetValue(s.B, out var rb)) continue;
+            var mesh = new MeshInstance3D { Mesh = Models.RailMesh(t => RailPoint(ra, rb, s.Shape, t), s.LengthMm / 1000f) };
+            AddChild(mesh);
+            _rails[s.Id] = mesh;
+        }
+        foreach (var id in _rails.Keys.Where(k => !seen.Contains(k)).ToList())
+        {
+            _rails[id].QueueFree();
+            _rails.Remove(id);
+        }
+
+        seen.Clear();
+        foreach (var t in w.Trains.Values)
+        {
+            seen.Add(t.Id);
+            if (!_trains.ContainsKey(t.Id)) _trains[t.Id] = CreateTrainNode();
+        }
+        foreach (var id in _trains.Keys.Where(k => !seen.Contains(k)).ToList())
+        {
+            _trains[id].Loco.QueueFree();
+            _trains[id].Wagon.QueueFree();
+            _trains.Remove(id);
+        }
+
         if (w.ObjectiveIndex != _objectiveSeen)
         {
             _objectiveSeen = w.ObjectiveIndex;
@@ -473,6 +519,119 @@ public partial class GameView : Node3D
         }
         if (w.Credits > _lastCredits + 5) Sfx.Play("sell");
         _lastCredits = w.Credits;
+    }
+
+    private static Vector3 RailPoint(RailNode a, RailNode b, byte shape, double t)
+    {
+        var (x, z) = RailMath.Eval(a, b, shape, t);
+        return new Vector3((float)x * Cell, 0, (float)z * Cell);
+    }
+
+    private TrainNode CreateTrainNode()
+    {
+        var node = new TrainNode
+        {
+            Loco = new Node3D(),
+            Wagon = new Node3D(),
+            Cargo = new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(2.0f, 1f, 5.7f), Material = Models.Mat("rust") } },
+            Label = new Label3D { Billboard = BaseMaterial3D.BillboardModeEnum.Enabled, FontSize = 36, PixelSize = 0.007f, OutlineSize = 8, Position = new Vector3(0, 4.3f, 0), VisibilityRangeEnd = 60 },
+        };
+        node.Loco.AddChild(new MeshInstance3D { Mesh = Models.Locomotive() });
+        node.Loco.AddChild(node.Label);
+        node.Wagon.AddChild(new MeshInstance3D { Mesh = Models.Wagon() });
+        node.Wagon.AddChild(node.Cargo);
+        node.Cargo.Position = new Vector3(0, 0.8f, 0);
+        AddChild(node.Loco);
+        AddChild(node.Wagon);
+        return node;
+    }
+
+    /// <summary>Sitúa el tren por distancia recorrida en su ruta. El vagón va 7,4 m por detrás de la locomotora.</summary>
+    private void UpdateTrains(double delta)
+    {
+        var w = Session.Client.World!;
+        var speed = w.Content.Balance.Rail.TrainSpeedMmPerTick * (double)w.Content.Balance.TicksPerSecond;
+        foreach (var (id, node) in _trains)
+        {
+            if (!w.Trains.TryGetValue(id, out var t)) continue;
+            // Entre actualizaciones del servidor se extrapola; la siguiente corrige.
+            if (t.State == TrainState.Moving) t.PosMm += (long)(speed * delta);
+            if (!TryTrainPose(w, t, 0, out var pos, out var dir)) continue;
+            node.Loco.GlobalPosition = pos;
+            node.Loco.LookAt(pos - dir, Vector3.Up);
+            if (TryTrainPose(w, t, -7400, out var wagonPos, out var wagonDir))
+            {
+                node.Wagon.GlobalPosition = wagonPos;
+                node.Wagon.LookAt(wagonPos - wagonDir, Vector3.Up);
+            }
+            var fill = Mathf.Clamp(t.Cargo.Total / (float)w.Content.Balance.Rail.TrainCapacity, 0, 1);
+            node.Cargo.Visible = fill > 0;
+            node.Cargo.Scale = new Vector3(1, Mathf.Max(0.05f, fill) * 1.2f, 1);
+            var reason = t.WaitReason.Length > 0 ? $": {Loc.T(t.WaitReason)}" : "";
+            node.Label.Text = $"{Loc.T("train_state_" + t.State)}{reason}\n{t.Cargo.Total}/{w.Content.Balance.Rail.TrainCapacity}";
+        }
+    }
+
+    private static bool TryTrainPose(World w, Train t, long offsetMm, out Vector3 pos, out Vector3 dir)
+    {
+        pos = Vector3.Zero;
+        dir = Vector3.Forward;
+        var index = Math.Min(t.PathIndex, t.Path.Count - 1);
+        var along = t.PosMm + offsetMm;
+        if (t.State != TrainState.Moving || t.Path.Count == 0)
+        {
+            // Parado: se apoya en el último tramo recorrido, o en cualquiera del nodo.
+            if (t.Path.Count == 0 || t.PathIndex == 0 && t.State == TrainState.Waiting)
+            {
+                var near = w.RailSegments.Values.FirstOrDefault(s => s.A == t.CurrentNode || s.B == t.CurrentNode);
+                if (near == null) return false;
+                var forward = near.A == t.CurrentNode;
+                return Pose(w, near, forward, Math.Min(near.LengthMm, 7400 + Math.Abs(offsetMm)) - Math.Abs(offsetMm), out pos, out dir);
+            }
+            index = t.Path.Count - 1;
+            if (!w.RailSegments.TryGetValue(t.Path[index], out var last)) return false;
+            along = last.LengthMm + offsetMm;
+        }
+
+        if (!w.RailSegments.TryGetValue(t.Path[index], out var seg)) return false;
+        // Recorre hacia atrás los tramos anteriores si el desplazamiento se sale del actual.
+        while (along < 0 && index > 0)
+        {
+            index--;
+            if (!w.RailSegments.TryGetValue(t.Path[index], out seg!)) return false;
+            along += seg.LengthMm;
+        }
+        along = Math.Clamp(along, 0, seg.LengthMm);
+        var isForward = SegmentForward(w, t, index);
+        return Pose(w, seg, isForward, along, out pos, out dir);
+    }
+
+    private static bool SegmentForward(World w, Train t, int index)
+    {
+        // Reconstruye el sentido del tramo desde el nodo de origen de la ruta.
+        var end = t.CurrentNode;
+        var reached = t.State == TrainState.Moving ? t.PathIndex : t.Path.Count;
+        for (var i = reached - 1; i >= index; i--)
+        {
+            if (!w.RailSegments.TryGetValue(t.Path[i], out var s)) return true;
+            end = s.A == end ? s.B : s.A;
+        }
+        return w.RailSegments.TryGetValue(t.Path[index], out var seg) && seg.A == end;
+    }
+
+    private static bool Pose(World w, RailSegment s, bool forward, long along, out Vector3 pos, out Vector3 dir)
+    {
+        pos = Vector3.Zero;
+        dir = Vector3.Forward;
+        if (!w.RailNodes.TryGetValue(s.A, out var a) || !w.RailNodes.TryGetValue(s.B, out var b) || s.LengthMm == 0) return false;
+        var frac = (double)along / s.LengthMm;
+        var t = forward ? frac : 1 - frac;
+        pos = RailPoint(a, b, s.Shape, t);
+        var ahead = RailPoint(a, b, s.Shape, Math.Clamp(t + (forward ? 0.01 : -0.01), 0, 1));
+        var back = RailPoint(a, b, s.Shape, Math.Clamp(t - (forward ? 0.01 : -0.01), 0, 1));
+        var d = ahead - back;
+        if (d.LengthSquared() > 0.00001f) dir = d.Normalized();
+        return true;
     }
 
     private static Vector3 CenterOf(World w, Machine m)
@@ -629,7 +788,12 @@ public partial class GameView : Node3D
         else if (e.IsActionPressed("tool_build")) OpenBuildMenu();
         else if (e.IsActionPressed("tool_link")) SetTool(Tool.Link);
         else if (e.IsActionPressed("tool_remove")) SetTool(Tool.Remove);
-        else if (e.IsActionPressed("rotate")) _buildRot = (_buildRot + 1) % 4;
+        else if (e.IsActionPressed("tool_rail")) SetTool(Tool.Rail);
+        else if (e.IsActionPressed("rotate"))
+        {
+            if (_tool == Tool.Rail) _railShape = (byte)((_railShape + 1) % 3);
+            else _buildRot = (_buildRot + 1) % 4;
+        }
         else if (e.IsActionPressed("cancel")) { SetTool(Tool.Cutter); _linkFrom = -1; }
         else if (e.IsActionPressed("interact_insert")) AimedMachine(CommandType.Insert);
         else if (e.IsActionPressed("interact_take")) AimedMachine(CommandType.Extract);
@@ -644,6 +808,7 @@ public partial class GameView : Node3D
         else if (e.IsActionPressed("secondary"))
         {
             if (_tool == Tool.Link) _linkFrom = -1;
+            if (_tool == Tool.Rail) _railPlacing = false;
         }
     }
 
@@ -685,8 +850,10 @@ public partial class GameView : Node3D
         _tool = t;
         _linkFrom = -1;
         _hud.SetTool((int)t);
-        _ground.SetShaderParameter("grid_strength", t == Tool.Build ? 1f : 0f);
+        _railPlacing = false;
+        _ground.SetShaderParameter("grid_strength", t is Tool.Build or Tool.Rail ? 1f : 0f);
         if (t != Tool.Build) RemoveGhost();
+        if (t != Tool.Rail) RemoveRailGhost();
     }
 
     private void OpenBuildMenu()
@@ -747,6 +914,28 @@ public partial class GameView : Node3D
                     client.Send(new Command { Type = CommandType.Remove, A = _aim.id });
                     Sfx.Play("remove");
                 }
+                else if (NearestRail() is { } rail)
+                {
+                    client.Send(new Command { Type = CommandType.RemoveRail, A = rail });
+                    Sfx.Play("remove");
+                }
+                break;
+            case Tool.Rail:
+                if (!TryGroundPoint(out var ground)) break;
+                var (gx, gz) = RailSnap(ground);
+                if (!_railPlacing)
+                {
+                    _railStartX = gx;
+                    _railStartZ = gz;
+                    _railPlacing = true;
+                }
+                else
+                {
+                    client.Send(new Command { Type = CommandType.PlaceRail, A = _railStartX, B = _railStartZ, C = gx, D = gz, Amount = _railShape });
+                    Sfx.Play("build");
+                    _railStartX = gx;
+                    _railStartZ = gz;
+                }
                 break;
         }
     }
@@ -801,6 +990,7 @@ public partial class GameView : Node3D
         _body.Rotation = new Vector3(0, _yaw, 0);
 
         AnimateMachines((float)delta);
+        UpdateTrains(delta);
         UpdateRemote(delta);
         UpdateAudio(delta);
         UpdateTool(delta);
@@ -927,6 +1117,99 @@ public partial class GameView : Node3D
         }
     }
 
+    private bool TryGroundPoint(out Vector3 point)
+    {
+        point = Vector3.Zero;
+        var from = _camera.GlobalPosition;
+        var dir = -_camera.GlobalBasis.Z;
+        if (dir.Y >= -0.02f) return false;
+        var t = -from.Y / dir.Y;
+        if (t > 60f) return false;
+        point = from + dir * t;
+        return true;
+    }
+
+    private (int x, int z) RailSnap(Vector3 p)
+    {
+        var w = Session.Client.World!;
+        var x = Mathf.RoundToInt(p.X / Cell);
+        var z = Mathf.RoundToInt(p.Z / Cell);
+        // Encaja en un nodo existente cercano para que unir tramos no dependa de la puntería.
+        var best = 2.5f * Cell * 2.5f * Cell;
+        foreach (var n in w.RailNodes.Values)
+        {
+            var d = new Vector2(n.X * Cell - p.X, n.Z * Cell - p.Z).LengthSquared();
+            if (d < best)
+            {
+                best = d;
+                x = n.X;
+                z = n.Z;
+            }
+        }
+        return (x, z);
+    }
+
+    private int? NearestRail()
+    {
+        if (!TryGroundPoint(out var p)) return null;
+        var w = Session.Client.World!;
+        int? found = null;
+        var best = 2.5f * 2.5f;
+        foreach (var s in w.RailSegments.Values)
+        {
+            if (s.OwnerStation >= 0 || !w.RailNodes.TryGetValue(s.A, out var a) || !w.RailNodes.TryGetValue(s.B, out var b)) continue;
+            for (var i = 0; i <= 16; i++)
+            {
+                var q = RailPoint(a, b, s.Shape, i / 16.0);
+                var d = new Vector2(q.X - p.X, q.Z - p.Z).LengthSquared();
+                if (d < best)
+                {
+                    best = d;
+                    found = s.Id;
+                }
+            }
+        }
+        return found;
+    }
+
+    private void RemoveRailGhost()
+    {
+        _railGhost?.QueueFree();
+        _railGhost = null;
+        _railGhostKey = "";
+    }
+
+    private void UpdateRailGhost(World w, PlayerState me, ref string status, ref Color color)
+    {
+        status = Loc.T("rail_shape_" + _railShape);
+        if (!_railPlacing || !TryGroundPoint(out var p))
+        {
+            RemoveRailGhost();
+            return;
+        }
+        var (x, z) = RailSnap(p);
+        var error = w.CheckRail(me.Planet, _railStartX, _railStartZ, x, z, _railShape, out var credits);
+        if (error == null && w.Credits < credits) error = "err_cost";
+        status = error == null ? $"{Loc.T("rail_shape_" + _railShape)} — {credits} ¤" : Loc.T(error);
+        color = error == null ? Ui.Ink : Ui.Bad;
+        var key = $"{_railStartX},{_railStartZ},{x},{z},{_railShape}";
+        if (key != _railGhostKey && (x != _railStartX || z != _railStartZ))
+        {
+            RemoveRailGhost();
+            _railGhostKey = key;
+            var a = new RailNode { X = _railStartX, Z = _railStartZ };
+            var b = new RailNode { X = x, Z = z };
+            var shape = _railShape;
+            _railGhost = new MeshInstance3D
+            {
+                Mesh = Models.RailMesh(t => RailPoint(a, b, shape, t), RailMath.Length(a, b, shape, 2000) / 1000f),
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            };
+            AddChild(_railGhost);
+        }
+        if (_railGhost != null) _railGhost.MaterialOverride = error == null ? _ghostOk : _ghostBad;
+    }
+
     /// <summary>Punto en el suelo al que apunta la cámara, hasta 32 m.</summary>
     private bool TryGhostCell(out int x, out int z)
     {
@@ -1022,6 +1305,10 @@ public partial class GameView : Node3D
             case Tool.Remove:
                 prompt = Loc.T("prompt_remove");
                 break;
+            case Tool.Rail:
+                prompt = Loc.T(_railPlacing ? "prompt_rail_to" : "prompt_rail_from");
+                UpdateRailGhost(w, me, ref status, ref statusColor);
+                break;
         }
         _beam.Visible = cutting;
         _hud.SetPrompt(blocked ? "" : status, statusColor, blocked ? "" : prompt);
@@ -1082,6 +1369,7 @@ public partial class GameView : Node3D
         _head.Rotation = new Vector3(_pitch, 0, 0);
     }
 
+    public void SetRailShape(byte shape) => _railShape = shape;
     public (string kind, int id) AimTarget => _aim;
     public Vector3? FirstRemotePlayer => _remote.Count > 0 ? _remote.Values.First().Root.GlobalPosition : null;
     public Vector3 PlayerPosition => _body.GlobalPosition;
@@ -1112,6 +1400,7 @@ public static class Controls
         Key("tool_build", Godot.Key.Key2, Godot.Key.B);
         Key("tool_link", Godot.Key.Key3, Godot.Key.L);
         Key("tool_remove", Godot.Key.Key4, Godot.Key.X);
+        Key("tool_rail", Godot.Key.Key5, Godot.Key.T);
         Key("rotate", Godot.Key.R);
         Key("cancel", Godot.Key.Q);
         Key("interact_insert", Godot.Key.E);

@@ -286,6 +286,20 @@ public static class Models
                 m.Height = 4.3f;
                 m.LampPos = new Vector3(-2.2f, 1.9f, 1.63f);
                 break;
+            case "station":
+                // Andén alineado con su vía, que pasa por el borde +Z del volumen.
+                b.Box("dark", 0, 0.15f, 0, 7.9f, 0.3f, 3.9f);
+                b.Box("panel", 0, 0.4f, 0, 7.6f, 0.2f, 3.6f);
+                b.Box("stripe", 0, 0.52f, 1.65f, 7.6f, 0.03f, 0.22f);
+                b.Box("hull", -2.2f, 1.5f, -0.7f, 2.8f, 2f, 1.9f);
+                b.Seams(-2.2f, 1.5f, -0.7f, 2.8f, 2f, 1.9f);
+                b.Box("amber", -2.2f, 1.9f, 0.27f, 1.8f, 0.4f, 0.04f);
+                b.Cyl("panel", 2.8f, 1.8f, -1f, 0.1f, 2.6f);
+                b.Box("panel", 2.3f, 3.1f, -1f, 1.2f, 0.12f, 1.8f);
+                b.Box("rust", 0.8f, 1f, -0.9f, 1.3f, 1f, 1.3f, 12);
+                m.Height = 3.4f;
+                m.LampPos = new Vector3(-0.5f, 1.2f, 0.3f);
+                break;
             case "storage_crate":
                 b.Plinth(4, 4);
                 b.Box("hull", 0, 1f, 0, 3.2f, 1.6f, 3.2f);
@@ -350,6 +364,73 @@ public static class Models
             var r = rng.RandfRange(1.0f, 1.9f);
             b.Cyl(mat, Mathf.Cos(a) * r, 0.25f, Mathf.Sin(a) * r, rng.RandfRange(0.1f, 0.24f), rng.RandfRange(0.3f, 0.9f), rng.RandfRange(-25, 25), rng.RandfRange(-25, 25), 5, 0.02f);
         }
+        mesh = b.Commit();
+        DebrisCache[key] = mesh;
+        return mesh;
+    }
+
+    /// <summary>Malla de un tramo de vía: traviesas y dos raíles sobre la curva real.</summary>
+    public static ArrayMesh RailMesh(Func<double, Vector3> eval, float lengthM)
+    {
+        var b = new Builder();
+        var steps = Mathf.Max(1, Mathf.RoundToInt(lengthM / 1.2f));
+        for (var i = 0; i <= steps; i++)
+        {
+            var t = i / (double)steps;
+            var p = eval(t);
+            var next = eval(Math.Min(1, t + 0.01));
+            var prev = eval(Math.Max(0, t - 0.01));
+            var dir = (next - prev).Normalized();
+            var yaw = Mathf.RadToDeg(Mathf.Atan2(dir.X, dir.Z));
+            b.Box("rust", p.X, 0.07f, p.Z, 2.1f, 0.12f, 0.34f, yaw);
+            if (i == steps) continue;
+            var q = eval((i + 1) / (double)steps);
+            var mid = (p + q) / 2;
+            var d = (q - p);
+            var side = new Vector3(d.Z, 0, -d.X).Normalized() * 0.72f;
+            var segYaw = Mathf.RadToDeg(Mathf.Atan2(d.X, d.Z));
+            var len = d.Length() + 0.03f;
+            b.Box("panel", mid.X + side.X, 0.19f, mid.Z + side.Z, 0.11f, 0.13f, len, segYaw);
+            b.Box("panel", mid.X - side.X, 0.19f, mid.Z - side.Z, 0.11f, 0.13f, len, segYaw);
+        }
+        return b.Commit();
+    }
+
+    public static ArrayMesh Locomotive()
+    {
+        const string key = "loco";
+        if (DebrisCache.TryGetValue(key, out var mesh)) return mesh;
+        var b = new Builder();
+        b.Box("dark", 0, 0.55f, 0, 2.2f, 0.5f, 7f);
+        b.Box("hull", 0, 1.6f, -0.6f, 2.3f, 1.7f, 4.6f);
+        b.Seams(0, 1.6f, -0.6f, 2.3f, 1.7f, 4.6f);
+        b.Box("panel", 0, 2.1f, 2.5f, 2.5f, 2.6f, 1.9f);
+        b.Box("cyan", 0, 2.6f, 3.47f, 2f, 0.7f, 0.05f);
+        b.Box("stripe", 0, 1f, 3.48f, 2.2f, 0.3f, 0.05f);
+        b.Box("amber", -0.8f, 1.25f, 3.5f, 0.3f, 0.2f, 0.05f);
+        b.Box("amber", 0.8f, 1.25f, 3.5f, 0.3f, 0.2f, 0.05f);
+        b.Cyl("copper", 0, 2.75f, -2f, 0.28f, 0.8f);
+        foreach (var z in new[] { -2.4f, 2.4f })
+        foreach (var x in new[] { -0.75f, 0.75f })
+            b.Cyl("dark", x, 0.32f, z, 0.32f, 0.14f, 0, 90, 10);
+        mesh = b.Commit();
+        DebrisCache[key] = mesh;
+        return mesh;
+    }
+
+    public static ArrayMesh Wagon()
+    {
+        const string key = "wagon";
+        if (DebrisCache.TryGetValue(key, out var mesh)) return mesh;
+        var b = new Builder();
+        b.Box("dark", 0, 0.55f, 0, 2.2f, 0.45f, 6.4f);
+        b.Box("hull", 0, 1f, -3f, 2.3f, 0.5f, 0.12f);
+        b.Box("hull", 0, 1f, 3f, 2.3f, 0.5f, 0.12f);
+        b.Box("hull", -1.14f, 1f, 0, 0.12f, 0.5f, 6.1f);
+        b.Box("hull", 1.14f, 1f, 0, 0.12f, 0.5f, 6.1f);
+        foreach (var z in new[] { -2.2f, 2.2f })
+        foreach (var x in new[] { -0.75f, 0.75f })
+            b.Cyl("dark", x, 0.32f, z, 0.32f, 0.14f, 0, 90, 10);
         mesh = b.Commit();
         DebrisCache[key] = mesh;
         return mesh;

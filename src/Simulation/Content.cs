@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 
 namespace Pluton.Simulation;
 
-public enum MachineKind { Production, Generator, Storage, Terminal }
+public enum MachineKind { Production, Generator, Storage, Terminal, Station }
 
 public sealed class ItemDef
 {
@@ -88,6 +88,7 @@ public sealed class NodeDef
     public string Item { get; set; } = "";
     public int X { get; set; }
     public int Z { get; set; }
+    public int YieldPermille { get; set; } = 1000;
 }
 
 public sealed class DebrisFieldDef
@@ -122,8 +123,22 @@ public sealed class DebrisDef
     public int Cells { get; set; } = 1;
 }
 
+public sealed class RailDef
+{
+    public long CreditsPerCell { get; set; }
+    public int MaxStraightCells { get; set; }
+    public int MaxCurveCells { get; set; }
+    public long TrainCredits { get; set; }
+    public Dictionary<string, long> TrainCost { get; set; } = new();
+    public int TrainSpeedMmPerTick { get; set; }
+    public long TrainCapacity { get; set; }
+    public long TransferUnitsPerTick { get; set; }
+    public int MaxLoadWaitTicks { get; set; }
+}
+
 public sealed class BalanceDef
 {
+    public RailDef Rail { get; set; } = new();
     public int CellSizeMm { get; set; } = 2000;
     public int TicksPerSecond { get; set; } = 10;
     public long MaxCredits { get; set; }
