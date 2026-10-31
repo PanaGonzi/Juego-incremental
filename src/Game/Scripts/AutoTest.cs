@@ -21,6 +21,7 @@ public partial class AutoTest : Node
     private bool _measuring;
     private int _failures;
     private ulong _lastUsec;
+    private bool _skipFrame;
     private readonly List<string> _spikes = new();
 
     public AutoTest(Main main, Dictionary<string, string> args)
@@ -42,7 +43,8 @@ public partial class AutoTest : Node
     {
         _clock += delta;
         var now = Time.GetTicksUsec();
-        if (_measuring && _lastUsec != 0)
+        if (_skipFrame) _skipFrame = false;
+        else if (_measuring && _lastUsec != 0)
         {
             var frameMs = (now - _lastUsec) / 1000f;
             _frames.Add(frameMs);
@@ -87,6 +89,8 @@ public partial class AutoTest : Node
         await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
         var image = GetViewport().GetTexture().GetImage();
         image.SavePng(Path.Combine(_out, name + ".png"));
+        // Guardar la imagen bloquea el hilo: ese frame no representa al juego.
+        _skipFrame = true;
     }
 
     private World W => _view!.Session.Client.World!;
