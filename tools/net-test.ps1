@@ -1,4 +1,4 @@
-﻿# Ensayo con procesos independientes: un servidor dedicado y N clientes con el protocolo real.
+# Ensayo con procesos independientes: un servidor dedicado y N clientes con el protocolo real.
 # Uso: tools\net-test.ps1 -Clients 12 -Seconds 60 [-Latency 100 -Jitter 10 -Loss 2] [-Reconnect 20] [-Extra 1] [-Tag nombre] [-Abuser]
 param(
     [int]$Clients = 2,
@@ -29,7 +29,7 @@ $Server = "$Repo\src\Server\bin\Release\net10.0\Pluton.Server.exe"
 $Bot = "$Repo\tools\BotClient\bin\Release\net10.0\Pluton.BotClient.exe"
 
 $srv = Start-Process $Server -PassThru -NoNewWindow -RedirectStandardOutput "$Out\server.log" -RedirectStandardError "$Out\server.err" `
-    -ArgumentList @('--port', $Port, '--world', 'test', '--profile', 'test', '--data-root', "`"$DataRoot`"", '--metrics', "`"$Out\metrics.csv`"", '--autosave', '30')
+    -ArgumentList @('--port', $Port, '--world', 'test', '--profile', 'test', '--data-root', "`"$DataRoot`"", '--metrics', "`"$Out\metrics.csv`"", '--autosave', '30', '--stop-file', "`"$Out\stop.txt`"")
 Start-Sleep -Milliseconds 800
 
 $procs = @()
@@ -54,8 +54,9 @@ for ($i = 0; $i -lt $Extra; $i++) {
 foreach ($p in ($procs + $extraProcs)) { $null = $p.WaitForExit(($Seconds + 40) * 1000); if (-not $p.HasExited) { $p.Kill() } }
 Start-Sleep -Seconds 6
 
-# Cierre ordenado del servidor mediante un archivo de parada.
-Stop-Process -Id $srv.Id -Force
+# Cierre ordenado: el servidor guarda al detectar el archivo de parada.
+"stop" | Set-Content "$Out\stop.txt"
+if (-not $srv.WaitForExit(15000)) { "EL SERVIDOR NO SE CERRÓ"; Stop-Process -Id $srv.Id -Force }
 Get-ChildItem $Out -Filter 'bot*.log' | Sort-Object { [int]($_.BaseName -replace '\D') } | ForEach-Object { Get-Content $_.FullName }
 Get-ChildItem $Out -Filter 'extra*.log' | ForEach-Object { Get-Content $_.FullName }
 Get-ChildItem $Out -Filter '*.err' | Where-Object Length -gt 0 | ForEach-Object { "STDERR $($_.Name):"; Get-Content $_.FullName -TotalCount 10 }

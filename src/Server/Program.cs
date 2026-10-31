@@ -12,6 +12,7 @@ var profile = args2.GetValueOrDefault("profile", "server");
 var maxPlayers = Math.Clamp(int.Parse(args2.GetValueOrDefault("max-players", "12"), CultureInfo.InvariantCulture), 1, Protocol.MaxPlayers);
 var metricsPath = args2.GetValueOrDefault("metrics", "");
 var autosave = int.Parse(args2.GetValueOrDefault("autosave", "120"), CultureInfo.InvariantCulture);
+var stopFile = args2.GetValueOrDefault("stop-file", "");
 
 void Log(string message) => Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}");
 
@@ -52,8 +53,12 @@ if (metricsPath.Length > 0)
     File.WriteAllText(metricsPath, "unix_s,tick,players,tick_avg_ms,tick_p99_ms,tick_max_ms,late,sent_kbps,recv_kbps,working_set_mb,gc_heap_mb,applied,rejected\n");
 
 long lastSent = 0, lastRecv = 0;
-while (!quit.Wait(5000))
+var sinceMetrics = 0;
+while (!quit.Wait(500))
 {
+    if (stopFile.Length > 0 && File.Exists(stopFile)) break;
+    if (++sinceMetrics < 10 && runner.Fault == null) continue;
+    sinceMetrics = 0;
     if (runner.Fault != null)
     {
         Log("Fallo fatal del servidor: " + runner.Fault);
