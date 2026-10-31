@@ -24,6 +24,10 @@ public static class Scenarios
         foreach (var id in content.Upgrades.Keys) w.Upgrades.Add(id);
         w.Credits = 1000000;
         w.ObjectiveIndex = content.Objectives.Count;
+        // Reservas para que los clientes de carga ejerzan la economía: recoger, vender y construir.
+        var depot = w.DepotOf(0) ?? w.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
+        depot.In.Add("scrap", 100000);
+        depot.In.Add("recovered", 100000);
 
         Machine Add(string def, int x, int z, int node = -1)
         {
