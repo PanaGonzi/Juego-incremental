@@ -6,6 +6,7 @@
     { "id": "smelt_speed",    "credits": 300,  "cost": { "ingot": 25 }, "mods": { "speed.smelt_ingot": 250 } },
     { "id": "link_rate",      "credits": 200,  "cost": { "ingot": 10 }, "mods": { "link_rate": 1 } },
     { "id": "tech_rail",      "credits": 300,  "cost": { "ingot": 20 }, "requires": "tech_assembly" },
+    { "id": "tech_shuttle",   "credits": 1500, "cost": { "parts": 20 }, "requires": "tech_rail" },
     { "id": "tech_cryo",      "credits": 800,  "cost": { "parts": 15 }, "requires": "tech_assembly" },
     { "id": "export_premium", "credits": 1200, "cost": { "parts": 30 }, "requires": "tech_assembly", "mods": { "sell_bonus": 150 } }
   ],

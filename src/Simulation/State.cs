@@ -40,7 +40,7 @@ public sealed class Inventory
     public void Clear() => _items.Clear();
 }
 
-public enum MachineStatus : byte { Idle, Working, NoInput, OutputFull, NoPower, LowPower, Generating, Storing }
+public enum MachineStatus : byte { Idle, Working, NoInput, OutputFull, NoPower, LowPower, Generating, Storing, Ready }
 
 public sealed class Machine
 {
@@ -139,6 +139,8 @@ public sealed class PlayerState
     public bool Connected;
     public int Planet;
     public float X, Y, Z, Yaw;
+    public int TransitTo = -1;
+    public long TransitStartTick, TransitEndTick;
     public readonly Inventory Bag = new();
     public long CutterReadyTick;
 }
@@ -147,7 +149,7 @@ public enum CommandType : byte
 {
     CutDebris, Place, Remove, Move, Link, Unlink, Insert, Extract, Sell, SetAutoSell,
     FulfillContract, BuyUpgrade, SetRole, Kick,
-    PlaceRail, RemoveRail, StationMode, CreateTrain, RemoveTrain,
+    PlaceRail, RemoveRail, StationMode, CreateTrain, RemoveTrain, Travel,
 }
 
 /// <summary>Intención de un jugador. Todo lo que contiene se valida antes de aplicarse.</summary>

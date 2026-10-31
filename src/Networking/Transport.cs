@@ -24,9 +24,6 @@ public interface ITransport : IDisposable
     long BytesReceived { get; }
 }
 
-/// <summary>Condiciones de red simuladas para las pruebas de 50-150 ms y pérdida de 1-3 %.</summary>
-public sealed record NetSimulation(int MinLatencyMs, int MaxLatencyMs, int LossPercent);
-
 public sealed class LiteNetTransport : ITransport
 {
     public const string ConnectionKey = "pluton-v1";
@@ -41,7 +38,7 @@ public sealed class LiteNetTransport : ITransport
     public event Action<int, byte[], int>? Received;
     public event Action<int, string>? Disconnected;
 
-    private LiteNetTransport(NetSimulation? sim)
+    private LiteNetTransport()
     {
         _net = new NetManager(_listener)
         {
@@ -51,15 +48,6 @@ public sealed class LiteNetTransport : ITransport
             EnableStatistics = true,
             IPv6Enabled = false,
         };
-        if (sim != null)
-        {
-            _net.SimulateLatency = sim.MaxLatencyMs > 0;
-            _net.SimulationMinLatency = sim.MinLatencyMs;
-            _net.SimulationMaxLatency = sim.MaxLatencyMs;
-            _net.SimulatePacketLoss = sim.LossPercent > 0;
-            _net.SimulationPacketLossChance = sim.LossPercent;
-        }
-
         _listener.ConnectionRequestEvent += request =>
         {
             if (_net.ConnectedPeersCount < MaxConnections) request.AcceptIfKey(ConnectionKey);
@@ -84,16 +72,16 @@ public sealed class LiteNetTransport : ITransport
         };
     }
 
-    public static LiteNetTransport Listen(int port, NetSimulation? sim = null)
+    public static LiteNetTransport Listen(int port)
     {
-        var t = new LiteNetTransport(sim);
+        var t = new LiteNetTransport();
         if (!t._net.Start(port)) throw new SocketException((int)SocketError.AddressAlreadyInUse);
         return t;
     }
 
-    public static LiteNetTransport Dial(string host, int port, NetSimulation? sim = null)
+    public static LiteNetTransport Dial(string host, int port)
     {
-        var t = new LiteNetTransport(sim);
+        var t = new LiteNetTransport();
         t._net.Start();
         t._net.Connect(host, port, ConnectionKey);
         return t;

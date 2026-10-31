@@ -1,4 +1,4 @@
-# Dos clientes Godot exportados en la misma máquina: anfitrión + invitado, o dedicado + dos clientes.
+﻿# Dos clientes Godot exportados en la misma máquina: anfitrión + invitado, o dedicado + dos clientes.
 # Uso: tools\coop-test.ps1 -Mode host|dedicated [-Build dev] [-Seconds 15]
 param([ValidateSet('host', 'dedicated')][string]$Mode = 'host', [string]$Build = 'dev', [int]$Seconds = 15, [int]$Port = 27801)
 $Repo = Split-Path $PSScriptRoot -Parent

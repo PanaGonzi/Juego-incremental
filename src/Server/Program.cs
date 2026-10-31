@@ -13,6 +13,7 @@ var maxPlayers = Math.Clamp(int.Parse(args2.GetValueOrDefault("max-players", "12
 var metricsPath = args2.GetValueOrDefault("metrics", "");
 var autosave = int.Parse(args2.GetValueOrDefault("autosave", "120"), CultureInfo.InvariantCulture);
 var stopFile = args2.GetValueOrDefault("stop-file", "");
+var loadTestUnlock = args2.ContainsKey("load-test-unlock");
 
 void Log(string message) => Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}");
 
@@ -29,6 +30,13 @@ else
 {
     world = World.CreateNew(content);
     Log($"Mundo nuevo '{slot}'");
+}
+
+if (loadTestUnlock)
+{
+    // Solo para ensayos de carga: habilita los viajes sin jugar la progresión.
+    world.Upgrades.Add("tech_shuttle");
+    world.Reindex();
 }
 
 var transport = LiteNetTransport.Listen(port);
@@ -90,7 +98,7 @@ while (!quit.Wait(500))
 }
 
 Log("Cerrando: guardando mundo");
-runner.Stop(save: true);
+runner.Stop(save: runner.Fault == null);
 runner.Dispose();
 Log("Cerrado");
 

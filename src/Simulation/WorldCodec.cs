@@ -248,6 +248,9 @@ public static class WorldCodec
         w.Write((byte)p.Role);
         w.Write7BitEncodedInt(p.Planet);
         w.Write7BitEncodedInt(p.Num);
+        w.Write7BitEncodedInt(p.TransitTo + 1);
+        w.Write7BitEncodedInt64(p.TransitStartTick);
+        w.Write7BitEncodedInt64(p.TransitEndTick);
         if (!forHash)
         {
             w.Write(p.Connected);
@@ -259,7 +262,7 @@ public static class WorldCodec
         WriteInv(w, p.Bag);
     }
 
-    public static PlayerState ReadPlayer(BinaryReader r)
+    public static PlayerState ReadPlayer(BinaryReader r, int version = FormatVersion)
     {
         var p = new PlayerState
         {
@@ -268,12 +271,18 @@ public static class WorldCodec
             Role = (Role)r.ReadByte(),
             Planet = r.Read7BitEncodedInt(),
             Num = r.Read7BitEncodedInt(),
-            Connected = r.ReadBoolean(),
-            X = r.ReadSingle(),
-            Y = r.ReadSingle(),
-            Z = r.ReadSingle(),
-            Yaw = r.ReadSingle(),
         };
+        if (version >= 2)
+        {
+            p.TransitTo = r.Read7BitEncodedInt() - 1;
+            p.TransitStartTick = r.Read7BitEncodedInt64();
+            p.TransitEndTick = r.Read7BitEncodedInt64();
+        }
+        p.Connected = r.ReadBoolean();
+        p.X = r.ReadSingle();
+        p.Y = r.ReadSingle();
+        p.Z = r.ReadSingle();
+        p.Yaw = r.ReadSingle();
         ReadInv(r, p.Bag);
         return p;
     }
@@ -383,7 +392,7 @@ public static class WorldCodec
         n = r.Read7BitEncodedInt();
         for (var i = 0; i < n; i++)
         {
-            var p = ReadPlayer(r);
+            var p = ReadPlayer(r, formatVersion);
             p.Connected = false;
             world.Players[p.Key] = p;
         }
@@ -428,6 +437,13 @@ public static class WorldCodec
                 foreach (var def in planet.Nodes)
                     if (planet.Id == node.Planet && def.X == node.X && def.Z == node.Z)
                         node.YieldPermille = def.YieldPermille;
+        foreach (var planet in world.Content.Planets)
+        {
+            if (world.Machines.Values.Any(m => m.Planet == planet.Id))
+                foreach (var b in planet.Builtins) world.EnsureBuiltin(planet, b);
+            else
+                world.GeneratePlanet(planet);
+        }
     }
 
     /// <summary>Firma del estado económico y estructural; excluye datos volátiles como posición o progreso.</summary>

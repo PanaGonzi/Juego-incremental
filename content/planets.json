@@ -9,7 +9,8 @@
       { "def": "depot",           "x": -4,  "z": 2 },
       { "def": "aux_core",        "x": 0,   "z": 3 },
       { "def": "recycler",        "x": 3,   "z": 3 },
-      { "def": "export_terminal", "x": -10, "z": 3 }
+      { "def": "export_terminal", "x": -10, "z": 3 },
+      { "def": "shuttle_terminal", "x": -20, "z": 20 }
     ],
     "nodes": [
       { "item": "ore", "x": 18,  "z": -6 },
@@ -29,6 +30,23 @@
       { "def": "scrap_pile", "x": 55,  "z": -36, "radius": 20, "count": 24, "seed": 41 },
       { "def": "ice_block",  "x": -30, "z": 12,  "radius": 12, "count": 14, "seed": 53 },
       { "def": "ice_block",  "x": -50, "z": -30, "radius": 18, "count": 18, "seed": 61 }
+    ]
+  },
+  {
+    "id": 1,
+    "key": "mars",
+    "halfSizeCells": 60,
+    "startCredits": 0,
+    "spawn": { "x": 0, "z": 10 },
+    "builtins": [
+      { "def": "depot",           "x": -6,  "z": -4 },
+      { "def": "aux_core",        "x": 2,   "z": -3 },
+      { "def": "shuttle_terminal", "x": -4, "z": 4 }
+    ],
+    "nodes": [],
+    "debrisFields": [
+      { "def": "red_rock", "x": 18,  "z": 10,  "radius": 12, "count": 18, "seed": 71 },
+      { "def": "red_rock", "x": -22, "z": -8,  "radius": 14, "count": 18, "seed": 83 }
     ]
   }
 ]

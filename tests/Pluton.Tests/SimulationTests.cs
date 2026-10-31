@@ -317,6 +317,95 @@ public class SimulationTests
     }
 }
 
+public class TravelTests
+{
+    private static (World w, PlayerState p) AtPad()
+    {
+        var (w, p) = Fixture.NewWorld();
+        w.Upgrades.Add("tech_shuttle");
+        w.Reindex();
+        Fixture.StandAt(w, p, w.Machines.Values.First(m => m.Def == "shuttle_terminal" && m.Planet == 0));
+        return (w, p);
+    }
+
+    private static Command Go(int planet) => new() { Type = CommandType.Travel, A = planet };
+
+    [Fact]
+    public void Travel_needs_upgrade_range_and_valid_destination()
+    {
+        var (w, p) = Fixture.NewWorld();
+        Assert.Equal("err_locked", w.Apply(p, Go(1)).Error);
+        w.Upgrades.Add("tech_shuttle");
+        p.X = 150; p.Z = 150;
+        Assert.Equal("err_range", w.Apply(p, Go(1)).Error);
+        Fixture.StandAt(w, p, w.Machines.Values.First(m => m.Def == "shuttle_terminal" && m.Planet == 0));
+        Assert.Equal("err_same_planet", w.Apply(p, Go(0)).Error);
+        Assert.Equal("err_invalid", w.Apply(p, Go(7)).Error);
+    }
+
+    [Fact]
+    public void Player_arrives_keeps_inventory_and_cannot_act_in_transit()
+    {
+        var (w, p) = AtPad();
+        p.Bag.Add("ingot", 12);
+        Assert.True(w.Apply(p, Go(1)).Ok);
+        Assert.Equal("err_transit", w.Apply(p, Go(1)).Error);
+        Assert.Equal("err_transit", w.Apply(p, new Command { Type = CommandType.Insert, A = 1 }).Error);
+        for (var i = 0; i < w.Content.Balance.TravelTicks + 1; i++) w.Step();
+        Assert.Equal(1, p.Planet);
+        Assert.Equal(-1, p.TransitTo);
+        Assert.Equal(12, p.Bag.Get("ingot"));
+        Assert.Equal(20f, p.Z);
+    }
+
+    [Fact]
+    public void Save_in_transit_resumes_without_losing_player_or_cargo()
+    {
+        var (w, p) = AtPad();
+        p.Bag.Add("ingot", 12);
+        Assert.True(w.Apply(p, Go(1)).Ok);
+        for (var i = 0; i < 50; i++) w.Step();
+        var loaded = WorldCodec.Deserialize(Fixture.Content, WorldCodec.Serialize(w));
+        Assert.Equal(WorldCodec.Hash(w), WorldCodec.Hash(loaded));
+        var q = loaded.Players[p.Key];
+        Assert.Equal(1, q.TransitTo);
+        for (var i = 0; i < w.Content.Balance.TravelTicks; i++) loaded.Step();
+        Assert.Equal(1, q.Planet);
+        Assert.Equal(12, q.Bag.Get("ingot"));
+    }
+
+    [Fact]
+    public void Factory_on_other_planet_keeps_producing_while_player_is_away()
+    {
+        var (w, p) = AtPad();
+        var recycler = Fixture.Find(w, "recycler");
+        recycler.In.Add("scrap", 20);
+        Assert.True(w.Apply(p, Go(1)).Ok);
+        for (var i = 0; i < 400; i++) w.Step();
+        Assert.Equal(1, p.Planet);
+        Assert.True(recycler.Out.Get("recovered") >= 8);
+    }
+
+    [Fact]
+    public void Two_players_travel_independently_and_planets_have_separate_power_and_depots()
+    {
+        var (w, a) = AtPad();
+        var b = Fixture.AddPlayer(w, "player-b");
+        Fixture.StandAt(w, b, w.Machines.Values.First(m => m.Def == "shuttle_terminal" && m.Planet == 0));
+        Assert.True(w.Apply(a, Go(1)).Ok);
+        for (var i = 0; i < 300; i++) w.Step();
+        Assert.Equal(1, a.Planet);
+        Assert.Equal(0, b.Planet);
+        var depots = w.Machines.Values.Where(m => m.Def == "depot").Select(m => m.Planet).ToList();
+        Assert.Equal(new[] { 0, 1 }, depots);
+        Assert.NotEqual(w.DepotOf(0)!.Id, w.DepotOf(1)!.Id);
+        var marsDebris = w.DebrisById.Values.First(d => d.Planet == 1);
+        b.X = marsDebris.X * 2f;
+        b.Z = marsDebris.Z * 2f;
+        Assert.Equal("err_gone", w.Apply(b, new Command { Type = CommandType.CutDebris, A = marsDebris.Id }).Error);
+    }
+}
+
 public class RailTests
 {
     private static (World w, PlayerState p, Machine a, Machine b) TwoStations()
@@ -346,6 +435,7 @@ public class RailTests
     {
         var (w, p, _, _) = TwoStations();
         p.X = 0; p.Z = -88;
+        // Nodos ricos y resto no afectan a esta validación geométrica.
         var credits = w.Credits;
         Assert.Equal("err_rail_shape", w.Apply(p, new Command { Type = CommandType.PlaceRail, A = 0, B = -44, C = 3, D = -46 }).Error);
         Assert.Equal("err_rail_shape", w.Apply(p, new Command { Type = CommandType.PlaceRail, A = 0, B = -44, C = 3, D = -46, Amount = 1 }).Error);
@@ -664,6 +754,8 @@ public class SaveTests : IDisposable
         Assert.Equal("o_cryo", Fixture.Content.Objectives[loaded.ObjectiveIndex].Id);
         Assert.Equal(777, loaded.Credits);
         Assert.True(loaded.Nodes.Values.Any(n => n.YieldPermille > 1000));
+        Assert.Contains(loaded.Machines.Values, m => m.Def == "shuttle_terminal" && m.Planet == 0);
+        Assert.Contains(loaded.Machines.Values, m => m.Def == "depot" && m.Planet == 1);
         Assert.True(File.Exists(store.PathOf("vieja") + ".v1.bak"));
         Assert.Equal(encoded, File.ReadAllBytes(store.PathOf("vieja") + ".v1.bak"));
     }

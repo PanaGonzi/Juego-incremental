@@ -31,6 +31,7 @@ public sealed class GameServer : IDisposable
         public int Violations;
         public long LastMoveMs;
         public float LastX, LastZ;
+        public int LastPlanet;
     }
 
     private sealed class RecentResults
@@ -218,6 +219,7 @@ public sealed class GameServer : IDisposable
         s.Player = player;
         s.LastX = player.X;
         s.LastZ = player.Z;
+        s.LastPlanet = player.Planet;
         s.LastMoveMs = _clock.ElapsedMilliseconds;
         World.DirtyPlayers.Add(key);
         _pendingJoin.Add(s);
@@ -295,6 +297,15 @@ public sealed class GameServer : IDisposable
         var z = r.ReadSingle();
         var yaw = r.ReadSingle();
         var p = s.Player!;
+        if (p.TransitTo >= 0) return; // la lanzadera manda: se ignora hasta llegar
+        if (p.Planet != s.LastPlanet)
+        {
+            // Acaba de llegar: la referencia de velocidad es el punto de llegada.
+            s.LastPlanet = p.Planet;
+            s.LastX = p.X;
+            s.LastZ = p.Z;
+            s.LastMoveMs = _clock.ElapsedMilliseconds;
+        }
         if (!float.IsFinite(x) || !float.IsFinite(y) || !float.IsFinite(z) || !float.IsFinite(yaw)) { Violation(s); return; }
 
         var now = _clock.ElapsedMilliseconds;
@@ -464,7 +475,7 @@ public sealed class GameServer : IDisposable
             w.Write(count);
             foreach (var s in _sessions.Values)
             {
-                if (s == target || s.Player == null || s.Player.Planet != target.Player!.Planet) continue;
+                if (s == target || s.Player == null || s.Player.Planet != target.Player!.Planet || s.Player.TransitTo >= 0 || target.Player.TransitTo >= 0) continue;
                 w.Write((ushort)s.Player.Num);
                 w.Write(s.Player.X);
                 w.Write(s.Player.Y);
@@ -519,6 +530,14 @@ public sealed class GameServer : IDisposable
             try { store.Write(slot, SaveStore.Encode(bytes, revision, tick, DateTime.UtcNow)); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Log("Fallo al guardar: " + e.Message); }
         });
+    }
+
+    /// <summary>Tras un fallo interno: copia en una ranura aparte, sin sustituir el último guardado válido.</summary>
+    public void EmergencySave()
+    {
+        if (_opt.Store == null || _opt.SaveSlot.Length == 0) return;
+        try { _opt.Store.Save(_opt.SaveSlot + "-emergencia", World); }
+        catch (Exception e) { Log("Fallo en el guardado de emergencia: " + e.Message); }
     }
 
     public void SaveBlocking()
@@ -586,6 +605,7 @@ public sealed class ServerRunner : IDisposable
         catch (Exception e)
         {
             Fault = e;
+            Server.EmergencySave();
         }
     }
 
@@ -604,7 +624,8 @@ public sealed class ServerRunner : IDisposable
     {
         _running = false;
         if (_thread.IsAlive) _thread.Join(5000);
-        if (save) Server.SaveBlocking();
+        // Tras un fallo el mundo podría ser incoherente: no sustituye al último guardado válido.
+        if (save && Fault == null) Server.SaveBlocking();
         Server.NotifyShutdown();
     }
 

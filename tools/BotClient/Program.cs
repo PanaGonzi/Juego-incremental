@@ -18,12 +18,14 @@ var reconnectEvery = int.Parse(map.GetValueOrDefault("reconnect-every", "0"), Cu
 var key = map.GetValueOrDefault("key", $"bot-identity-{index:D8}");
 var protocolLabel = $"bot{index:D2}";
 
-NetSimulation? sim = null;
+UdpRelay? relay = null;
 if (map.TryGetValue("latency", out var latency))
 {
     var l = int.Parse(latency, CultureInfo.InvariantCulture);
     var jitter = int.Parse(map.GetValueOrDefault("jitter", "0"), CultureInfo.InvariantCulture);
-    sim = new NetSimulation(l / 2, l / 2 + jitter, int.Parse(map.GetValueOrDefault("loss", "0"), CultureInfo.InvariantCulture));
+    relay = new UdpRelay(host, port, l, jitter, int.Parse(map.GetValueOrDefault("loss", "0"), CultureInfo.InvariantCulture), index + 1);
+    host = "127.0.0.1";
+    port = relay.LocalPort;
 }
 
 var content = ContentDb.Load(map.GetValueOrDefault("content", ContentDb.LocateDirectory()));
@@ -33,16 +35,18 @@ int mismatches = 0, checks = 0;
 long maxRtt = 0;
 string closeReason = "";
 var rng = new Random(index * 7919 + 13);
+var plan0 = new BotPlan();
 
 while (total.Elapsed.TotalSeconds < seconds)
 {
     var connectStart = total.ElapsedMilliseconds;
-    var client = new GameClient(content, LiteNetTransport.Dial(host, port, sim), key, protocolLabel);
+    var client = new GameClient(content, LiteNetTransport.Dial(host, port), key, protocolLabel);
     client.ResultReceived += (_, r) => { if (r.Ok) ok++; else failed++; };
     var sessionEnd = reconnectEvery > 0 ? total.Elapsed.TotalSeconds + reconnectEvery : double.MaxValue;
     var connected = false;
     float x = 0, z = 0, angle = (float)(rng.NextDouble() * Math.PI * 2);
-    var plan = new BotPlan();
+    var plan = plan0;
+    plan.Target = null;
     client.PositionCorrected += (cx, _, cz) => { x = cx; z = cz; };
     long nextMove = 0, nextAction = 0;
 
@@ -67,6 +71,12 @@ while (total.Elapsed.TotalSeconds < seconds)
             if (now >= nextMove)
             {
                 nextMove = now + 50;
+                if (plan.Arrived && client.LocalPlayer is { } arrived)
+                {
+                    plan.Arrived = false;
+                    x = arrived.X;
+                    z = arrived.Z;
+                }
                 // Camina hacia su objetivo a velocidad legal.
                 if (plan.Target is { } goal)
                 {
@@ -86,7 +96,7 @@ while (total.Elapsed.TotalSeconds < seconds)
             if (now >= nextAction)
             {
                 nextAction = now + 250 + rng.Next(250);
-                Act(client, behaviour, rng, ref x, ref z, plan);
+                Act(client, behaviour, rng, x, z, plan);
                 if (rng.Next(200) == 0) { client.SendChat("hola desde " + protocolLabel); chats++; }
             }
         }
@@ -114,9 +124,9 @@ Environment.Exit(mismatches == 0 ? 0 : 5);
 
 void Report() => Console.WriteLine(
     $"{protocolLabel} connects={connects} avgConnectMs={(connects == 0 ? 0 : connectMsSum / connects)} ok={ok} failed={failed} moves={moves} chats={chats} " +
-    $"reconnects={reconnects} hashChecks={checks} hashMismatch={mismatches} maxRttMs={maxRtt} closeReason={closeReason}");
+    $"reconnects={reconnects} hashChecks={checks} hashMismatch={mismatches} maxRttMs={maxRtt} relayDropped={relay?.Dropped ?? 0} relayForwarded={relay?.Forwarded ?? 0} travels={plan0.Travels} closeReason={closeReason}");
 
-static void Act(GameClient client, string behaviour, Random rng, ref float x, ref float z, BotPlan plan)
+static void Act(GameClient client, string behaviour, Random rng, float x, float z, BotPlan plan)
 {
     var world = client.World!;
     var me = client.LocalPlayer!;
@@ -134,13 +144,46 @@ static void Act(GameClient client, string behaviour, Random rng, ref float x, re
         return;
     }
 
+    if (me.TransitTo >= 0)
+    {
+        plan.WasTraveling = true;
+        return;
+    }
+    if (plan.WasTraveling)
+    {
+        // Ya en el destino: retoma desde la posición que marca el servidor.
+        plan.WasTraveling = false;
+        plan.Travels++;
+        plan.Arrived = true;
+        plan.Target = null;
+    }
+
     // Ciclo de jugador: limpiar, reciclar, llevar al depósito y vender. Compite por lo mismo que los demás.
-    Machine Find(string def) => world.Machines.Values.First(m => m.Def == def);
+    Machine Find(string def) => world.Machines.Values.First(m => m.Def == def && m.Planet == me.Planet);
     bool Near((float x, float z) target, float range) => (target.x - x) * (target.x - x) + (target.z - z) * (target.z - z) < range * range;
     (float x, float z) Center(Machine m)
     {
         var (mx, mz) = world.MachineCenterMm(m);
         return (mx / 1000f, mz / 1000f);
+    }
+
+    if (behaviour == "traveler")
+    {
+        // Viaja una y otra vez entre planetas, independiente del resto de la sala.
+        var pad = Find("shuttle_terminal");
+        plan.Target = Center(pad);
+        if (Near(plan.Target.Value, 6))
+            client.Send(new Command { Type = CommandType.Travel, A = me.Planet == 0 ? 1 : 0 });
+        return;
+    }
+
+    if (me.Planet != 0)
+    {
+        // Los bots de producción solo operan en Plutón.
+        var back = Find("shuttle_terminal");
+        plan.Target = Center(back);
+        if (Near(plan.Target.Value, 6)) client.Send(new Command { Type = CommandType.Travel, A = 0 });
+        return;
     }
 
     switch (plan.Step % 5)
@@ -150,6 +193,7 @@ static void Act(GameClient client, string behaviour, Random rng, ref float x, re
             var bestDist = float.MaxValue;
             foreach (var d in world.DebrisById.Values)
             {
+                if (d.Planet != me.Planet) continue;
                 var dx = (d.X + 0.5f) * cell - x;
                 var dz = (d.Z + 0.5f) * cell - z;
                 var dist = dx * dx + dz * dz;
@@ -162,7 +206,7 @@ static void Act(GameClient client, string behaviour, Random rng, ref float x, re
         case 1:
             var recycler = Find("recycler");
             plan.Target = Center(recycler);
-            if (!Near(plan.Target, 6)) break;
+            if (!Near(plan.Target!.Value, 6)) break;
             client.Send(new Command { Type = CommandType.Insert, A = recycler.Id });
             client.Send(new Command { Type = CommandType.Link, A = recycler.Id, B = Find("depot").Id });
             plan.Step++;
@@ -170,14 +214,14 @@ static void Act(GameClient client, string behaviour, Random rng, ref float x, re
         case 2:
             var depot = Find("depot");
             plan.Target = Center(depot);
-            if (!Near(plan.Target, 6)) break;
+            if (!Near(plan.Target!.Value, 6)) break;
             client.Send(new Command { Type = CommandType.Extract, A = depot.Id });
             plan.Step++;
             break;
         case 3:
             var terminal = Find("export_terminal");
             plan.Target = Center(terminal);
-            if (!Near(plan.Target, 6)) break;
+            if (!Near(plan.Target!.Value, 6)) break;
             client.Send(new Command { Type = CommandType.Insert, A = terminal.Id });
             foreach (var kv in terminal.In.Items.ToList())
                 client.Send(new Command { Type = CommandType.Sell, A = terminal.Id, Text = kv.Key, Amount = kv.Value });
@@ -190,7 +234,7 @@ static void Act(GameClient client, string behaviour, Random rng, ref float x, re
             {
                 var old = own[rng.Next(own.Count)];
                 plan.Target = Center(old);
-                if (Near(plan.Target, 20)) client.Send(new Command { Type = CommandType.Remove, A = old.Id });
+                if (Near(plan.Target!.Value, 20)) client.Send(new Command { Type = CommandType.Remove, A = old.Id });
             }
             else
             {
@@ -205,4 +249,7 @@ sealed class BotPlan
 {
     public int Step;
     public (float x, float z)? Target;
+    public bool WasTraveling;
+    public bool Arrived;
+    public int Travels;
 }

@@ -45,7 +45,16 @@ public sealed partial class World
     public static World CreateNew(ContentDb content)
     {
         var w = new World(content);
-        foreach (var planet in content.Planets)
+        foreach (var planet in content.Planets) w.GeneratePlanet(planet);
+        w.Reindex();
+        return w;
+    }
+
+    /// <summary>Crea el contenido inicial de un planeta. También lo usa la migración de mundos antiguos.</summary>
+    public void GeneratePlanet(PlanetDef planet)
+    {
+        var w = this;
+        var content = Content;
         {
             w.Credits += planet.StartCredits;
             foreach (var b in planet.Builtins)
@@ -68,8 +77,29 @@ public sealed partial class World
             w.Reindex();
             foreach (var f in planet.DebrisFields) w.ScatterDebris(planet, f);
         }
-        w.Reindex();
-        return w;
+    }
+
+    /// <summary>Añade una instalación fija a un mundo antiguo, retirando los escombros que la tapen.</summary>
+    public void EnsureBuiltin(PlanetDef planet, BuiltinDef b)
+    {
+        if (Machines.Values.Any(m => m.Planet == planet.Id && m.Def == b.Def)) return;
+        Reindex();
+        for (var radius = 0; radius < 40; radius++)
+        for (var dx = -radius; dx <= radius; dx++)
+        for (var dz = -radius; dz <= radius; dz++)
+        {
+            if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != radius) continue;
+            var cells = Footprint(b.Def, b.X + dx, b.Z + dz, 0).ToList();
+            if (cells.Any(c => _occupied.ContainsKey((planet.Id, c.x, c.z)) || RailBlocksCell(planet.Id, c.x, c.z))) continue;
+            foreach (var c in cells)
+                if (_debrisCells.TryGetValue((planet.Id, c.x, c.z), out var debris) && DebrisById[debris].CoversNode < 0) DebrisById.Remove(debris);
+            Reindex();
+            if (cells.Any(c => _debrisCells.ContainsKey((planet.Id, c.x, c.z)))) continue;
+            var m = new Machine { Id = NextId++, Def = b.Def, Planet = planet.Id, X = b.X + dx, Z = b.Z + dz, Builtin = true };
+            Machines[m.Id] = m;
+            Reindex();
+            return;
+        }
     }
 
     private void ScatterDebris(PlanetDef planet, DebrisFieldDef f)
@@ -177,6 +207,7 @@ public sealed partial class World
             _ => Role.Builder,
         };
         if (p.Role < need) return CommandResult.Fail("err_permission");
+        if (p.TransitTo >= 0) return CommandResult.Fail("err_transit");
 
         return c.Type switch
         {
@@ -198,8 +229,42 @@ public sealed partial class World
             CommandType.StationMode => StationMode(p, c.A, c.B != 0),
             CommandType.CreateTrain => CreateTrain(p, c.A, c.B),
             CommandType.RemoveTrain => RemoveTrain(p, c.A),
+            CommandType.Travel => Travel(p, c.A),
             _ => CommandResult.Fail("err_invalid"),
         };
+    }
+
+    private CommandResult Travel(PlayerState p, int destination)
+    {
+        if (!Upgrades.Contains("tech_shuttle")) return CommandResult.Fail("err_locked");
+        if (destination == p.Planet) return CommandResult.Fail("err_same_planet");
+        if (!Content.Planets.Any(pl => pl.Id == destination)) return CommandResult.Fail("err_invalid");
+        var pad = _machineList.FirstOrDefault(m => m.Planet == p.Planet && m.Def == "shuttle_terminal");
+        if (pad == null) return CommandResult.Fail("err_invalid");
+        var (cx, cz) = MachineCenterMm(pad);
+        if (!InRange(p, cx, cz, B.ShuttleRangeMm)) return CommandResult.Fail("err_range");
+        p.TransitTo = destination;
+        p.TransitStartTick = Tick;
+        p.TransitEndTick = Tick + B.TravelTicks;
+        DirtyPlayers.Add(p.Key);
+        Bump("travels");
+        return CommandResult.Success;
+    }
+
+    private void StepTransit()
+    {
+        foreach (var p in Players.Values)
+        {
+            if (p.TransitTo < 0 || Tick < p.TransitEndTick) continue;
+            var planet = Content.Planets.First(pl => pl.Id == p.TransitTo);
+            var cell = B.CellSizeMm / 1000f;
+            p.Planet = planet.Id;
+            p.TransitTo = -1;
+            p.X = planet.Spawn.X * cell;
+            p.Y = 0.5f;
+            p.Z = planet.Spawn.Z * cell;
+            DirtyPlayers.Add(p.Key);
+        }
     }
 
     private CommandResult Cut(PlayerState p, int debrisId)
@@ -224,6 +289,7 @@ public sealed partial class World
         p.Bag.Add(def.Drop, def.Final);
         AddCredits(def.Credits);
         DebrisById.Remove(d.Id);
+        DirtyDebris.Remove(d.Id);
         _debrisCells.Remove((d.Planet, d.X, d.Z));
         RemovedDebris.Add((d.Planet, d.Id));
         Bump("cleared");
@@ -430,7 +496,7 @@ public sealed partial class World
         if (!LinkInRange(a, b)) return CommandResult.Fail("err_link_range");
         var aDef = Content.Machines[a.Def];
         var bDef = Content.Machines[b.Def];
-        if (aDef.Kind == MachineKind.Generator || bDef.Kind == MachineKind.Generator) return CommandResult.Fail("err_link_kind");
+        if (aDef.Kind is MachineKind.Generator or MachineKind.Shuttle || bDef.Kind is MachineKind.Generator or MachineKind.Shuttle) return CommandResult.Fail("err_link_kind");
         foreach (var l in Links.Values)
             if (l.From == from && l.To == to) return CommandResult.Fail("err_link_exists");
 
@@ -620,6 +686,7 @@ public sealed partial class World
         foreach (var m in _machineList) StepMachine(m);
         foreach (var l in _linkList) StepLink(l);
         StepTrains();
+        StepTransit();
         if (Tick % B.TicksPerSecond == 0) StepObjectives();
     }
 
@@ -682,6 +749,9 @@ public sealed partial class World
             case MachineKind.Storage:
             case MachineKind.Station:
                 m.Status = MachineStatus.Storing;
+                break;
+            case MachineKind.Shuttle:
+                m.Status = MachineStatus.Ready;
                 break;
             case MachineKind.Terminal:
                 m.Status = MachineStatus.Storing;

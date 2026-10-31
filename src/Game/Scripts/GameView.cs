@@ -974,6 +974,12 @@ public partial class GameView : Node3D
         _time += delta;
         var client = Session.Client;
         client.Poll();
+        if (Session.Runner?.Fault is { } fault)
+        {
+            GD.PrintErr("Fallo del servidor local: " + fault);
+            _main.EndSession(Loc.T("reject_server_fault"));
+            return;
+        }
         if (client.State == ClientState.Closed)
         {
             _main.EndSession(client.CloseReason == "reject_left" ? "" : Loc.T(client.CloseReason));

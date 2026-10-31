@@ -102,6 +102,34 @@ public class NetworkTests
     }
 
     [Fact]
+    public void Two_players_finishing_the_same_debris_in_one_flush_window_do_not_kill_the_server()
+    {
+        using var h = new NetHarness(new ServerOptions { FlushEveryTicks = 1000 });
+        var a = h.Join(KeyA);
+        var b = h.Join(KeyB);
+        var world = h.Server.World;
+        var d = world.DebrisById.Values.First(x => x.Def == "scrap_pile");
+        d.Hp = 2;
+        foreach (var key in new[] { KeyA, KeyB })
+        {
+            world.Players[key].X = d.X * 2f;
+            world.Players[key].Z = d.Z * 2f;
+        }
+        var results = 0;
+        a.ResultReceived += (_, _) => results++;
+        b.ResultReceived += (_, _) => results++;
+        a.Send(new Command { Type = CommandType.CutDebris, A = d.Id });
+        b.Send(new Command { Type = CommandType.CutDebris, A = d.Id });
+        h.Pump(() => results == 2);
+        Assert.False(world.DebrisById.ContainsKey(d.Id));
+
+        // Un cliente nuevo fuerza el vaciado de cambios con el escombro ya retirado.
+        var late = h.Join("client-identity-cccc");
+        h.Settle(200);
+        Assert.False(late.World!.DebrisById.ContainsKey(d.Id));
+    }
+
+    [Fact]
     public void Client_cannot_credit_itself_with_invalid_commands()
     {
         using var h = new NetHarness();

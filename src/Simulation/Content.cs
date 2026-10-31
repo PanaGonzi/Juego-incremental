@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 
 namespace Pluton.Simulation;
 
-public enum MachineKind { Production, Generator, Storage, Terminal, Station }
+public enum MachineKind { Production, Generator, Storage, Terminal, Station, Shuttle }
 
 public sealed class ItemDef
 {
@@ -155,6 +155,8 @@ public sealed class BalanceDef
     public int SellIntervalTicks { get; set; }
     public int SellUnitsPerInterval { get; set; }
     public int OfflineCapHours { get; set; }
+    public int TravelTicks { get; set; }
+    public int ShuttleRangeMm { get; set; }
     public Dictionary<string, DebrisDef> Debris { get; set; } = new();
 }
 

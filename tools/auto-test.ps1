@@ -1,4 +1,4 @@
-# Ejecuta el cliente exportado en modo de recorrido automático y resume el resultado.
+﻿# Ejecuta el cliente exportado en modo de recorrido automático y resume el resultado.
 # Uso: tools\auto-test.ps1 -Build dev -Tag prueba [-Width 1920 -Height 1080] [-Join host:puerto] [-Seconds 10]
 param([string]$Build = 'dev', [string]$Tag = 'auto', [int]$Width = 1280, [int]$Height = 720, [string]$Join = '', [string]$HostPort = '', [string]$Profile = 'test', [string]$Scenario = '', [int]$Seconds = 10, [int]$Timeout = 480)
 $Repo = Split-Path $PSScriptRoot -Parent
