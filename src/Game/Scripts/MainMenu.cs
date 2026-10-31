@@ -50,7 +50,7 @@ public partial class MainMenu : Control
             col.AddChild(label);
         }
 
-        var version = Ui.Text($"Alfa {Protocol.GameVersion} · protocolo {Protocol.Version} · datos {_main.Content.Revision[..8]}", 14, Ui.Dim);
+        var version = Ui.Text($"Alpha {Protocol.GameVersion} · protocol {Protocol.Version} · data {_main.Content.Revision[..8]}", 14, Ui.Dim);
         version.SetAnchorsAndOffsetsPreset(LayoutPreset.BottomLeft);
         version.OffsetLeft = 16;
         version.OffsetTop = -30;
@@ -226,6 +226,74 @@ public static class SettingsForm
         Toggle("settings_bob", prefs.CameraBob, v => prefs.CameraBob = v);
         Toggle("settings_shadows", prefs.Shadows, v => prefs.Shadows = v);
         Toggle("settings_glow", prefs.Glow, v => prefs.Glow = v);
+        var languages = new HBoxContainer();
+        languages.AddChild(Ui.Text(Loc.T("settings_language") + ": ", 15, Ui.Dim));
+        foreach (var code in Loc.Languages)
+        {
+            var lang = code;
+            languages.AddChild(Ui.Btn(code.ToUpperInvariant(), () =>
+            {
+                prefs.Language = lang;
+                prefs.Save();
+                Loc.Load(lang);
+                back();
+            }));
+        }
+        box.AddChild(languages);
+        box.AddChild(Ui.Btn(Loc.T("settings_controls"), () =>
+        {
+            foreach (var c in box.GetChildren()) { box.RemoveChild(c); c.QueueFree(); }
+            ControlsForm(box, back);
+        }));
         box.AddChild(Ui.Btn(Loc.T("menu_back"), back));
+    }
+
+    private static void ControlsForm(Container box, Action back)
+    {
+        box.AddChild(Ui.Text(Loc.T("settings_controls"), 24, Ui.Amber));
+        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(460, 520) };
+        var list = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        scroll.AddChild(list);
+        box.AddChild(scroll);
+        foreach (var action in Controls.Rebindable)
+        {
+            var id = action;
+            Button button = null!;
+            button = Ui.Btn($"{Loc.T("action_" + id)}: {Controls.KeyNames(id)}", () =>
+            {
+                button.Text = Loc.T("settings_press_key");
+                var capture = new KeyCapture(key =>
+                {
+                    if (key != Key.None) Controls.Rebind(id, key);
+                    foreach (var c in box.GetChildren()) { box.RemoveChild(c); c.QueueFree(); }
+                    ControlsForm(box, back);
+                });
+                box.AddChild(capture);
+            });
+            button.Alignment = HorizontalAlignment.Left;
+            list.AddChild(button);
+        }
+        box.AddChild(Ui.Btn(Loc.T("settings_reset_controls"), () =>
+        {
+            Controls.ResetAll();
+            foreach (var c in box.GetChildren()) { box.RemoveChild(c); c.QueueFree(); }
+            ControlsForm(box, back);
+        }));
+        box.AddChild(Ui.Btn(Loc.T("menu_back"), back));
+    }
+}
+
+/// <summary>Espera una pulsación para reasignar. Esc cancela; no llega al juego.</summary>
+public partial class KeyCapture : Control
+{
+    private readonly Action<Key> _done;
+    public KeyCapture(Action<Key> done) { _done = done; }
+
+    public override void _Input(InputEvent e)
+    {
+        if (e is not InputEventKey { Pressed: true } key) return;
+        GetViewport().SetInputAsHandled();
+        var pressed = key.PhysicalKeycode != Key.None ? key.PhysicalKeycode : key.Keycode;
+        _done(pressed == Key.Escape ? Key.None : pressed);
     }
 }

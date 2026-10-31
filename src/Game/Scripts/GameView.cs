@@ -144,7 +144,6 @@ public partial class GameView : Node3D
 
     public override void _Ready()
     {
-        Controls.Setup();
         BuildEnvironment();
         BuildPlayer();
         var layer = new CanvasLayer();
@@ -1617,39 +1616,94 @@ public partial class GameView : Node3D
 public static class Controls
 {
     private static bool _done;
-
-    public static void Setup()
+    private static Settings _prefs = null!;
+    private static readonly Dictionary<string, Godot.Key[]> Defaults = new()
     {
+        ["move_forward"] = new[] { Godot.Key.W },
+        ["move_back"] = new[] { Godot.Key.S },
+        ["move_left"] = new[] { Godot.Key.A },
+        ["move_right"] = new[] { Godot.Key.D },
+        ["sprint"] = new[] { Godot.Key.Shift },
+        ["jump"] = new[] { Godot.Key.Space },
+        ["chat"] = new[] { Godot.Key.Enter },
+        ["tech"] = new[] { Godot.Key.Tab },
+        ["players"] = new[] { Godot.Key.P },
+        ["tool_cutter"] = new[] { Godot.Key.Key1 },
+        ["tool_build"] = new[] { Godot.Key.Key2, Godot.Key.B },
+        ["tool_link"] = new[] { Godot.Key.Key3, Godot.Key.L },
+        ["tool_remove"] = new[] { Godot.Key.Key4, Godot.Key.X },
+        ["tool_rail"] = new[] { Godot.Key.Key5, Godot.Key.T },
+        ["rotate"] = new[] { Godot.Key.R },
+        ["cancel"] = new[] { Godot.Key.Q },
+        ["interact_insert"] = new[] { Godot.Key.E },
+        ["interact_take"] = new[] { Godot.Key.F },
+        ["interact_panel"] = new[] { Godot.Key.C },
+    };
+
+    public static IEnumerable<string> Rebindable => Defaults.Keys;
+
+    public static void Setup(Settings prefs)
+    {
+        _prefs = prefs;
         if (_done) return;
         _done = true;
-        Key("move_forward", Godot.Key.W);
-        Key("move_back", Godot.Key.S);
-        Key("move_left", Godot.Key.A);
-        Key("move_right", Godot.Key.D);
-        Key("sprint", Godot.Key.Shift);
-        Key("jump", Godot.Key.Space);
-        Key("pause", Godot.Key.Escape);
-        Key("chat", Godot.Key.Enter);
-        Key("tech", Godot.Key.Tab);
-        Key("players", Godot.Key.P);
-        Key("tool_cutter", Godot.Key.Key1);
-        Key("tool_build", Godot.Key.Key2, Godot.Key.B);
-        Key("tool_link", Godot.Key.Key3, Godot.Key.L);
-        Key("tool_remove", Godot.Key.Key4, Godot.Key.X);
-        Key("tool_rail", Godot.Key.Key5, Godot.Key.T);
-        Key("rotate", Godot.Key.R);
-        Key("cancel", Godot.Key.Q);
-        Key("interact_insert", Godot.Key.E);
-        Key("interact_take", Godot.Key.F);
-        Key("interact_panel", Godot.Key.C);
+        InputMap.AddAction("pause");
+        InputMap.ActionAddEvent("pause", new InputEventKey { PhysicalKeycode = Godot.Key.Escape });
+        foreach (var action in Defaults.Keys)
+        {
+            InputMap.AddAction(action);
+            Apply(action);
+        }
         Mouse("primary", MouseButton.Left);
         Mouse("secondary", MouseButton.Right);
     }
 
-    private static void Key(string action, params Godot.Key[] keys)
+    private static void Apply(string action)
     {
-        InputMap.AddAction(action);
-        foreach (var k in keys) InputMap.ActionAddEvent(action, new InputEventKey { PhysicalKeycode = k });
+        InputMap.ActionEraseEvents(action);
+        if (_prefs.Bindings.TryGetValue(action, out var custom))
+        {
+            InputMap.ActionAddEvent(action, new InputEventKey { PhysicalKeycode = (Godot.Key)custom });
+            return;
+        }
+        foreach (var k in Defaults[action]) InputMap.ActionAddEvent(action, new InputEventKey { PhysicalKeycode = k });
+    }
+
+    public static void Rebind(string action, Godot.Key key)
+    {
+        _prefs.Bindings[action] = (long)key;
+        // Una tecla hace una sola cosa: quien la tuviera vuelve a sus valores si no chocan, o queda sin ella.
+        foreach (var other in Defaults.Keys.Where(a => a != action).ToList())
+        {
+            if (!_prefs.Bindings.TryGetValue(other, out var bound) || bound != (long)key) continue;
+            _prefs.Bindings.Remove(other);
+            Apply(other);
+        }
+        Apply(action);
+        foreach (var other in Defaults.Keys.Where(a => a != action))
+            foreach (var e in InputMap.ActionGetEvents(other).OfType<InputEventKey>().ToList())
+                if (e.PhysicalKeycode == key) InputMap.ActionEraseEvent(other, e);
+        _prefs.Save();
+    }
+
+    public static void ResetAll()
+    {
+        _prefs.Bindings.Clear();
+        foreach (var action in Defaults.Keys) Apply(action);
+        _prefs.Save();
+    }
+
+    public static string KeyName(string action)
+    {
+        if (!InputMap.HasAction(action)) return action;
+        var key = InputMap.ActionGetEvents(action).OfType<InputEventKey>().LastOrDefault();
+        return key == null ? "—" : OS.GetKeycodeString(key.PhysicalKeycode);
+    }
+
+    public static string KeyNames(string action)
+    {
+        if (!InputMap.HasAction(action)) return action;
+        return string.Join(" / ", InputMap.ActionGetEvents(action).OfType<InputEventKey>().Select(k => OS.GetKeycodeString(k.PhysicalKeycode)));
     }
 
     private static void Mouse(string action, MouseButton button)

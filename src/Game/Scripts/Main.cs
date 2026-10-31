@@ -26,7 +26,9 @@ public partial class Main : Node
         var profile = args.GetValueOrDefault("profile", OS.HasFeature("editor") ? "dev" : "user");
         Store = new SaveStore(profile);
         Prefs = Settings.Load(profile);
-        Loc.Load(Content, Prefs.Language);
+        if (args.TryGetValue("language", out var language)) Prefs.Language = language;
+        Controls.Setup(Prefs);
+        Loc.Load(Prefs.Language);
         Prefs.ApplyDisplay();
         Sfx.Setup(this, Prefs);
 
@@ -209,6 +211,7 @@ public sealed class Settings
     public bool Shadows { get; set; } = true;
     public bool Glow { get; set; } = true;
     public float EventAmbience { get; set; } = 0.7f;
+    public Dictionary<string, long> Bindings { get; set; } = new();
 
     private string _path = "";
 
@@ -245,18 +248,24 @@ public sealed class Settings
 public static class Loc
 {
     private static Dictionary<string, string> _table = new();
+    private static readonly System.Text.RegularExpressions.Regex KeyToken = new(@"\{([a-z_]+)\}", System.Text.RegularExpressions.RegexOptions.Compiled);
+    public static readonly string[] Languages = { "es", "en" };
 
-    public static void Load(ContentDb content, string language)
+    public static void Load(string language)
     {
-        var dir = System.IO.Path.Combine(ContentDb.LocateDirectory(content == null ? null : ProjectRootHint()), "loc");
+        var root = OS.HasFeature("editor") ? ProjectSettings.GlobalizePath("res://") : System.IO.Path.GetDirectoryName(OS.GetExecutablePath())!;
+        var dir = System.IO.Path.Combine(ContentDb.LocateDirectory(root), "loc");
         var path = System.IO.Path.Combine(dir, language + ".json");
         if (!File.Exists(path)) path = System.IO.Path.Combine(dir, "es.json");
         _table = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(path)) ?? new();
     }
 
-    private static string ProjectRootHint() =>
-        OS.HasFeature("editor") ? ProjectSettings.GlobalizePath("res://") : System.IO.Path.GetDirectoryName(OS.GetExecutablePath())!;
+    /// <summary>Los marcadores {accion} muestran la tecla asignada: la ayuda no miente tras reasignar controles.</summary>
+    public static string T(string key)
+    {
+        if (!_table.TryGetValue(key, out var v)) return key;
+        return v.Contains('{') ? KeyToken.Replace(v, m => Controls.KeyName(m.Groups[1].Value)) : v;
+    }
 
-    public static string T(string key) => _table.TryGetValue(key, out var v) ? v : key;
     public static string T(string key, string arg) => T(key).Replace("{0}", arg);
 }

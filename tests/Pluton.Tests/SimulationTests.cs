@@ -335,6 +335,37 @@ public class SimulationTests
     }
 }
 
+public class LocalizationTests
+{
+    private static Dictionary<string, string> Table(string lang) =>
+        System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(Path.Combine(ContentDb.LocateDirectory(), "loc", lang + ".json")))!;
+
+    [Fact]
+    public void Languages_have_the_same_keys_and_placeholders()
+    {
+        var es = Table("es");
+        var en = Table("en");
+        Assert.Empty(es.Keys.Except(en.Keys));
+        Assert.Empty(en.Keys.Except(es.Keys));
+        var token = new System.Text.RegularExpressions.Regex(@"\{[a-z_0-9]+\}");
+        foreach (var (key, value) in es)
+            Assert.Equal(token.Matches(value).Select(m => m.Value).OrderBy(x => x), token.Matches(en[key]).Select(m => m.Value).OrderBy(x => x));
+    }
+
+    [Fact]
+    public void Every_game_id_has_a_text()
+    {
+        var es = Table("es");
+        var c = Fixture.Content;
+        foreach (var id in c.Items.Keys) Assert.Contains("item_" + id, es.Keys);
+        foreach (var id in c.Machines.Keys) Assert.Contains("machine_" + id, es.Keys);
+        foreach (var id in c.Upgrades.Keys) { Assert.Contains("upgrade_" + id, es.Keys); Assert.Contains("upgrade_" + id + "_d", es.Keys); }
+        foreach (var id in c.Contracts.Keys) Assert.Contains("contract_" + id, es.Keys);
+        foreach (var o in c.Objectives) Assert.Contains("objective_" + o.Id, es.Keys);
+        foreach (var s in Enum.GetNames<MachineStatus>()) Assert.Contains("status_" + s, es.Keys);
+    }
+}
+
 public class EventTests
 {
     private static Command Deliver => new() { Type = CommandType.FulfillContract, Text = "c_shadow_express" };
@@ -714,6 +745,31 @@ public class RailTests
         Assert.True(w.Apply(p, new Command { Type = CommandType.PlaceRail, A = 22, B = -32, C = 30, D = -32 }).Ok);
         for (var i = 0; i < 400 && b.In.Get("ore") < 60; i++) w.Step();
         Assert.Equal(60, b.In.Get("ore"));
+    }
+
+    [Fact]
+    public void Trains_never_share_a_segment_and_never_deadlock()
+    {
+        var (w, p, a, b) = TwoStations();
+        Assert.True(w.Apply(p, new Command { Type = CommandType.PlaceRail, A = 14, B = -32, C = 22, D = -32 }).Ok);
+        Assert.True(w.Apply(p, new Command { Type = CommandType.PlaceRail, A = 22, B = -32, C = 30, D = -32 }).Ok);
+        b.StationUnload = true;
+        a.In.Add("ore", 240);
+        p.Bag.Add("ingot", 50);
+        for (var i = 0; i < 3; i++)
+            Assert.True(w.Apply(p, new Command { Type = CommandType.CreateTrain, A = i == 1 ? b.Id : a.Id, B = i == 1 ? a.Id : b.Id }).Ok);
+        var blocked = false;
+        for (var i = 0; i < 12000 && b.In.Get("ore") < 240; i++)
+        {
+            w.Step();
+            var moving = w.Trains.Values.Where(t => t.State == TrainState.Moving).ToList();
+            var current = moving.Where(t => t.PathIndex < t.Path.Count).Select(t => t.Path[t.PathIndex]).ToList();
+            Assert.Equal(current.Count, current.Distinct().Count());
+            blocked |= w.Trains.Values.Any(t => t.WaitReason == "wait_block");
+        }
+        Assert.True(blocked, "la prueba debe ejercer la espera por vía ocupada");
+        Assert.Equal(240, b.In.Get("ore"));
+        Assert.Equal(240, w.CountEverywhere("ore"));
     }
 
     [Fact]

@@ -277,6 +277,25 @@ public partial class AutoTest : Node
         await Wait(0.1);
         Check(v.CurrentTool == Tool.Cutter, "Q cancela y vuelve al cortador");
 
+        Controls.Rebind("tool_link", Godot.Key.K);
+        Key(Godot.Key.L);
+        await Wait(0.1);
+        Check(v.CurrentTool == Tool.Cutter, "tras reasignar, L deja de seleccionar el enlazador");
+        Key(Godot.Key.K);
+        await Wait(0.1);
+        Check(v.CurrentTool == Tool.Link, "K selecciona el enlazador reasignado");
+        Check(Loc.T("objective_o_link").Contains("K"), "la ayuda muestra la tecla reasignada");
+        Controls.Rebind("rotate", Godot.Key.K);
+        Check(Controls.KeyNames("tool_link") == "—" || !Controls.KeyNames("tool_link").Contains("K"), "una tecla no queda asignada a dos acciones");
+        Controls.ResetAll();
+        Key(Godot.Key.Q);
+        await Wait(0.1);
+        Key(Godot.Key.L);
+        await Wait(0.1);
+        Check(v.CurrentTool == Tool.Link, "restaurar controles recupera L");
+        Key(Godot.Key.Q);
+        await Wait(0.1);
+
         Key(Godot.Key.Tab);
         await Wait(0.2);
         Check(v.PanelIsOpen && Input.MouseMode == Input.MouseModeEnum.Visible, "Tab abre el panel y libera el ratón");

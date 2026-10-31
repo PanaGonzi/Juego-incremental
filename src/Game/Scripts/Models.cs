@@ -575,15 +575,22 @@ public static class Models
             var x = Mathf.Cos(a) * r;
             var z = Mathf.Sin(a) * r;
             var s = rng.RandfRange(0.35f, 0.7f);
-            b.Ball("pumpkin", x, s * 0.75f, z, s, 12, 6, 0.8f);
-            b.Cyl("stem", x, s * 1.35f, z, 0.06f, 0.22f);
-            // Cara orientada hacia el centro del ramal
-            var ox = -Mathf.Cos(a) * s;
-            var oz = -Mathf.Sin(a) * s;
-            var yaw = Mathf.RadToDeg(Mathf.Atan2(ox, oz));
-            b.Box("amber", x + ox * 0.95f + oz * 0.3f, s * 0.95f, z + oz * 0.95f - ox * 0.3f, s * 0.2f, s * 0.2f, 0.04f, yaw);
-            b.Box("amber", x + ox * 0.95f - oz * 0.3f, s * 0.95f, z + oz * 0.95f + ox * 0.3f, s * 0.2f, s * 0.2f, 0.04f, yaw);
-            b.Box("amber", x + ox * 0.97f, s * 0.6f, z + oz * 0.97f, s * 0.6f, s * 0.12f, 0.04f, yaw);
+            for (var lobe = 0; lobe < 7; lobe++)
+            {
+                var la = lobe * Mathf.Tau / 7;
+                b.Ball("pumpkin", x + Mathf.Cos(la) * s * 0.42f, s * 0.62f, z + Mathf.Sin(la) * s * 0.42f, s * 0.62f, 8, 5, 0.95f);
+            }
+            b.Cyl("stem", x, s * 1.2f, z, 0.06f, 0.26f);
+            // Cara orientada hacia el centro del ramal, apoyada en la superficie
+            var fx = -Mathf.Cos(a);
+            var fz = -Mathf.Sin(a);
+            var sx = -fz;
+            var sz = fx;
+            var yaw = Mathf.RadToDeg(Mathf.Atan2(fx, fz));
+            var depth = s * 0.98f;
+            b.Box("amber", x + fx * depth + sx * s * 0.32f, s * 0.82f, z + fz * depth + sz * s * 0.32f, s * 0.2f, s * 0.2f, 0.05f, yaw);
+            b.Box("amber", x + fx * depth - sx * s * 0.32f, s * 0.82f, z + fz * depth - sz * s * 0.32f, s * 0.2f, s * 0.2f, 0.05f, yaw);
+            b.Box("amber", x + fx * depth, s * 0.42f, z + fz * depth, s * 0.62f, s * 0.11f, 0.05f, yaw);
         }
         for (var i = 0; i < 12; i++)
         {

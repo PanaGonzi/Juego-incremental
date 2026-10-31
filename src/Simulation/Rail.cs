@@ -69,6 +69,7 @@ public sealed partial class World
     private readonly Dictionary<(int planet, int x, int z), int> _nodeAt = new();
     private readonly Dictionary<int, List<RailSegment>> _adjacency = new();
     private Train[] _trainList = Array.Empty<Train>();
+    private readonly Dictionary<int, int> _reservedSegments = new();
 
     private RailDef R => Content.Balance.Rail;
 
@@ -85,6 +86,18 @@ public sealed partial class World
                 _railCells[(s.Planet, c.x, c.z)] = _railCells.GetValueOrDefault((s.Planet, c.x, c.z)) + 1;
         }
         _trainList = Trains.Values.ToArray();
+        _reservedSegments.Clear();
+        foreach (var t in _trainList)
+        {
+            if (t.State != TrainState.Moving) continue;
+            for (var i = t.PathIndex; i < t.Path.Count; i++) _reservedSegments[t.Path[i]] = t.Id;
+        }
+    }
+
+    private void ReleaseReservations(Train t)
+    {
+        foreach (var id in t.Path)
+            if (_reservedSegments.TryGetValue(id, out var owner) && owner == t.Id) _reservedSegments.Remove(id);
     }
 
     private void AddAdjacent(RailSegment s)
@@ -130,6 +143,7 @@ public sealed partial class World
     private void RemoveSegment(RailSegment s)
     {
         RailSegments.Remove(s.Id);
+        _reservedSegments.Remove(s.Id);
         DirtyRailSegments.Remove(s.Id);
         RemovedRailSegments.Add(s.Id);
         _adjacency[s.A].Remove(s);
@@ -349,6 +363,21 @@ public sealed partial class World
             t.Timer = 10;
             return;
         }
+        // Se reserva el trayecto completo o no se sale: nadie espera con vía retenida, así que no hay interbloqueos.
+        foreach (var id in path)
+        {
+            if (!_reservedSegments.TryGetValue(id, out var owner) || owner == t.Id) continue;
+            if (t.State != TrainState.Waiting)
+            {
+                t.State = TrainState.Waiting;
+                DirtyTrains.Add(t.Id);
+            }
+            SetWait(t, "wait_block");
+            t.Timer = 5;
+            return;
+        }
+        ReleaseReservations(t);
+        foreach (var id in path) _reservedSegments[id] = t.Id;
         t.Path.Clear();
         t.Path.AddRange(path);
         DirtyTrainPaths.Add(t.Id);
@@ -415,13 +444,14 @@ public sealed partial class World
                 t.PosMm = 0;
                 t.State = TrainState.Waiting;
                 t.Timer = 10;
-                t.HeadingToB = t.HeadingToB;
+                ReleaseReservations(t);
                 SetWait(t, "wait_no_route");
                 DirtyTrains.Add(t.Id);
                 return;
             }
             if (t.PosMm < s.LengthMm) return;
             t.PosMm -= s.LengthMm;
+            if (_reservedSegments.TryGetValue(s.Id, out var holder) && holder == t.Id) _reservedSegments.Remove(s.Id);
             t.CurrentNode = t.Forward ? s.B : s.A;
             t.PathIndex++;
             DirtyTrains.Add(t.Id);

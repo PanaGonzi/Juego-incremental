@@ -152,7 +152,7 @@ public partial class Hud : Control
         hotbar.GrowVertical = GrowDirection.Begin;
         hotbar.OffsetBottom = -16;
         AddChild(hotbar);
-        foreach (var (key, label) in new[] { ("1", "tool_cutter"), ("2 / B", "tool_build"), ("3 / L", "tool_link"), ("4 / X", "tool_remove"), ("5 / T", "tool_rail") })
+        foreach (var (key, label) in new[] { (Controls.KeyNames("tool_cutter"), "tool_cutter"), (Controls.KeyNames("tool_build"), "tool_build"), (Controls.KeyNames("tool_link"), "tool_link"), (Controls.KeyNames("tool_remove"), "tool_remove"), (Controls.KeyNames("tool_rail"), "tool_rail") })
         {
             var slot = new PanelContainer { MouseFilter = MouseFilterEnum.Ignore };
             var box = new VBoxContainer();
@@ -435,7 +435,7 @@ public partial class Hud : Control
         }
         else if (def.Kind is not (MachineKind.Generator or MachineKind.Shuttle))
         {
-            Add(Ui.Text($"{Loc.T("panel_contents")} (máx. {def.Capacity} por tipo):", 17));
+            Add(Ui.Text(Loc.T("panel_capacity", def.Capacity.ToString()), 17));
             Add(Ui.Text(Ui.Amounts(m.In.Items), 17));
         }
 
