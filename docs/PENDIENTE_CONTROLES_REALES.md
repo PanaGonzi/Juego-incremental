@@ -24,6 +24,13 @@ La última sesión con entradas reales fue la de `0.5.0-qa2`.
 - [ ] Insertar un divisor y un unificador sobre una cinta tendida, apuntando con el ratón.
 - [ ] Botón «Mover» del panel: fantasma, rotar, confirmar y cancelar.
 
+## Ferrocarril
+
+- [ ] Con la herramienta de vías, R recorre recta, curvas y señal.
+- [ ] Poner y quitar una señal con el ratón, con la vista previa del coste y del estado.
+- [ ] Tender un ramal desde la mitad de una recta.
+- [ ] Una persona entiende por qué un tren espera ante una señal.
+
 ## Inventario y barra rápida
 
 - [ ] Mayús+clic y Ctrl+clic.

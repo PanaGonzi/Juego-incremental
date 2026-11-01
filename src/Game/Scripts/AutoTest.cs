@@ -235,6 +235,15 @@ public partial class AutoTest : Node
             {
                 _main.StartSession(GameSession.Local(_main, RailWorld(), "autotest-rail", null, _main.Prefs));
             }
+            else if (_args.GetValueOrDefault("scenario") == "signals")
+            {
+                var signalWorld = RailWorld();
+                // Más de lo que cabe en la mochila: al llevar carga a la estación, sigue quedando para pagar los trenes.
+                var stock = signalWorld.Machines.Values.First(m => m.Def == "depot");
+                stock.In.Add("ingot", 400);
+                stock.In.Add("parts", 200);
+                _main.StartSession(GameSession.Local(_main, signalWorld, "autotest-signals", null, _main.Prefs));
+            }
             else if (_args.GetValueOrDefault("scenario") == "gallery")
             {
                 _main.StartSession(GameSession.Local(_main, GalleryWorld(), "autotest-gallery", null, _main.Prefs));
@@ -315,6 +324,7 @@ public partial class AutoTest : Node
             if (_args.ContainsKey("measure")) await MeasureScenario();
             else if (_args.GetValueOrDefault("scenario") == "coopfactory") await CoopFactoryScenario();
             else if (_args.GetValueOrDefault("scenario") == "rail") await RailScenario();
+            else if (_args.GetValueOrDefault("scenario") == "signals") await SignalScenario();
             else if (_args.GetValueOrDefault("scenario") == "belts") await BeltScenario();
             else if (_args.GetValueOrDefault("scenario") == "gallery") await GalleryScenario();
             else if (_args.GetValueOrDefault("scenario") == "build") await BuildScenario();
@@ -1150,6 +1160,121 @@ public partial class AutoTest : Node
         await Shot("rail_09_reanudado");
     }
 
+    private RailNode? RailNodeAt(int x, int z) => W.RailNodes.Values.FirstOrDefault(n => n.X == x && n.Z == z);
+
+    /// <summary>Señal puesta con la herramienta normal: apuntar, ver la vista previa y hacer clic.</summary>
+    private async Task<bool> ToggleSignalAt(int x, int z, string shot)
+    {
+        var v = _view!;
+        var was = RailNodeAt(x, z)?.Signal ?? false;
+        var at = new Vector3(x * 2f, 0, z * 2f);
+        await WalkTo(at + new Vector3(-6, 0, 9));
+        v.SetTool(Tool.Rail);
+        v.SetRailShape(3);
+        v.AimAt(at);
+        await Wait(0.3);
+        if (shot.Length > 0) await Shot(shot);
+        v.Primary();
+        var ok = await Until(() => (RailNodeAt(x, z)?.Signal ?? false) != was, 3);
+        v.SetRailShape(0);
+        v.SetTool(Tool.Cutter);
+        return ok;
+    }
+
+    /// <summary>B-8 de principio a fin: línea con apartadero y señales puestas con herramientas, dos trenes en sentidos opuestos que se cruzan.</summary>
+    private async Task SignalScenario()
+    {
+        var v = _view!;
+        var client = v.Session.Client;
+        const int Z = -12;
+        client.ResultReceived += (_, r) => { if (!r.Ok) Log($"orden rechazada: {r.Error}"); };
+        Check(await Build("station", 2, Z - 2), "estación A");
+        var a = W.Machines.Values.Last(m => m.Def == "station");
+        Check(await Build("station", 40, Z - 2), "estación B");
+        var b = W.Machines.Values.Last(m => m.Def == "station");
+        Check(await PlaceRailAt(6, Z, 30, Z, 0, ""), "línea recta entre el andén A y el apartadero");
+        Check(await PlaceRailAt(30, Z, 40, Z, 0, ""), "línea hasta el andén B");
+
+        // Un extremo en mitad de la recta crea el desvío de entrada, y otro el de salida.
+        var segments = W.RailSegments.Count;
+        Check(await PlaceRailAt(14, Z, 22, Z + 8, 0, "signals_01_desvio_previa"), "ramal desde la mitad de la recta");
+        Check(RailNodeAt(14, Z) != null && W.RailDegree(RailNodeAt(14, Z)!.Id) == 3, "la recta queda partida en un desvío de tres vías");
+        Check(W.RailSegments.Count == segments + 2, $"se parte el tramo y se añade el ramal: {segments} → {W.RailSegments.Count}");
+        Check(await PlaceRailAt(22, Z + 8, 30, Z, 0, ""), "el ramal vuelve a la línea");
+        await Wait(0.5);
+        Check(v.SwitchShownForTest(RailNodeAt(14, Z)!.Id), "se ve la palanca del desvío");
+        await Shot("signals_02_apartadero");
+
+        Check(await ToggleSignalAt(14, Z, "signals_03_senal_previa"), "señal en la entrada, con la herramienta");
+        Check(await ToggleSignalAt(30, Z, ""), "señal en la salida, con la herramienta");
+        await Wait(0.5);
+        var entry = RailNodeAt(14, Z)!.Id;
+        var exit = RailNodeAt(30, Z)!.Id;
+        Check(v.SignalShownForTest(entry) == SignalLight.Clear && v.SignalShownForTest(exit) == SignalLight.Clear, "las dos en verde con la vía libre");
+        var view = new Vector3(30 * 2f, 1.5f, Z * 2f);
+        await WalkTo(view + new Vector3(-12, -1.5f, -14), 6);
+        v.AimAt(view);
+        await Wait(0.3);
+        await Shot("signals_04_verde");
+
+        client.Send(new Command { Type = CommandType.StationMode, A = b.Id, B = 1 });
+        var depot = W.Machines.Values.First(m => m.Def == "depot");
+        await UseOn(depot, () => client.Send(new Command { Type = CommandType.Extract, A = depot.Id }));
+        await Wait(0.5);
+        await UseOn(a, () => client.Send(new Command { Type = CommandType.Insert, A = a.Id }));
+        await Wait(0.5);
+        Check(W.Machines[a.Id].In.Total > 0, $"carga en origen: {W.Machines[a.Id].In.Total}");
+        await WalkTo(view + new Vector3(-12, -1.5f, -14), 6);
+        v.AimAt(view);
+
+        client.Send(new Command { Type = CommandType.CreateTrain, A = a.Id, B = b.Id });
+        Check(await Until(() => W.Trains.Count == 1, 3), "primer tren");
+        var east = W.Trains.Keys.Last();
+        Check(await Until(() => W.Trains[east].State == TrainState.Moving, 25), "el primero sale de A");
+        client.Send(new Command { Type = CommandType.CreateTrain, A = b.Id, B = a.Id });
+        Check(await Until(() => W.Trains.Count == 2, 3), "segundo tren, en sentido contrario");
+        var west = W.Trains.Keys.Last();
+
+        Check(await Until(() => W.Trains[east].State == TrainState.AtSignal, 15), "el primero se detiene ante la señal de salida");
+        Check(W.Trains[east].WaitReason == "wait_signal", $"explica por qué espera: {W.Trains[east].WaitReason}");
+        await Wait(0.3);
+        Check(v.SignalShownForTest(exit) == SignalLight.Stop, "la señal está en rojo");
+        var shown = v.TrainShownForTest(east);
+        var mast = new Vector3(30 * 2f, 0, Z * 2f);
+        var gapToSignal = new Vector2(shown.X - mast.X, shown.Z - mast.Z).Length();
+        Check(shown.X < mast.X && gapToSignal < 8, $"la locomotora para antes de la señal: a {gapToSignal:0.0} m");
+        await Shot("signals_05_rojo_tren_detenido");
+
+        var bothInLoop = false;
+        for (var i = 0; i < 300 && !bothInLoop; i++)
+        {
+            bothInLoop = W.Trains[west].State == TrainState.Moving && W.Trains[east].State is TrainState.AtSignal or TrainState.Moving
+                && W.Trains[west].PathIndex < W.Trains[west].Path.Count && W.RailSegments.TryGetValue(W.Trains[west].Path[W.Trains[west].PathIndex], out var ws) && W.RailNodes[ws.A].Z != Z | W.RailNodes[ws.B].Z != Z;
+            if (!bothInLoop) await Wait(0.05);
+        }
+        Check(bothInLoop, "el segundo toma la vía libre del apartadero");
+        await Shot("signals_06_cruce");
+        Check(await Until(() => W.Trains[east].State == TrainState.Moving && W.Trains[east].Forward, 15), "el primero sigue cuando se libera su bloque");
+        var delivered = await Until(() => W.Stats.GetValueOrDefault("train_delivered") > 0, 40);
+        Check(delivered, $"entrega tras cruzarse: {W.Stats.GetValueOrDefault("train_delivered")}");
+        await Wait(3);
+        await Shot("signals_07_tras_cruce");
+
+        // Guardar y volver a abrir con la señal puesta.
+        client.RequestSave();
+        await Wait(1);
+        var slot = v.Session.Slot;
+        _main.EndSession("");
+        await Wait(0.5);
+        _main.StartSolo(slot, false);
+        _view = _main.GetChildren().OfType<GameView>().First(x => !x.IsQueuedForDeletion());
+        Check(await Until(() => _view.Session.Client.State == Pluton.Networking.ClientState.InGame, 20), "reanudar con señales");
+        Check(RailNodeAt(14, Z)?.Signal == true && RailNodeAt(30, Z)?.Signal == true, "las señales siguen al cargar");
+        await Wait(1);
+        Check(_view.SignalShownForTest(RailNodeAt(14, Z)!.Id) != null, "se ven tras cargar");
+        Check(_view.Session.Client.HashMismatches == 0, "sin divergencias");
+    }
+
     /// <summary>Almacén junto al inicio y otro a unos 150 m, con escombros y máquinas en medio.</summary>
     private World BeltStage()
     {
@@ -1176,6 +1301,7 @@ public partial class AutoTest : Node
             world.Nodes[d.CoversNode].Revealed = true;
         }
         world.Credits = 5000;
+        world.Upgrades.Add("tech_rail");
         var depot = world.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
         depot.In.Add("recovered", 600); // más que el almacén y la cinta juntos: el atasco debe llenar la cinta entera
         depot.In.Add("ingot", 100);

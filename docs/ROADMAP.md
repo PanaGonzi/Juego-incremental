@@ -103,7 +103,7 @@ Encargo: [PROMPT_CLAUDE_CONSTRUCCION_PRIMEROS_30_MIN.md](../PROMPT_CLAUDE_CONSTR
 | B-5 | M | Exportar y comprobar servidor Linux | pendiente; sin entorno Linux aquí, no se anuncia |
 | B-6 | M | Arte: variedad, animación de jugadores, audio ambiente | pendiente |
 | B-7 | B | Prestigio opcional | pendiente |
-| B-8 | A | Desvíos y señales | pendiente; siguiente en cola tras lo anterior |
+| B-8 | A | Desvíos y señales | primer sistema implementado: reservas por bloques, señales con foco, rutas deterministas, desvíos en mitad de una recta y cruces. Comprobado: xUnit, incluida la réplica por UDP con dos clientes, y un recorrido `signals` anterior al último cambio del foco (T-024). **NO VERIFICADO:** foco rehecho, parte de señales de `coopfactory`, regresión gráfica y de 12 clientes sobre protocolo 9, y último ajuste al restaurar reservas |
 
 ## RC
 

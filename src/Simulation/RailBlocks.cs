@@ -66,7 +66,7 @@ public sealed partial class World
 
     private int TargetOf(Train t) => t.HeadingToB ? t.StationB : t.StationA;
 
-    private static bool OnTrack(TrainState s) => s is TrainState.Moving or TrainState.AtSignal;
+    public static bool OnTrack(TrainState s) => s is TrainState.Moving or TrainState.AtSignal;
 
     private int OtherEnd(RailSegment s, int node) => s.A == node ? s.B : s.A;
 
@@ -153,6 +153,8 @@ public sealed partial class World
             dist += s.LengthMm;
             node = OtherEnd(s, node);
         }
+        // Lo concedido incluye el nodo de partida: si la cola ya lo pasó, se suelta igual que sin guardar y cargar.
+        ReleaseBehind(t);
     }
 
     private bool ReleaseIfMine(int id, Train t)
@@ -171,7 +173,7 @@ public sealed partial class World
         for (var i = t.PathIndex; ; i--)
         {
             if (dist >= length) ReleaseIfMine(node, t);
-            if (i == 0 || !RailSegments.TryGetValue(t.Path[i - 1], out var s)) break;
+            if (i == 0 || i > t.Path.Count || !RailSegments.TryGetValue(t.Path[i - 1], out var s)) break;
             if (dist >= length && !ReleaseIfMine(s.Id, t)) break;
             dist += s.LengthMm;
             node = OtherEnd(s, node);
@@ -545,6 +547,8 @@ public sealed partial class World
         }
         return SignalLight.Clear;
     }
+
+    public IReadOnlyList<RailSegment> SegmentsAt(int node) => _adjacency.TryGetValue(node, out var list) ? list : Array.Empty<RailSegment>();
 
     /// <summary>Número de vías que salen de un nodo; con tres o más hay un desvío que conviene señalar en el mundo.</summary>
     public int RailDegree(int node) => _adjacency.TryGetValue(node, out var list) ? list.Count : 0;

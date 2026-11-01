@@ -3,11 +3,11 @@
 - **Rama de trabajo:** `evolucion-0.5`. La estable sigue en `main` y `builds/alpha-0.4.1`. Sin remoto: publicar requiere autorización del titular.
 - **Alfas:** etiquetas `alpha-0.1.0` a `alpha-0.4.1`; las de prueba `0.5.0-qa*` no están etiquetadas. Commit y versión en `builds/alpha-*/VERSION.txt`. Ver `git log` para lo posterior.
 - **Procesos activos:** ninguno.
-- **Comandos:** en [CLAUDE.md](../CLAUDE.md); además `tools/net-matrix.ps1`, `tools/host-test.ps1`, y `auto-test.ps1 -Scenario rail|travel|mars|halloween`, `-Measure small|medium|stress`.
+- **Comandos:** en [CLAUDE.md](../CLAUDE.md); además `tools/net-matrix.ps1`, `tools/host-test.ps1`, y `auto-test.ps1 -Scenario rail|signals|travel|mars|halloween`, `-Measure small|medium|stress`.
 - **Bloqueos exactos:** ver [STATUS](STATUS.md). Todos requieren al titular.
 - **Pruebas pendientes:** «Sin verificar» en [TEST_REPORTS](TEST_REPORTS.md).
 - **Agentes:** ninguno activo. Las ramas `agente/*` ya están integradas en `evolucion-0.5`.
-- **Siguiente tarea concreta:** la primera con pendiente en el [ROADMAP](ROADMAP.md), en el orden del encargo: construcción y gestión, E-10, BUG-005 y B-8. Con el equipo libre, además, [PENDIENTE_CONTROLES_REALES](PENDIENTE_CONTROLES_REALES.md).
+- **Siguiente tarea concreta:** con memoria libre, repetir la regresión de T-024 (xUnit, exportar `dev`, `signals`, `rail`, `manage`, bucle, `coopfactory` con anfitrión y dedicado, 12 clientes), mirar las capturas del foco de `signals` y, si todo pasa, exportar `0.5.0-qa6`. Después, la primera con pendiente en el [ROADMAP](ROADMAP.md). Con el equipo libre, además, [PENDIENTE_CONTROLES_REALES](PENDIENTE_CONTROLES_REALES.md).
 - **Pruebas sin molestar al titular:** `auto-test`, `coop-test` y `host-test` abren sin sonido y en un monitor secundario (`tools/lib-ventana.ps1`). En `auto-test`, `-NoCapture` evita capturar el ratón. Mientras use el equipo, no ejecutar `PlayDriver`, ni `fp` o el bucle sin `-NoCapture`: capturan el ratón. El titular lo pidió el 01-11-2026.
 - **Pruebas visuales:** `tools/PlayDriver`. Una sola sesión a la vez; siempre perfil `test*`.
 - **Cuidado:**

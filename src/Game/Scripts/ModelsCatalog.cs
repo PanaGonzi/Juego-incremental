@@ -968,6 +968,39 @@ public static partial class Models
         return mesh;
     }
 
+    /// <summary>Mástil de señal ferroviaria: base, poste y cabeza con dos focos. Los focos son objetos aparte, para cambiarles el material. Asoman por todos los lados: la señal vale en los dos sentidos.</summary>
+    public static ArrayMesh SignalMast()
+    {
+        const string key = "signal_mast";
+        if (DebrisCache.TryGetValue(key, out var mesh)) return mesh;
+        var b = new Builder();
+        b.Box("regolith", 0, 0.12f, 0, 0.8f, 0.24f, 0.8f);
+        b.Cyl("steel_dark", 0, 1.75f, 0, 0.09f, 3.1f, sides: 8);
+        b.Box("steel_dark", 0, 3.65f, 0, 0.36f, 1.3f, 0.34f);
+        b.Box("signal", 0, 2.8f, 0, 0.3f, 0.2f, 0.22f);
+        mesh = b.Commit();
+        DebrisCache[key] = mesh;
+        return mesh;
+    }
+
+    public static readonly Vector3 SignalRedLamp = new(0, 3.97f, 0);
+    public static readonly Vector3 SignalGreenLamp = new(0, 3.37f, 0);
+
+    /// <summary>Palanca de desvío junto a un nodo del que salen tres o más vías.</summary>
+    public static ArrayMesh RailSwitch()
+    {
+        const string key = "rail_switch";
+        if (DebrisCache.TryGetValue(key, out var mesh)) return mesh;
+        var b = new Builder();
+        b.Box("regolith", 0, 0.1f, 0, 0.9f, 0.2f, 0.7f);
+        b.Box("steel_dark", 0, 0.42f, 0, 0.6f, 0.44f, 0.42f);
+        b.Beam("signal", new Vector3(-0.12f, 0.62f, 0), new Vector3(0.28f, 1.35f, 0), 0.04f, 0.03f);
+        b.Box("amber", 0.3f, 1.4f, 0, 0.3f, 0.16f, 0.06f);
+        mesh = b.Commit();
+        DebrisCache[key] = mesh;
+        return mesh;
+    }
+
     /// <summary>Malla de un tramo de vía: balasto, traviesas y raíles sobre la curva real.</summary>
     public static ArrayMesh RailMesh(Func<double, Vector3> eval, float lengthM)
     {

@@ -145,6 +145,7 @@ public partial class AutoTest
         DumpGeometry("4_reconectar");
         Check(W.Links.ContainsKey(rebuilt), "la cinta sigue en el estado recibido tras reconectar");
         Check(await Until(() => W.Links[rebuilt].Load > 0, 15), $"la carga se ve en el estado recibido: {W.Links[rebuilt].Load}");
+        await CoopSignals(client);
         await Wait(4);
         Check(_hashMismatchesBefore + client.HashMismatches == 0, $"sin divergencias ({_hashChecksBefore + client.HashChecks} comprobaciones)");
         Check(_hashChecksBefore + client.HashChecks > 0, "ha habido comprobaciones de hash");
@@ -152,6 +153,39 @@ public partial class AutoTest
 
         // 6. Solo con anfitrión: guardar, cerrar y volver a cargar la misma partida.
         if (_view.Session.IsLocal) await CoopSaveAndLoad();
+    }
+
+    /// <summary>Uno tiende la vía y parte con una señal, y el otro la quita y la vuelve a poner. Los dos ven lo mismo y lo pagado cuadra.</summary>
+    private async Task CoopSignals(Pluton.Networking.GameClient client)
+    {
+        await Barrier("senales_listo");
+        const int X = 0, Length = 8;
+        var z = -16;
+        if (CoopIsA)
+        {
+            while (z < 12 && W.CheckRail(0, X, z, X + Length, z, 0, out _) != null) z++;
+            Check(z < 12, $"sitio libre para la vía en z={z}");
+            await WalkTo(new Vector3((X + Length / 2f) * 2, 0, z * 2 + 6));
+            client.Send(new Command { Type = CommandType.PlaceRail, A = X, B = z, C = X + Length, D = z });
+        }
+        Check(await Until(() => W.RailSegments.Count > 0, 10), "los dos ven la vía");
+        var first = W.RailSegments.Values.First();
+        z = W.RailNodes[first.A].Z;
+        if (!CoopIsA) await WalkTo(new Vector3((X + Length / 2f) * 2, 0, z * 2 - 6));
+        await Barrier("senales_via");
+        var credits = W.Credits;
+        RailNode? Mid() => W.RailNodes.Values.FirstOrDefault(n => n.X == X + 4 && n.Z == z);
+        if (CoopIsA) client.Send(new Command { Type = CommandType.ToggleSignal, A = X + 4, B = z });
+        Check(await Until(() => Mid()?.Signal == true, 10), "los dos ven la señal, con la vía partida");
+        Check(W.RailSegments.Count == 2, $"tramos tras partir: {W.RailSegments.Count}");
+        await Barrier("senales_puesta");
+        if (!CoopIsA) client.Send(new Command { Type = CommandType.ToggleSignal, A = X + 4, B = z });
+        Check(await Until(() => Mid()?.Signal == false, 10), "los dos ven que B la quita");
+        await Barrier("senales_quitada");
+        Check(await Until(() => W.Credits == credits, 5), $"poner y quitar cuesta cero: {credits} → {W.Credits}");
+        if (CoopIsA) client.Send(new Command { Type = CommandType.ToggleSignal, A = X + 4, B = z });
+        Check(await Until(() => Mid()?.Signal == true, 10), "queda puesta para el guardado");
+        await Barrier("senales_fin");
     }
 
     private async Task CoopReconnect(int beltId)
@@ -197,6 +231,7 @@ public partial class AutoTest
         var machines = W.Machines.Keys.OrderBy(i => i).ToList();
         var recovered = W.CountEverywhere("recovered");
         var ingots = W.CountEverywhere("ingot");
+        var signals = W.RailNodes.Values.Count(n => n.Signal);
         var old = _view;
         var port = int.Parse(_args["host"]);
         _main.EndSession("");
@@ -210,6 +245,7 @@ public partial class AutoTest
         Check(W.Machines.Keys.OrderBy(i => i).SequenceEqual(machines), "las máquinas siguen al cargar");
         Check(W.CountEverywhere("recovered") == recovered, $"la carga se conserva al cargar: {recovered} → {W.CountEverywhere("recovered")}");
         Check(W.CountEverywhere("ingot") == ingots, $"los lingotes se conservan al cargar: {ingots} → {W.CountEverywhere("ingot")}");
+        Check(W.RailNodes.Values.Count(n => n.Signal) == signals && signals > 0, $"las señales se conservan al cargar: {signals}");
         DumpGeometry("5_cargada");
     }
 }

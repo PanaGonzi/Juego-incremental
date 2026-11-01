@@ -702,6 +702,54 @@ public class RailSignalTests
         return (stops, detours);
     }
 
+    /// <summary>
+    /// Coste con muchos trenes compitiendo: lo que paga cada tick del servidor es buscar rutas y comprobar que un bloque es seguro.
+    /// El tope es holgado para no fallar por ruido; la cifra real queda en la salida y en TEST_REPORTS.
+    /// </summary>
+    [Fact]
+    public void Many_trains_competing_on_one_line_stay_cheap()
+    {
+        var y = NewYard();
+        var a = y.Station(-80, Z - 2);
+        var b = y.Station(76, Z - 2);
+        var xs = new List<int> { -76 };
+        for (var x = -60; x < 76; x += 16) xs.Add(x);
+        xs.Add(76);
+        for (var i = 0; i + 1 < xs.Count; i++)
+        {
+            y.Rail(xs[i], Z, xs[i + 1], Z);
+            if (xs[i + 1] - xs[i] == 16)
+            {
+                y.Rail(xs[i], Z, xs[i] + 8, Z + 8);
+                y.Rail(xs[i] + 8, Z + 8, xs[i + 1], Z);
+            }
+            if (i + 2 < xs.Count) y.Signal(xs[i + 1], Z);
+        }
+        b.StationUnload = true;
+        for (var i = 0; i < 40; i++) y.Train(i % 2 == 0 ? a : b, i % 2 == 0 ? b : a);
+        a.In.Add("ore", 100000);
+
+        var sw = new System.Diagnostics.Stopwatch();
+        var worst = 0.0;
+        for (var i = 0; i < 6000; i++)
+        {
+            sw.Restart();
+            y.Step(b);
+            var ms = sw.Elapsed.TotalMilliseconds;
+            if (i > 100) worst = Math.Max(worst, ms);
+            AssertExclusive(y.W);
+            if (i % 500 == 0 && a.In.Get("ore") < 1000) a.In.Add("ore", 100000);
+        }
+        var perTick = new System.Diagnostics.Stopwatch();
+        perTick.Start();
+        for (var i = 0; i < 2000; i++) y.Step(b);
+        perTick.Stop();
+        var average = perTick.Elapsed.TotalMilliseconds / 2000;
+        System.Console.WriteLine($"MEDIDA señales: 40 trenes, {y.W.RailSegments.Count} tramos: media {average:0.00} ms por tick, peor {worst:0.0} ms; entregado {y.Drained}");
+        Assert.True(y.Drained > 0);
+        Assert.True(average < 20, $"media {average:0.00} ms por tick");
+    }
+
     [Fact]
     public void Signals_and_stopped_trains_replicate_to_clients_with_matching_hashes()
     {

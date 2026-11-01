@@ -50,6 +50,17 @@ public partial class GameView : Node3D
     private readonly Dictionary<int, MeshInstance3D> _nodes = new();
     private readonly Dictionary<int, RemotePlayer> _remote = new();
     private readonly Dictionary<int, MeshInstance3D> _rails = new();
+    private readonly Dictionary<int, SignalView> _signals = new();
+    private readonly Dictionary<int, MeshInstance3D> _switches = new();
+    private double _signalClock;
+
+    private sealed class SignalView
+    {
+        public required MeshInstance3D Mast;
+        public required MeshInstance3D Red;
+        public required MeshInstance3D Green;
+        public SignalLight? Shown;
+    }
 
     private sealed class TrainNode
     {
@@ -70,6 +81,8 @@ public partial class GameView : Node3D
     private int _railStartX, _railStartZ;
     private bool _railPlacing;
     private byte _railShape;
+    /// <summary>La tecla de rotar recorre recta, las dos curvas y la señal.</summary>
+    private const byte RailModes = 4, RailModeSignal = 3;
     private MeshInstance3D? _railGhost;
     private string _railGhostKey = "";
     private readonly Dictionary<ulong, (string kind, int id)> _pickables = new();
@@ -573,6 +586,7 @@ public partial class GameView : Node3D
             _rails[id].QueueFree();
             _rails.Remove(id);
         }
+        SyncSignals(w);
 
         seen.Clear();
         foreach (var t in w.Trains.Values)
@@ -754,6 +768,83 @@ public partial class GameView : Node3D
         return node;
     }
 
+    /// <summary>Mástiles y palancas de los nodos de este planeta, a un lado de la vía. El estado de cada foco se deriva del estado replicado.</summary>
+    private void SyncSignals(World w)
+    {
+        var withSignal = new HashSet<int>();
+        var withSwitch = new HashSet<int>();
+        foreach (var n in w.RailNodes.Values)
+        {
+            if (n.Planet != _viewPlanet) continue;
+            if (n.Signal) withSignal.Add(n.Id);
+            if (w.RailDegree(n.Id) >= 3) withSwitch.Add(n.Id);
+        }
+        foreach (var id in _signals.Keys.Where(k => !withSignal.Contains(k)).ToList())
+        {
+            _signals[id].Mast.QueueFree();
+            _signals.Remove(id);
+        }
+        foreach (var id in _switches.Keys.Where(k => !withSwitch.Contains(k)).ToList())
+        {
+            _switches[id].QueueFree();
+            _switches.Remove(id);
+        }
+        foreach (var id in withSignal)
+        {
+            if (_signals.ContainsKey(id)) continue;
+            var (position, yaw) = BesideNode(w, w.RailNodes[id], 2.3f);
+            var mast = new MeshInstance3D { Mesh = Models.SignalMast(), Position = position, Rotation = new Vector3(0, yaw, 0), VisibilityRangeEnd = 160 };
+            var red = new MeshInstance3D { Mesh = Models.Lamp(), Position = Models.SignalRedLamp, Scale = Vector3.One * 1.6f, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+            var green = new MeshInstance3D { Mesh = Models.Lamp(), Position = Models.SignalGreenLamp, Scale = Vector3.One * 1.6f, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+            mast.AddChild(red);
+            mast.AddChild(green);
+            AddChild(mast);
+            _signals[id] = new SignalView { Mast = mast, Red = red, Green = green };
+        }
+        foreach (var id in withSwitch)
+        {
+            if (_switches.ContainsKey(id)) continue;
+            var (position, yaw) = BesideNode(w, w.RailNodes[id], -2.3f);
+            var lever = new MeshInstance3D { Mesh = Models.RailSwitch(), Position = position, Rotation = new Vector3(0, yaw, 0), VisibilityRangeEnd = 120 };
+            AddChild(lever);
+            _switches[id] = lever;
+        }
+    }
+
+    /// <summary>Punto a un lado de la vía en un nodo, orientado de cara a los trenes que llegan por su primer tramo.</summary>
+    private static (Vector3 position, float yaw) BesideNode(World w, RailNode node, float side)
+    {
+        var at = new Vector3(node.X * Cell, 0, node.Z * Cell);
+        var dir = Vector3.Right;
+        var segments = w.SegmentsAt(node.Id);
+        if (segments.Count > 0 && w.RailNodes.TryGetValue(segments[0].A == node.Id ? segments[0].B : segments[0].A, out var other))
+        {
+            var toward = new Vector3(other.X - node.X, 0, other.Z - node.Z);
+            if (toward.LengthSquared() > 0.01f) dir = toward.Normalized();
+        }
+        var position = at + new Vector3(dir.Z, 0, -dir.X) * side;
+        return (position, Mathf.Atan2(dir.X, dir.Z));
+    }
+
+    private void UpdateSignals(double delta)
+    {
+        _signalClock += delta;
+        if (_signalClock < 0.2) return;
+        _signalClock = 0;
+        var w = Session.Client.World!;
+        foreach (var (id, view) in _signals)
+        {
+            var light = w.SignalLightOf(id);
+            if (view.Shown == light) continue;
+            view.Shown = light;
+            view.Red.MaterialOverride = light == SignalLight.Stop ? Materials.Lamp("red") : Models.Mat("dark");
+            view.Green.MaterialOverride = light == SignalLight.Clear ? Materials.Lamp("green") : Models.Mat("dark");
+        }
+    }
+
+    public SignalLight? SignalShownForTest(int node) => _signals.TryGetValue(node, out var view) ? view.Shown : null;
+    public bool SwitchShownForTest(int node) => _switches.ContainsKey(node);
+
     /// <summary>Sitúa el tren por distancia recorrida en su ruta. El vagón va 7,4 m por detrás de la locomotora.</summary>
     private void UpdateTrains(double delta)
     {
@@ -763,7 +854,12 @@ public partial class GameView : Node3D
         {
             if (!w.Trains.TryGetValue(id, out var t)) continue;
             // Entre actualizaciones del servidor se extrapola; la siguiente corrige.
-            if (t.State == TrainState.Moving) t.PosMm += (long)(speed * delta);
+            if (t.State == TrainState.Moving)
+            {
+                t.PosMm += (long)(speed * delta);
+                // No se adelanta a la decisión del servidor: si no le conceden el bloque, se para antes de la señal.
+                if (w.StopLimit(t) is { } limit) t.PosMm = Math.Min(t.PosMm, limit);
+            }
             if (!TryTrainPose(w, t, 0, out var pos, out var dir)) continue;
             // Al cambiar de puesto en la cola, o al salir, avanza por la vía en vez de saltar.
             var catchUp = (float)(speed / 1000 * 2 * delta);
@@ -800,7 +896,7 @@ public partial class GameView : Node3D
         pos = Vector3.Zero;
         dir = Vector3.Forward;
         var spacing = (long)w.Content.Balance.Rail.TrainSpacingMm;
-        if (t.State != TrainState.Moving || t.Path.Count == 0)
+        if (!World.OnTrack(t.State) || t.Path.Count == 0)
         {
             if (w.RestPoint(t, w.PlatformSlot(t) * spacing - offsetMm) is not { } rest) return false;
             return Pose(w, rest.segment, rest.forward, rest.along, out pos, out dir);
@@ -832,7 +928,7 @@ public partial class GameView : Node3D
     {
         // Reconstruye el sentido del tramo desde el nodo de origen de la ruta.
         var end = t.CurrentNode;
-        var reached = t.State == TrainState.Moving ? t.PathIndex : t.Path.Count;
+        var reached = World.OnTrack(t.State) ? t.PathIndex : t.Path.Count;
         for (var i = reached - 1; i >= index; i--)
         {
             if (!w.RailSegments.TryGetValue(t.Path[i], out var s)) return true;
@@ -1030,7 +1126,11 @@ public partial class GameView : Node3D
         else if (e.IsActionPressed("rotate"))
         {
             if (_tool == Tool.Link) Belts.ToolNextRoute();
-            else if (_tool == Tool.Rail) _railShape = (byte)((_railShape + 1) % 3);
+            else if (_tool == Tool.Rail)
+            {
+                _railShape = (byte)((_railShape + 1) % RailModes);
+                if (_railShape == RailModeSignal) _railPlacing = false;
+            }
             else if (_tool == Tool.Build) _buildRot = (_buildRot + 1) % 4;
             if (_tool is Tool.Rail or Tool.Build) _rig.OnTap();
         }
@@ -1428,6 +1528,12 @@ public partial class GameView : Node3D
             case Tool.Rail:
                 if (!TryGroundPoint(out var ground)) break;
                 var (gx, gz) = RailSnap(ground);
+                if (_railShape == RailModeSignal)
+                {
+                    client.Send(new Command { Type = CommandType.ToggleSignal, A = gx, B = gz });
+                    Sfx.Play("build");
+                    break;
+                }
                 if (!_railPlacing)
                 {
                     _railStartX = gx;
@@ -1528,6 +1634,7 @@ public partial class GameView : Node3D
         AnimateMachines((float)delta);
         Belts.Process(client.World!, _body.GlobalPosition, (float)delta);
         UpdateTrains(delta);
+        UpdateSignals(delta);
         if (local != null) UpdateObjectiveMarker(client.World!, local);
         UpdateRemote(delta);
         UpdateAudio(delta);
@@ -1853,6 +1960,11 @@ public partial class GameView : Node3D
     private void UpdateRailGhost(World w, PlayerState me, ref string status, ref Color color)
     {
         status = Loc.T("rail_shape_" + _railShape);
+        if (_railShape == RailModeSignal)
+        {
+            UpdateSignalGhost(w, me, ref status, ref color);
+            return;
+        }
         if (!_railPlacing || !TryGroundPoint(out var p))
         {
             RemoveRailGhost();
@@ -1874,6 +1986,38 @@ public partial class GameView : Node3D
             _railGhost = new MeshInstance3D
             {
                 Mesh = Models.RailMesh(t => RailPoint(a, b, shape, t), RailMath.Length(a, b, shape, 2000) / 1000f),
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            };
+            AddChild(_railGhost);
+        }
+        if (_railGhost != null) _railGhost.MaterialOverride = error == null ? _ghostOk : _ghostBad;
+    }
+
+    /// <summary>Vista previa de la señal, con la misma regla que aplicará el servidor. Si ya hay una, dice que se va a quitar y qué muestra ahora.</summary>
+    private void UpdateSignalGhost(World w, PlayerState me, ref string status, ref Color color)
+    {
+        if (!TryGroundPoint(out var p))
+        {
+            RemoveRailGhost();
+            return;
+        }
+        var (x, z) = RailSnap(p);
+        var error = w.SignalError(me, x, z, out var credits);
+        if (error == null && w.Credits < credits) error = "err_cost";
+        var existing = w.RailNodes.Values.FirstOrDefault(n => n.Planet == me.Planet && n.X == x && n.Z == z && n.Signal);
+        status = error != null ? Loc.T(error)
+            : existing != null ? $"{Loc.T("signal_remove")} — {Loc.T("signal_state_" + w.SignalLightOf(existing.Id))}"
+            : $"{Loc.T("signal_place")} — {credits} ¤";
+        color = error == null ? Ui.Ink : Ui.Bad;
+        var key = $"signal,{x},{z}";
+        if (key != _railGhostKey)
+        {
+            RemoveRailGhost();
+            _railGhostKey = key;
+            _railGhost = new MeshInstance3D
+            {
+                Mesh = Models.SignalMast(),
+                Position = new Vector3(x * Cell, 0, z * Cell),
                 CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
             };
             AddChild(_railGhost);
@@ -2000,7 +2144,7 @@ public partial class GameView : Node3D
                 UpdateRemoval(w, me, ref status, ref statusColor, ref prompt, ref highlight, ref highlightColor);
                 break;
             case Tool.Rail:
-                prompt = Loc.T(_railPlacing ? "prompt_rail_to" : "prompt_rail_from");
+                prompt = Loc.T(_railShape == RailModeSignal ? "prompt_rail_signal" : _railPlacing ? "prompt_rail_to" : "prompt_rail_from");
                 UpdateRailGhost(w, me, ref status, ref statusColor);
                 break;
         }

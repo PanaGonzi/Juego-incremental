@@ -13,6 +13,8 @@
 - **No hecho:** revisión independiente de rendimiento (E-8).
 - **Mitigado sin resolver del todo:** BUG-005: causa medida y respuesta mejorada, pero con pérdida siguen los picos (T-023).
 
+**B-8, señales y desvíos:** implementado, con la regresión final **NO VERIFICADA**: se detuvo por falta de memoria del equipo. Detalle en T-024. No hay alfa exportada con señales; `0.5.0-qa5` no las incluye.
+
 **Pendiente con controles reales:** lista concreta en [PENDIENTE_CONTROLES_REALES](PENDIENTE_CONTROLES_REALES.md). Toma el foco y el ratón: solo cuando el titular no esté usando el equipo. No detiene el resto del trabajo.
 
 **El titular prueba:** nada registrado. Comentarios en [FEEDBACK](FEEDBACK.md).
