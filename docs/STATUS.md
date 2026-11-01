@@ -2,7 +2,7 @@
 
 **Última build estable:** `builds/alpha-0.4.1` (commit babc91c, etiqueta `alpha-0.4.1`, protocolo 4, guardado 4). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`.
 
-**Última build de prueba:** `builds/alpha-0.5.0-qa5` (protocolo 8, guardado 5; commit en su `VERSION.txt`). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`. Sin QA con entradas reales de Windows: la última es la de `0.5.0-qa2`.
+**Última build de prueba:** `builds/alpha-0.5.0-qa6` (protocolo 9, guardado 6; commit en su `VERSION.txt`). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`. Sin QA con entradas reales de Windows: la última es la de `0.5.0-qa2`.
 
 **Hitos:** M0, A0.1, A0.2, A0.4 y evento/offline de A0.5 implementados, con verificación en una sola máquina. A0.3 completo salvo Steam en el menú.
 
@@ -13,7 +13,7 @@
 - **No hecho:** revisión independiente de rendimiento (E-8).
 - **Mitigado sin resolver del todo:** BUG-005: causa medida y respuesta mejorada, pero con pérdida siguen los picos (T-023).
 
-**B-8, señales y desvíos:** implementado, con la regresión final **NO VERIFICADA**: se detuvo por falta de memoria del equipo. Detalle en T-024. No hay alfa exportada con señales; `0.5.0-qa5` no las incluye.
+**B-8, señales y desvíos:** primer sistema implementado y comprobado con órdenes automáticas en un PC (T-024). Con entradas reales: **NO VERIFICADO**.
 
 **Pendiente con controles reales:** lista concreta en [PENDIENTE_CONTROLES_REALES](PENDIENTE_CONTROLES_REALES.md). Toma el foco y el ratón: solo cuando el titular no esté usando el equipo. No detiene el resto del trabajo.
 

@@ -7,7 +7,7 @@
 - **Bloqueos exactos:** ver [STATUS](STATUS.md). Todos requieren al titular.
 - **Pruebas pendientes:** «Sin verificar» en [TEST_REPORTS](TEST_REPORTS.md).
 - **Agentes:** ninguno activo. Las ramas `agente/*` ya están integradas en `evolucion-0.5`.
-- **Siguiente tarea concreta:** con memoria libre, repetir la regresión de T-024 (xUnit, exportar `dev`, `signals`, `rail`, `manage`, bucle, `coopfactory` con anfitrión y dedicado, 12 clientes), mirar las capturas del foco de `signals` y, si todo pasa, exportar `0.5.0-qa6`. Después, la primera con pendiente en el [ROADMAP](ROADMAP.md). Con el equipo libre, además, [PENDIENTE_CONTROLES_REALES](PENDIENTE_CONTROLES_REALES.md).
+- **Siguiente tarea concreta:** las seis tareas del encargo vigente están hechas, con sus límites en [STATUS](STATUS.md) y T-024. Lo siguiente es la primera con pendiente en el [ROADMAP](ROADMAP.md), con INC-21 como arreglo menor. Con el equipo libre, además, [PENDIENTE_CONTROLES_REALES](PENDIENTE_CONTROLES_REALES.md).
 - **Pruebas sin molestar al titular:** `auto-test`, `coop-test` y `host-test` abren sin sonido y en un monitor secundario (`tools/lib-ventana.ps1`). En `auto-test`, `-NoCapture` evita capturar el ratón. Mientras use el equipo, no ejecutar `PlayDriver`, ni `fp` o el bucle sin `-NoCapture`: capturan el ratón. El titular lo pidió el 01-11-2026.
 - **Pruebas visuales:** `tools/PlayDriver`. Una sola sesión a la vez; siempre perfil `test*`.
 - **Cuidado:**

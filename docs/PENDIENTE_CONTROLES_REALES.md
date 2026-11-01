@@ -6,7 +6,7 @@ Hasta que se hagan, todo lo que aparece aquí está **NO VERIFICADO** con entrad
 
 ## Base: repetir sobre la última versión
 
-La última sesión con entradas reales fue la de `0.5.0-qa2`.
+La última sesión con entradas reales fue la de `0.5.0-qa2`. La versión actual es `0.5.0-qa6`.
 
 - [ ] Primera experiencia: de partida nueva a vender, y hasta donde se llegue (en qa2, el objetivo 10 de 23).
 - [ ] Escenario `fp` y bucle completo sin `-NoCapture`: captura del ratón y comprobaciones de entrada (`InputPaths`).
