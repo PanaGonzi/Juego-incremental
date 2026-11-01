@@ -412,7 +412,7 @@ public class BeltRouteTests
             var a = BeltTests.Place(w, p, "storage_crate", -85, z);
             var b = BeltTests.Place(w, p, "storage_crate", 85, z);
             extractors.Add(BeltTests.Lay(w, p, a, b));
-            a.In.Add("ore", 100000);
+            
         }
         var rng = new Random(7);
         var raw = 0L;
@@ -420,9 +420,9 @@ public class BeltRouteTests
         var hops = 0L;
         for (var second = 0; second < 30; second++)
         {
-            // Hueco aleatorio en la entrada para imitar un flujo irregular.
+// Entrada irregular y escasa: el peor caso para codificar por tramos.
             foreach (var l in extractors)
-                if (rng.Next(3) == 0) l.Slots[0] = null;
+                w.Machines[l.From].In.Add("ore", rng.Next(0, 4));
             for (var t = 0; t < 10; t++)
             {
                 var clock = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -485,18 +485,19 @@ public class BeltRouteNetworkTests
         b.ResultReceived += (id, r) => { if (id == ib) resB = r; };
         h.Pump(() => resA != null && resB != null);
 
-        Assert.True(resA!.Value.Ok);
-        Assert.False(resB!.Value.Ok);
-        Assert.Equal("err_belt_stale", resB.Value.Error);
+// Gana quien llega antes al servidor; el otro recibe el motivo y no gasta nada.
+        Assert.True(resA!.Value.Ok != resB!.Value.Ok);
+        Assert.Equal("err_belt_stale", resA.Value.Ok ? resB.Value.Error : resA.Value.Error);
         Assert.Single(world.Links);
-        Assert.Equal(ra, world.Links.Values.Single().Cells);
-        Assert.Equal(credits - ra.Count * world.Content.Balance.BeltCreditsPerCell, world.Credits);
+        var built = resA.Value.Ok ? ra : rb;
+        Assert.Equal(built, world.Links.Values.Single().Cells);
+        Assert.Equal(credits - built.Count * world.Content.Balance.BeltCreditsPerCell, world.Credits);
         _ = pa; _ = pb; _ = right2;
 
         // Ambos clientes ven lo mismo y siguen sincronizados.
         var checks = a.HashChecks;
         h.Pump(() => a.HashChecks >= checks + 2 && b.HashChecks >= checks + 2, 20000);
-        Assert.Equal(ra, b.World!.Links.Values.Single().Cells);
+        Assert.Equal(built, b.World!.Links.Values.Single().Cells);
         Assert.Equal(0, a.HashMismatches + b.HashMismatches);
     }
 

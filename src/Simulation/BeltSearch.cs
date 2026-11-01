@@ -136,13 +136,23 @@ public sealed partial class World
         private int Heuristic(int x, int z) =>
             (Math.Max(0, Math.Max(_minX - x, x - _maxX)) + Math.Max(0, Math.Max(_minZ - z, z - _maxZ))) * StepCost;
 
+        /// <summary>Además de la distancia, la curva inevitable: sin esto, en campo abierto se explora todo el rectángulo.</summary>
+        private int Remaining(int x, int z, int d)
+        {
+            var needX = x < _minX || x > _maxX;
+            var needZ = z < _minZ || z > _maxZ;
+            var alongX = d % 2 == 1;
+            var turnsNeeded = needX && needZ || needX && !alongX || needZ && alongX;
+            return Heuristic(x, z) + (turnsNeeded ? TurnCost : 0);
+        }
+
         private void Seed(int x, int z, int d, int cost)
         {
             var key = Key(x, z, d);
             if (_best.ContainsKey(key)) return;
             _best[key] = (cost + StepCost, -1);
             _starts.Add(key);
-            _open.Enqueue(key, Priority(cost + StepCost + Heuristic(x, z), key));
+            _open.Enqueue(key, Priority(cost + StepCost + Remaining(x, z, d), key));
         }
 
         // f, luego lo que falta (prefiere lo más avanzado: en campo abierto evita explorar todas las rutas iguales) y la celda como desempate total.
@@ -210,7 +220,7 @@ public sealed partial class World
         {
             var (x, z, d) = Decode(key);
             var g = _best[key].g;
-            if (g + Heuristic(x, z) < f) return; // entrada obsoleta
+            if (g + Remaining(x, z, d) < f) return; // entrada obsoleta
             var crossing = _w._beltCells.ContainsKey((_planet, x, z));
             if (!crossing && _goals.TryGetValue((x, z), out var goal))
             {
@@ -240,7 +250,7 @@ public sealed partial class World
                 var next = Key(nx, nz, nd);
                 if (_best.TryGetValue(next, out var seen) && seen.g <= cost) continue;
                 _best[next] = (cost, key);
-                _open.Enqueue(next, Priority(cost + Heuristic(nx, nz), next));
+                _open.Enqueue(next, Priority(cost + Remaining(nx, nz, nd), next));
             }
         }
 
