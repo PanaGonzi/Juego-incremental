@@ -87,6 +87,9 @@ public sealed partial class World
     private bool BeltCellFree(int planet, int x, int z) =>
         !_beltCells.ContainsKey((planet, x, z)) && !GroundBlocked(planet, x, z, Content.Planets.First(p => p.Id == planet).HalfSizeCells);
 
+    /// <summary>Máquina que ocupa una celda, o -1.</summary>
+    public int MachineAt(int planet, int x, int z) => _occupied.TryGetValue((planet, x, z), out var id) ? id : -1;
+
     /// <summary>Cinta que ocupa una celda; si hay cruce, la de abajo. -1 si no hay ninguna.</summary>
     public int BeltAt(int planet, int x, int z) =>
         _beltCells.TryGetValue((planet, x, z), out var use) ? (use.a >= 0 ? use.a : use.b) : -1;

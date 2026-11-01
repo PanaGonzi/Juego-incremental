@@ -12,7 +12,8 @@ public partial class BeltView : Node3D
     private const float Cell = 2f;
     private const float BandY = 0.46f;       // superficie de la banda sobre el suelo
     private const float BridgeY = 1.42f;     // en un cruce, por encima de la carga de la otra cinta
-    private const float ElevatedY = 3.7f;    // cintas migradas sin ruta: sobre las máquinas
+    private const float ElevatedY = 3.7f;    // cintas migradas sin ruta: altura mínima
+    private const float ElevatedClearance = 0.7f;
     private const float HalfWidth = 0.5f;
     private const float SlotLength = Cell / 4f;
     private const float MaxItemSize = 0.42f;
@@ -153,7 +154,7 @@ public partial class BeltView : Node3D
     private BeltVisual Build(World w, Link l, string key)
     {
         var points = l.Elevated ? ElevatedPath(w, l) : RoutePath(w, l.From, l.To, l.Cells, i => w.IsBridge(l, i));
-        var mesh = BuildMesh(points, l.Elevated, l.Elevated ? null : l, w);
+        var mesh = BuildMesh(points, l.Elevated, l, w);
         var node = new MeshInstance3D
         {
             Mesh = mesh,
@@ -239,11 +240,20 @@ public partial class BeltView : Node3D
     {
         var (ax, az) = w.MachineCenterMm(w.Machines[l.From]);
         var (bx, bz) = w.MachineCenterMm(w.Machines[l.To]);
-        var a = new Vector3(ax / 1000f, ElevatedY, az / 1000f);
-        var b = new Vector3(bx / 1000f, ElevatedY, bz / 1000f);
+        // Pasa por encima de la más alta de las dos: nunca atraviesa sus propias máquinas.
+        var top = Mathf.Max(TopOf(w.Machines[l.From].Def), TopOf(w.Machines[l.To].Def));
+        var y = Mathf.Max(ElevatedY, top + ElevatedClearance);
+        var a = new Vector3(ax / 1000f, y, az / 1000f);
+        var b = new Vector3(bx / 1000f, y, bz / 1000f);
         var points = new Vector3[l.Slots.Length + 1];
         for (var i = 0; i < points.Length; i++) points[i] = a.Lerp(b, i / (float)l.Slots.Length);
         return points;
+    }
+
+    private static float TopOf(string def)
+    {
+        var aabb = Models.Machine(def).Body.GetAabb();
+        return aabb.Position.Y + aabb.Size.Y;
     }
 
     // ---------- Geometría ----------
@@ -312,6 +322,16 @@ public partial class BeltView : Node3D
         return flat.Normalized().Cross(Vector3.Up).Normalized();
     }
 
+    private static bool MachineUnder(World w, int planet, Vector3 at, Vector3 side)
+    {
+        foreach (var sign in new[] { -1f, 1f })
+        {
+            var q = at + side * sign * (HalfWidth + 0.15f);
+            if (w.MachineAt(planet, Mathf.FloorToInt(q.X / Cell), Mathf.FloorToInt(q.Z / Cell)) >= 0) return true;
+        }
+        return false;
+    }
+
     private static ArrayMesh BuildMesh(Vector3[] p, bool elevated, Link? link, World w)
     {
         var band = new Geometry();
@@ -362,11 +382,19 @@ public partial class BeltView : Node3D
             var s = Side(t);
             frame.Box(p[i] + Vector3.Down * 0.05f, new Vector3(HalfWidth + 0.1f, 0.13f, 0.13f), s, Vector3.Up, t, Support);
         }
+        if (elevated)
+        {
+            // Postes que apoyan los extremos sobre el techo de cada máquina.
+            foreach (var i in new[] { 0, p.Length - 1 })
+                frame.Box(p[i] + Vector3.Down * (ElevatedClearance / 2 + 0.1f), new Vector3(0.1f, ElevatedClearance / 2 + 0.05f, 0.1f), Vector3.Right, Vector3.Up, Vector3.Back, Support);
+        }
         var step = elevated ? 16 : 4;
         for (var i = elevated ? 8 : 2; i < p.Length - 1; i += step)
         {
             var t = Tangent(p, i);
             var s = Side(t);
+            // Las elevadas pasan sobre máquinas: ahí no hay pata que atraviese nada.
+            if (elevated && link != null && MachineUnder(w, link.Planet, p[i], s)) continue;
             var top = p[i].Y - 0.16f;
             var legHalf = top / 2;
             var bridgeLeg = p[i].Y > BandY + 0.3f;
@@ -586,6 +614,9 @@ public partial class BeltView : Node3D
         distance = nearest;
         return best;
     }
+
+    /// <summary>Punto medio de la banda; para apuntar desde las pruebas.</summary>
+    public Vector3 CenterOfBelt(int id) => _belts.TryGetValue(id, out var v) ? v.Points[v.Points.Length / 2] : Vector3.Zero;
 
     /// <summary>Texto de inspección: lee de World, no de la copia visual.</summary>
     public static string Describe(World w, int id, out BeltStatus status)

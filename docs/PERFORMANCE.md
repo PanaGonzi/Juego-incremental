@@ -31,6 +31,22 @@ Tick presupuestado: 100 ms. Las reducciones: compresión compartida, ruta del tr
 
 Anfitrión + 11 en el medio: tick 0,40 ms, p99 3,45, tardíos 0, subida ~660 kbit/s.
 
+## Cintas con carga real (0.5, en desarrollo)
+
+`tools/net-test.ps1`, servidor dedicado + 12 clientes, 60 s (estrés 40 s). Medias con los 12 conectados, sin la primera muestra (reparto de instantáneas). Mismo equipo, con otros procesos de desarrollo a la vez: el tick es orientativo.
+
+| Escenario | Tick medio | p99 máx. | Tardíos | Envío total | Por cliente | Memoria | Divergencias |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Medio, enlaces antiguos (53e1df0) | 0,357 ms | 4,36 | 0 | 702 kbit/s | 58 kbit/s | 58 MB | 0 |
+| Medio, cintas (511 máquinas) | 0,358 ms | 4,61 | 0 | 776 kbit/s | 65 kbit/s | 58 MB | 0 |
+| Estrés, cintas (2011 máquinas) | 1,056 ms | 9,74 | 0 | 2019 kbit/s | 168 kbit/s | 75 MB | 0 |
+
+Los mundos de medición llevan cintas rectas con carga y una línea saturada de cada tres grupos; `Measurement_belts_are_valid_and_carry_real_cargo` comprueba que al menos el 90 % de las cintas mueve carga. Antes y después no son el mismo mundo: el de cintas tiene más máquinas y otra disposición.
+
+Búsqueda de ruta fallida (peor caso probado): unos 15 ms con la batería de pruebas en paralelo. No afecta al juego normal; varios clientes abusando del comando sí podrían notarlo.
+
+**Cliente con cintas (`--measure medium`): NO VERIFICADO.** Cada cinta es una malla propia con dos superficies, y la carga, un `MultiMesh` por objeto.
+
 ## Ensayo sostenido
 
 60 min, 12 clientes, 100 ms/2 %, medio, sobre 0.4.0: memoria 63→66 MB, tick 0,23-0,33 ms, p99 máx. 38 ms, 0 tardíos, envío medio 449-743 kbit/s, picos de hasta 10310 kbit/s al repartir instantáneas. Ver T-015. Ensayo anterior sobre 0.2.0: T-012.

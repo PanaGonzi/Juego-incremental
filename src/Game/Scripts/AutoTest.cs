@@ -891,7 +891,7 @@ public partial class AutoTest : Node
         }
         world.Credits = 5000;
         var depot = world.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
-        depot.In.Add("recovered", 300);
+        depot.In.Add("recovered", 600); // más que el almacén y la cinta juntos: el atasco debe llenar la cinta entera
         depot.In.Add("ingot", 100);
         world.Upgrades.Add("tech_assembly");
         world.Reindex();
@@ -969,7 +969,7 @@ public partial class AutoTest : Node
         var lineAim = new Vector3((lineMid.x + 0.5f) * 2, 0.5f, (lineMid.z + 0.5f) * 2);
         await WalkTo(lineAim + new Vector3(5, -0.5f, 3));
         v.AimAt(lineAim);
-        Check(await Until(() => W.Links[line.Id].Load >= W.Links[line.Id].Slots.Length - 1, 25), "cinta casi saturada");
+        Check(await Until(() => W.Links[line.Id].Load >= W.Links[line.Id].Slots.Length - 1, 60), "cinta casi saturada");
         await Wait(1.2);
         await Shot("belt_05_carga_densa");
         Check(await Until(() => W.BeltStatusOf(W.Links[line.Id]) == BeltStatus.BlockedFull, 110), $"la cinta se atasca con el destino lleno: {W.Machines[full.Id].In.Get("recovered")}");
@@ -1008,8 +1008,13 @@ public partial class AutoTest : Node
         {
             var a = CenterOf(W.Machines[elevated.From]);
             var b = CenterOf(W.Machines[elevated.To]);
-            var mid = (a + b) / 2 + new Vector3(0, 2.5f, 0);
-            await WalkTo(new Vector3(mid.X + 6, 0, mid.Z + 6));
+            // Desde lejos y de lado: el rayo llega a la cinta por encima de las máquinas que une.
+            var lateral = new Vector3(a.Z - b.Z, 0, b.X - a.X).Normalized(); // en este guardado, el lado sin máquinas
+            var ground = (a + b) / 2;
+            ground.Y = 0;
+            var stand = ground + lateral * 24f;
+            await WalkTo(stand, 15);
+            var mid = v.Belts.CenterOfBelt(elevated.Id);
             v.AimAt(mid);
             await Wait(0.5);
             Check(v.AimTarget == ("belt", elevated.Id), $"la elevada se puede apuntar: {v.AimTarget}");
