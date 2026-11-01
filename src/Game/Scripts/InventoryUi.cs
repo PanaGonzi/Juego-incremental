@@ -237,7 +237,10 @@ public partial class InventoryUi : Control
     private readonly Dictionary<string, ItemSlot> _bagSlots = new();
     private readonly Dictionary<string, ItemSlot> _machineSlots = new();
 
-    private Label _detailTitle = null!, _detailBody = null!, _help = null!;
+    private Label _detailTitle = null!, _detailBody = null!, _help = null!, _stockLine = null!;
+    private Button _closeButton = null!;
+    private string _detailItem = "";
+    private bool _detailInBag;
     private HBoxContainer _splitRow = null!;
     private HSlider _splitSlider = null!;
     private Label _splitLabel = null!;
@@ -296,7 +299,8 @@ public partial class InventoryUi : Control
         tabs.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
         _credits = Ui.Text("", 22, Ui.Amber);
         tabs.AddChild(_credits);
-        tabs.AddChild(Ui.Btn($"{Loc.T("panel_close")} [{Controls.KeyName("inventory")}]", Close));
+        _closeButton = Ui.Btn($"{Loc.T("panel_close")} [{Controls.KeyName("inventory")}]", Close);
+        tabs.AddChild(_closeButton);
 
         var pages = new Control { SizeFlagsVertical = SizeFlags.ExpandFill };
         root.AddChild(pages);
@@ -342,6 +346,10 @@ public partial class InventoryUi : Control
         _bagEmpty.CustomMinimumSize = new Vector2(320, 0);
         bagBody.AddChild(_bagEmpty);
         _bagGrid = ScrollGrid(bagBody, 5);
+        // Lo desmontado acaba aquí: se ve qué hay y se sabe que se usa solo (INC-17).
+        _stockLine = Ui.Text("", 14, Ui.Dim);
+        _stockLine.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        bagBody.AddChild(_stockLine);
 
         var machine = Column("", out var machineBody, new DropColumnFactory(false));
         columns.AddChild(machine);
@@ -531,6 +539,8 @@ public partial class InventoryUi : Control
         _tabCatalog.Text = $"{Loc.T("inv_catalog")} [{Controls.KeyName("tool_build")}]";
         _tabItems.Modulate = tab == InventoryTab.Items ? new Color(1.3f, 1.1f, 0.7f) : Colors.White;
         _tabCatalog.Modulate = tab == InventoryTab.Catalog ? new Color(1.3f, 1.1f, 0.7f) : Colors.White;
+        // Cada pestaña se cierra con su propia tecla: en el catálogo, Tab lleva al inventario como indica esa pestaña.
+        _closeButton.Text = $"{Loc.T("panel_close")} [{Controls.KeyName(tab == InventoryTab.Items ? "inventory" : "tool_build")}]";
         _help.Text = Loc.T(tab == InventoryTab.Items ? "inv_help_items" : "inv_help_catalog");
         _catalogSignature = "";
     }
@@ -600,6 +610,32 @@ public partial class InventoryUi : Control
         foreach (var (_, id) in list.OrderBy(x => x.d)) _nearby.Add(id);
     }
 
+    private void RefreshStock(World w, PlayerState me)
+    {
+        var totals = new SortedDictionary<string, long>(StringComparer.Ordinal);
+        foreach (var m in w.Machines.Values)
+        {
+            if (m.Planet != me.Planet || w.Content.Machines[m.Def].Kind is not (MachineKind.Storage or MachineKind.Terminal or MachineKind.Station or MachineKind.CargoPad)) continue;
+            foreach (var (item, qty) in m.In.Items) totals[item] = totals.GetValueOrDefault(item) + qty;
+        }
+        _stockLine.Text = Loc.T("inv_planet_stock", totals.Count == 0 ? Loc.T("hud_empty") : Ui.Amounts(totals));
+    }
+
+    /// <summary>La ficha muestra siempre la cantidad actual; si ya no queda nada de ese objeto, se vacía (INC-12).</summary>
+    private void RefreshDetail(Machine? machine, PlayerState me)
+    {
+        if (_detailItem.Length == 0) return;
+        var have = _detailInBag ? me.Bag.Get(_detailItem) : machine == null ? 0 : machine.In.Get(_detailItem) + machine.Out.Get(_detailItem);
+        if (have > 0)
+        {
+            _detailTitle.Text = $"{Loc.T("item_" + _detailItem)}   ·   {have:N0}";
+            return;
+        }
+        _detailItem = "";
+        _detailTitle.Text = Loc.T("inv_detail_hint");
+        _detailBody.Text = "";
+    }
+
     private void CycleMachine(int direction)
     {
         if (_nearby.Count == 0) return;
@@ -638,6 +674,8 @@ public partial class InventoryUi : Control
         }
         Sync(_bagGrid, _bagSlots, bagTip, true);
         _bagEmpty.Visible = _bagSlots.Count == 0;
+        RefreshStock(w, me);
+        RefreshDetail(machine, me);
         _bagGrid.Visible = _bagSlots.Count > 0;
 
         if (machine == null)
@@ -743,6 +781,8 @@ public partial class InventoryUi : Control
     {
         var w = _view.Session.Client.World;
         if (w == null) return;
+        _detailItem = slot.Item;
+        _detailInBag = slot.InBag;
         _detailTitle.Text = $"{Loc.T("item_" + slot.Item)}   ·   {slot.Quantity:N0}";
         var (uses, sources) = Uses(w, slot.Item);
         var lines = new List<string> { Loc.T("item_" + slot.Item + "_d") };
@@ -878,7 +918,10 @@ public partial class InventoryUi : Control
         var verdict = Ui.Text(EntryInfo.MissingText(w, me, def), 16, w.CanAfford(me, def.Credits, def.Cost) ? Ui.Good : Ui.Bad);
         verdict.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _costList.AddChild(verdict);
-        _costList.AddChild(Ui.Text(Loc.T("inv_catalog_pin"), 14, Ui.Dim));
+        // Con ajuste de línea: un texto largo sin ajustar ensanchaba la columna y movía las pestañas (INC-13).
+        var pin = Ui.Text(Loc.T("inv_catalog_pin"), 14, Ui.Dim);
+        pin.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _costList.AddChild(pin);
     }
 
     private static Control CostRow(string? item, long need, long have)

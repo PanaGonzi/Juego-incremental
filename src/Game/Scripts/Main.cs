@@ -206,7 +206,13 @@ public sealed class Settings
     public float MachineVolume { get; set; } = 0.6f;
     public float UiScale { get; set; } = 1f;
     public string Language { get; set; } = "es";
+    /// <summary>Guardados antiguos: solo se lee si DisplayMode no está decidido.</summary>
     public bool Fullscreen { get; set; }
+    /// <summary>0 ventana, 1 pantalla completa sin bordes, 2 pantalla completa exclusiva; −1 aún sin elegir.</summary>
+    public int DisplayMode { get; set; } = -1;
+    /// <summary>Tamaño de la ventana en modo ventana; 0 conserva el de arranque.</summary>
+    public int WindowWidth { get; set; }
+    public int WindowHeight { get; set; }
     public bool CameraBob { get; set; } = true;
     public float BobIntensity { get; set; } = 1f;
     public List<string> Hotbar { get; set; } = new();
@@ -243,9 +249,26 @@ public sealed class Settings
     public void Save() =>
         File.WriteAllText(_path, System.Text.Json.JsonSerializer.Serialize(this, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
 
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int EffectiveDisplayMode => DisplayMode >= 0 ? DisplayMode : Fullscreen ? 1 : 0;
+
     public void ApplyDisplay()
     {
-        DisplayServer.WindowSetMode(Fullscreen ? DisplayServer.WindowMode.Fullscreen : DisplayServer.WindowMode.Windowed);
+        var mode = EffectiveDisplayMode;
+        DisplayServer.WindowSetMode(mode switch
+        {
+            2 => DisplayServer.WindowMode.ExclusiveFullscreen,
+            1 => DisplayServer.WindowMode.Fullscreen,
+            _ => DisplayServer.WindowMode.Windowed,
+        });
+        if (mode == 0 && WindowWidth > 0 && WindowHeight > 0)
+        {
+            // Nunca mayor que el área útil de la pantalla actual, y centrada en ella.
+            var usable = DisplayServer.ScreenGetUsableRect(DisplayServer.WindowGetCurrentScreen());
+            var size = new Vector2I(Math.Min(WindowWidth, usable.Size.X), Math.Min(WindowHeight, usable.Size.Y));
+            DisplayServer.WindowSetSize(size);
+            DisplayServer.WindowSetPosition(usable.Position + (usable.Size - size) / 2);
+        }
         ((SceneTree)Engine.GetMainLoop()).Root.ContentScaleFactor = UiScale;
     }
 }

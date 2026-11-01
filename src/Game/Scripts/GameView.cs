@@ -126,6 +126,9 @@ public partial class GameView : Node3D
     private bool _working;
     private bool _suppressPrimary;
     private int _ignoreMotion;
+    private const float MaxLookStep = 900f;
+    private const ulong RemoveArmMs = 350;
+    private ulong _removeArmedAt;
     private Vector2 _lookAccum;
     private float _wallDistance = 9f;
     private float _kick;
@@ -576,20 +579,50 @@ public partial class GameView : Node3D
     private MeshInstance3D? _objectiveBeam;
     public bool ObjectiveMarkerVisible => _objectiveBeam is { Visible: true };
     public float ObjectiveDistance { get; private set; } = -1;
+    /// <summary>Destino del marcador del objetivo; el de la guía si falta algo. Null si no hay a dónde señalar.</summary>
+    public Vector3? ObjectivePoint { get; private set; }
+    public Vector3? DepotPoint { get; private set; }
+    public ObjectiveGuide Guide { get; private set; } = new();
+    public Camera3D Camera => _camera;
+    /// <summary>Partida a la vista, sin pantalla de carga.</summary>
+    public bool WorldShown => _worldReady && !_inFlight;
+    /// <summary>La flecha y el rombo sobre la pantalla: solo con la vista libre, sin paneles delante.</summary>
+    public bool PointerShown => WorldShown && !_paused && !_hud.PanelOpen && !_inv.IsOpen;
+    /// <summary>Altura a la que empieza la barra rápida: los paneles terminan antes.</summary>
+    public float HotbarTop => _hotbar.TopY;
+    private ulong _guideAt;
 
-    /// <summary>Haz de luz en el destino del objetivo actual. Si el objetivo no tiene lugar concreto, no se muestra.</summary>
+    /// <summary>Haz de luz, brújula y flecha apuntan al mismo sitio: el destino del objetivo o de lo que le falta. Depende de lo que hay en el mundo, no de ver la baliza.</summary>
     private void UpdateObjectiveMarker(World w, PlayerState me)
     {
         _objectiveBeam ??= CreateObjectiveBeam();
         ObjectiveDistance = -1;
+        ObjectivePoint = null;
         _objectiveBeam.Visible = false;
-        if (_inFlight || w.ObjectiveIndex >= w.Content.Objectives.Count) return;
-        var target = w.Content.Objectives[w.ObjectiveIndex].Target;
-        if (target == null) return;
         var from = _body.GlobalPosition;
-        var point = w.FindObjectiveTarget(target, me.Planet, (long)(from.X * 1000), (long)(from.Z * 1000));
+        var depot = w.DepotOf(me.Planet);
+        if (depot != null)
+        {
+            var (dx, dz) = w.MachineCenterMm(depot);
+            DepotPoint = new Vector3(dx / 1000f, 0, dz / 1000f);
+        }
+        else DepotPoint = null;
+        if (_inFlight || w.ObjectiveIndex >= w.Content.Objectives.Count) return;
+        // Cuatro veces por segundo basta: recorre máquinas y escombros.
+        var now = Time.GetTicksMsec();
+        if (now >= _guideAt)
+        {
+            _guideAt = now + 250;
+            Guide = w.GuideObjective(me);
+        }
+        if (Guide.Target == null) return;
+        var fx = (long)(from.X * 1000);
+        var fz = (long)(from.Z * 1000);
+        // Sin la máquina aún construida (o sin ella en este planeta), se señala el depósito para que la guía no se quede sin destino.
+        var point = w.FindObjectiveTarget(Guide.Target, me.Planet, fx, fz) ?? w.FindObjectiveTarget("machine:depot", me.Planet, fx, fz);
         if (point == null) return;
         var at = new Vector3(point.Value.x / 1000f, 0, point.Value.z / 1000f);
+        ObjectivePoint = at;
         ObjectiveDistance = new Vector2(at.X - from.X, at.Z - from.Z).Length();
         _objectiveBeam.Visible = ObjectiveDistance > 7;
         _objectiveBeam.GlobalPosition = at + Vector3.Up * 40;
@@ -876,6 +909,8 @@ public partial class GameView : Node3D
         {
             // Al recuperar el ratón llega un salto acumulado que no es movimiento del jugador.
             if (_ignoreMotion > 0) return;
+            // Un salto imposible de una sola vez no es movimiento del jugador: recuperar la ventana o el foco del sistema.
+            if (motion.Relative.LengthSquared() > MaxLookStep * MaxLookStep) return;
             var s = 0.0022f * _main.Prefs.Sensitivity;
             _yaw -= motion.Relative.X * s;
             _pitch = Mathf.Clamp(_pitch - motion.Relative.Y * s, -1.5f, 1.5f);
@@ -887,6 +922,7 @@ public partial class GameView : Node3D
         {
             if (_hud.ChatOpen) _hud.CloseChat();
             else if (_hud.PanelOpen && !_paused) _hud.ClosePanel();
+            else if (_paused && SettingsForm.Escape is { } back) back();
             else TogglePause();
             return;
         }
@@ -951,9 +987,16 @@ public partial class GameView : Node3D
         }
         else if (e.IsActionPressed("primary"))
         {
-            if (_tool != Tool.Cutter) Primary();
+            // Desmontar recién elegida no actúa: un clic que ya venía en camino no debe llevarse una máquina.
+            if (_tool != Tool.Cutter && !(_tool == Tool.Remove && Time.GetTicksMsec() < _removeArmedAt)) Primary();
         }
         else if (e.IsActionPressed("secondary")) Cancel();
+    }
+
+    /// <summary>Al volver el foco a la ventana, el sistema entrega de golpe el movimiento acumulado.</summary>
+    public override void _Notification(int what)
+    {
+        if (what == NotificationWMWindowFocusIn) _ignoreMotion = 3;
     }
 
     public int ChainSeed => _chain.Seed;
@@ -1040,8 +1083,16 @@ public partial class GameView : Node3D
         {
             case "cutter":
                 // Repetir la casilla de la herramienta la guarda y libera las manos.
-                if (_tool == Tool.Cutter && !_stowed) _stowed = true;
-                else SetTool(Tool.Cutter);
+                if (_tool == Tool.Cutter && !_stowed)
+                {
+                    _stowed = true;
+                    _hud.Toast(Loc.T("notice_stowed"), Ui.Ink);
+                }
+                else
+                {
+                    SetTool(Tool.Cutter);
+                    _hud.ClearToast();
+                }
                 return;
             case "link": SetTool(Tool.Link); return;
             case "remove": SetTool(Tool.Remove); return;
@@ -1177,6 +1228,11 @@ public partial class GameView : Node3D
     public void SetTool(Tool t)
     {
         if (_tool == Tool.Cutter && t != Tool.Cutter) _stowedBeforeTool = _stowed;
+        if (t == Tool.Remove && _tool != Tool.Remove)
+        {
+            _removeArmedAt = Time.GetTicksMsec() + RemoveArmMs;
+            _hud?.Toast(Loc.T("notice_remove_on"), Ui.Warn);
+        }
         _tool = t;
         _stowed = false;
         _hud.SetTool((int)t);
@@ -1813,6 +1869,9 @@ public partial class GameView : Node3D
     public static Vector3 ModelFront(MachineDef def, int rot) => Vector3.Back.Rotated(Vector3.Up, Mathf.DegToRad(ModelYawDegrees(def, rot)));
 
     public int BuildRotation => _buildRot;
+    /// <summary>0 lejos, 1 pegado a la pieza: a esa distancia las flechas de los puertos también se atenúan.</summary>
+    private float NearCellMarkFade { set { if (_cellMark != null) _cellMark.Transparency = value * 0.7f; _cellMarkFade = value; } }
+    private float _cellMarkFade;
     public string StatusText => _hud.StatusText;
 
     private void UpdateGhost(World w, PlayerState me, ref string status, ref Color color, ref string prompt)
@@ -1842,7 +1901,19 @@ public partial class GameView : Node3D
 
         var error = w.PlacementSiteError(me, _buildDef, x, z, _buildRot, out _);
         var afford = w.CanAfford(me, def.Credits, def.Cost);
-        ((MeshInstance3D)_ghost.GetChild(0)).MaterialOverride = error != null ? _ghostBad : afford ? _ghostOk : _ghostLacking;
+        var ghostMaterial = error != null ? _ghostBad : afford ? _ghostOk : _ghostLacking;
+        // De cerca la pieza llenaría la pantalla: se aclara al acercarse y, dentro de ella, queda solo la marca del suelo.
+        var cam = _camera.GlobalPosition;
+        var radius = Mathf.Max(fw, fd) * Cell / 2f;
+        var away = new Vector2(cam.X - _ghost.GlobalPosition.X, cam.Z - _ghost.GlobalPosition.Z).Length() - radius;
+        var fade = Mathf.Clamp((away - 1f) / 6f, 0f, 1f);
+        var ghostMesh = (MeshInstance3D)_ghost.GetChild(0);
+        ghostMesh.Visible = away > 0.2f;
+        var tint = ghostMaterial.AlbedoColor;
+        tint.A = Mathf.Lerp(0.06f, 0.42f, fade);
+        ghostMaterial.AlbedoColor = tint;
+        ghostMesh.MaterialOverride = ghostMaterial;
+        NearCellMarkFade = 1f - fade;
         if (error != null) status += "\n" + Loc.T(error);
         if (!afford) status += "\n" + EntryInfo.MissingText(w, me, def);
         if (error != null || !afford) color = error != null ? Ui.Bad : Ui.Warn;
@@ -1988,7 +2059,7 @@ public partial class GameView : Node3D
             foreach (var v in new[] { neck + lift - Vector3.Up * 0.34f, neck + lift + Vector3.Up * 0.34f, tip + lift }) st.AddVertex(v);
         }
         if (set.Count == 0 && !anyPort) return;
-        _cellMark = new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = CellMarkMaterial, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        _cellMark = new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = CellMarkMaterial, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Transparency = _tool == Tool.Build ? _cellMarkFade * 0.7f : 0f };
         AddChild(_cellMark);
     }
 

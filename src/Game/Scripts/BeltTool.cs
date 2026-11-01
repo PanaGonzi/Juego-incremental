@@ -105,7 +105,7 @@ public partial class BeltView
             plan.Reset();
             return Loc.T("prompt_link_from");
         }
-        ShowPorts(w, destination ?? origin, destination != null ? origin : null, plan.ToPort ?? plan.FromPort, stamp, plan.FromPort);
+        ShowPorts(w, destination ?? origin, destination != null ? origin : null, plan.EntryPort ?? plan.FromPort, stamp, plan.FromPort);
         UpdateMarkers(w, plan);
         UpdatePreviewMesh(w, plan);
         DescribePlan(w, me, plan, ref status, ref color);
@@ -133,8 +133,14 @@ public partial class BeltView
         if (aimed != null && aimed.Id != plan.From && w.CanReceiveByBelt(w.Content.Machines[aimed.Def]))
         {
             _destinationLost = 0;
-            UpdateHover(aimed, false, aimPoint, w);
-            plan.SetDestination(aimed.Id, _hoverPort);
+            // Por omisión, la búsqueda elige la entrada más directa: apuntar a la máquina no obliga a rodearla (INC-10).
+            // Elegir conector a mano, con su tecla, fija ese y deja de seguir a la puntería.
+            if (_manualPorts)
+            {
+                UpdateHover(aimed, false, aimPoint, w);
+                plan.SetDestination(aimed.Id, _hoverPort);
+            }
+            else plan.SetDestination(aimed.Id, null);
             return;
         }
         if (plan.To >= 0)

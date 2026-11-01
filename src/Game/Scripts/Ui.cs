@@ -102,6 +102,14 @@ public static class Ui
         return parts.Count == 0 ? "—" : string.Join(", ", parts);
     }
 
+    /// <summary>Lo que falta y cuánto hay: «3 Lingotes (7/10), 50 ¤ (150/200)». Vacío si no falta nada.</summary>
+    public static string Missing(CostReport report)
+    {
+        var parts = report.Missing.Select(l => $"{l.Short} {Loc.T("item_" + l.Item)} ({l.Have}/{l.Need})").ToList();
+        if (report.CreditsShort > 0) parts.Add($"{report.CreditsShort} ¤ ({report.CreditsHave}/{report.CreditsNeed})");
+        return string.Join(", ", parts);
+    }
+
     public static string Cost(long credits, Dictionary<string, long> items)
     {
         var parts = new List<string>();
@@ -115,14 +123,15 @@ public static class Ui
 public partial class Hud : Control
 {
     private readonly GameView _view;
-    private Label _credits = null!, _power = null!, _income = null!, _objective = null!, _objectiveStep = null!, _objectiveReward = null!, _objectiveCount = null!, _bag = null!, _prompt = null!, _status = null!, _players = null!, _chatLog = null!, _toast = null!;
+    private Label _credits = null!, _power = null!, _income = null!, _objective = null!, _objectiveNeed = null!, _objectiveStep = null!, _objectiveReward = null!, _objectiveCount = null!, _bag = null!, _prompt = null!, _status = null!, _players = null!, _chatLog = null!, _toast = null!;
     private readonly List<PanelContainer> _toolSlots = new();
     private readonly List<(Label label, string key)> _toolNames = new();
     private ProgressBar _powerBar = null!, _objectiveBar = null!;
     private int _meterId = -1;
     private long _meterProgress;
     private double _meterTime;
-    private PanelContainer _center = null!;
+    private PanelContainer _center = null!, _objectivePanel = null!, _promptPanel = null!;
+    private ScrollContainer _centerScroll = null!;
     private VBoxContainer _centerBody = null!;
     private LineEdit _chatInput = null!;
     private float _toastTime;
@@ -130,6 +139,7 @@ public partial class Hud : Control
     private readonly Queue<(double time, long total)> _earnings = new();
     private double _elapsed;
     private double _nextEarning;
+    private const double IncomeWindow = 300;
     private double _panelRefresh;
     private Action? _panelBuilder;
     public LookReadout Look { get; private set; } = null!;
@@ -161,8 +171,11 @@ public partial class Hud : Control
         var top = new PanelContainer { MouseFilter = MouseFilterEnum.Ignore };
         top.SetAnchorsAndOffsetsPreset(LayoutPreset.CenterTop);
         top.GrowHorizontal = GrowDirection.Both;
-        top.OffsetTop = 16;
+        top.OffsetTop = 6 + Compass.Height + 18;
         AddChild(top);
+        _objectivePanel = top;
+        AddChild(new Compass(_view));
+        AddChild(new ObjectivePointer(_view));
         var topBox = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
         topBox.AddThemeConstantOverride("separation", UiTheme.S);
         top.AddChild(topBox);
@@ -175,6 +188,10 @@ public partial class Hud : Control
         _objective.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _objective.CustomMinimumSize = new Vector2(760, 0);
         topBox.AddChild(_objective);
+        _objectiveNeed = Ui.Text("", UiTheme.Small, Ui.Warn);
+        _objectiveNeed.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _objectiveNeed.Visible = false;
+        topBox.AddChild(_objectiveNeed);
         _objectiveBar = Ui.Bar(0, 1, Ui.Amber, 8);
         _objectiveCount = Ui.Text("", UiTheme.Caption, Ui.Dim);
         var progressRow = Ui.Row(UiTheme.M, _objectiveBar, _objectiveCount);
@@ -222,18 +239,24 @@ public partial class Hud : Control
         cross.OffsetLeft = -2; cross.OffsetRight = 2; cross.OffsetTop = -2; cross.OffsetBottom = 2;
         AddChild(cross);
 
+        // Fondo propio: el texto se lee igual sobre máquinas, chatarra, cuadrícula o la herramienta en la mano (INC-05).
+        _promptPanel = new PanelContainer { MouseFilter = MouseFilterEnum.Ignore, Visible = false };
+        _promptPanel.AddThemeStyleboxOverride("panel", SlotStyle.Box(new Color(0.03f, 0.04f, 0.05f, 0.78f), new Color(0, 0, 0, 0), 0, 6, 8));
+        _promptPanel.SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
+        _promptPanel.GrowHorizontal = GrowDirection.Both;
+        _promptPanel.GrowVertical = GrowDirection.End;
+        _promptPanel.OffsetTop = 34;
+        _promptPanel.OffsetBottom = 34;
+        AddChild(_promptPanel);
         var promptBox = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
-        promptBox.SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
-        promptBox.GrowHorizontal = GrowDirection.Both;
-        promptBox.OffsetTop = 34;
-        promptBox.OffsetBottom = 120;
-        AddChild(promptBox);
+        promptBox.AddThemeConstantOverride("separation", 2);
+        _promptPanel.AddChild(promptBox);
         _status = Ui.Text("", 20);
         _status.HorizontalAlignment = HorizontalAlignment.Center;
         _status.AddThemeConstantOverride("outline_size", 5);
         _status.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.8f));
         promptBox.AddChild(_status);
-        _prompt = Ui.Text("", 16, Ui.Amber);
+        _prompt = Ui.Text("", 16, new Color(1f, 0.82f, 0.45f));
         _prompt.HorizontalAlignment = HorizontalAlignment.Center;
         _prompt.AddThemeConstantOverride("outline_size", 4);
         _prompt.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.8f));
@@ -273,9 +296,12 @@ public partial class Hud : Control
         _center.GrowHorizontal = GrowDirection.Both;
         _center.GrowVertical = GrowDirection.Both;
         AddChild(_center);
-        _centerBody = new VBoxContainer();
+        // Con desplazamiento propio: un panel más alto que el hueco libre se recorre, no se sale ni queda bajo la barra.
+        _centerScroll = new ScrollContainer { FollowFocus = true };
+        _center.AddChild(_centerScroll);
+        _centerBody = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         _centerBody.AddThemeConstantOverride("separation", 8);
-        _center.AddChild(_centerBody);
+        _centerScroll.AddChild(_centerBody);
         _center.Theme = Ui.Theme;
     }
 
@@ -292,6 +318,12 @@ public partial class Hud : Control
         _toast.Text = text;
         _toast.AddThemeColorOverride("font_color", color ?? Ui.Bad);
         _toastTime = 3f;
+    }
+
+    public void ClearToast()
+    {
+        _toast.Text = "";
+        _toastTime = 0;
     }
 
     public void AddChat(string line)
@@ -321,8 +353,10 @@ public partial class Hud : Control
     public void SetPrompt(string status, Color statusColor, string prompt)
     {
         _status.Text = status;
+        _status.Visible = status.Length > 0;
         _status.AddThemeColorOverride("font_color", statusColor);
         _prompt.Text = prompt;
+        _prompt.Visible = prompt.Length > 0;
     }
 
     /// <summary>Vuelve a aplicar el idioma a los textos fijos del HUD.</summary>
@@ -350,15 +384,16 @@ public partial class Hud : Control
         if (w == null || me == null) return;
 
         _credits.Text = $"{w.Credits:N0} ¤";
-        var total = w.Stats.GetValueOrDefault("sold_credits") + w.Stats.GetValueOrDefault("contract_credits");
+        // Ventas de la fábrica en una media de 5 min: las recompensas de contrato y una venta suelta no la disparan (INC-19).
+        var total = w.Stats.GetValueOrDefault("sold_credits");
         if (_elapsed >= _nextEarning)
         {
             _nextEarning = _elapsed + 1;
             _earnings.Enqueue((_elapsed, total));
-            while (_earnings.Count > 1 && _earnings.Peek().time < _elapsed - 60) _earnings.Dequeue();
+            while (_earnings.Count > 1 && _earnings.Peek().time < _elapsed - IncomeWindow) _earnings.Dequeue();
         }
         var (oldTime, oldTotal) = _earnings.Count > 0 ? _earnings.Peek() : (_elapsed, total);
-        var span = Math.Max(10, _elapsed - oldTime);
+        var span = Math.Max(IncomeWindow, _elapsed - oldTime);
         _income.Text = $"{Loc.T("hud_income")}: {(total - oldTotal) * 60 / span:F0} ¤";
 
         var (supply, demand) = EstimatePower(w, me.Planet);
@@ -383,12 +418,21 @@ public partial class Hud : Control
         var mode = _view.Session.IsSolo ? "" : $"  ·  {client.RoundTripMs} ms";
         _players.Text = $"{Loc.T("hud_players")} {list.Count}/12{mode}\n" + string.Join("\n", list.Select(p => $"{p.Name} ({Loc.T("role_" + p.Role)})"));
 
+        _promptPanel.Visible = _status.Visible || _prompt.Visible || Look.Visible;
         if (PanelOpen)
         {
-            // Centrado cada cuadro: el contenido cambia de tamaño al reconstruirse.
+            // Centrado cada cuadro en el hueco libre: el contenido cambia de tamaño al reconstruirse, y si no cabe se desplaza.
+            var safe = SafeArea();
+            var chrome = _center.GetCombinedMinimumSize() - _centerScroll.GetCombinedMinimumSize();
+            var content = _centerBody.GetCombinedMinimumSize();
+            var room = safe.Size - chrome;
+            var overflow = content.Y > room.Y;
+            _centerScroll.VerticalScrollMode = overflow ? ScrollContainer.ScrollMode.Auto : ScrollContainer.ScrollMode.Disabled;
+            _centerScroll.HorizontalScrollMode = content.X > room.X ? ScrollContainer.ScrollMode.Auto : ScrollContainer.ScrollMode.Disabled;
+            _centerScroll.CustomMinimumSize = new Vector2(Math.Min(content.X + (overflow ? 14 : 0), room.X), Math.Min(content.Y, room.Y));
             var size = _center.GetCombinedMinimumSize();
             _center.Size = size;
-            _center.Position = ((GetRect().Size - size) / 2).Max(Vector2.Zero);
+            _center.Position = (safe.Position + (safe.Size - size) / 2).Max(safe.Position);
         }
         if (PanelOpen && _panelBuilder != null)
         {
@@ -402,9 +446,38 @@ public partial class Hud : Control
         }
     }
 
+    /// <summary>Hueco entre el panel del objetivo y la barra rápida: lo que abre un panel central no los tapa ni queda debajo.</summary>
+    private Rect2 SafeArea()
+    {
+        var view = GetRect().Size;
+        var top = _objectivePanel.GetGlobalRect().End.Y + UiTheme.S;
+        var bottom = _view.HotbarTop - UiTheme.S;
+        return new Rect2(16, top, view.X - 32, Math.Max(200, bottom - top));
+    }
+
+    private static string GuideText(World w, ObjectiveGuide g)
+    {
+        if (!g.Blocked) return "";
+        var missing = Loc.T("guide_missing", Ui.Missing(g.Cost!));
+        var machine = g.Machine.Length > 0 ? Loc.T("machine_" + g.Machine) : "";
+        var item = g.Item.Length > 0 ? Loc.T("item_" + g.Item) : "";
+        var step = g.Action switch
+        {
+            GuideAction.Cut => Loc.T("guide_cut", item),
+            GuideAction.Deposit => Loc.T("guide_deposit", item).Replace("{1}", machine),
+            GuideAction.Collect => Loc.T("guide_collect", item).Replace("{1}", machine),
+            GuideAction.Wait => Loc.T("guide_wait", item).Replace("{1}", machine),
+            GuideAction.Sell => Loc.T("guide_sell", machine),
+            _ => "",
+        };
+        return step.Length > 0 ? $"{missing} {step}" : missing;
+    }
+
     private void UpdateObjective(World w)
     {
         var count = w.Content.Objectives.Count;
+        _objectiveNeed.Text = GuideText(w, _view.Guide);
+        _objectiveNeed.Visible = _objectiveNeed.Text.Length > 0 && w.ObjectiveIndex < count;
         if (w.ObjectiveIndex >= count)
         {
             _objectiveStep.Text = Loc.T("hud_objective").ToUpperInvariant();
@@ -485,9 +558,13 @@ public partial class Hud : Control
         Open(() => { });
         _panelBuilder = null;
         Clear();
+        SettingsForm.Escape = null;
         Add(Ui.Text(Loc.T("paused"), 28, Ui.Amber));
         if (!session.IsSolo) Add(Ui.Text(Loc.T("menu_online_nopause"), 15, Ui.Dim));
-        Add(Ui.Btn(Loc.T("menu_resume"), resume, 320));
+        var resumeButton = Ui.Btn(Loc.T("menu_resume"), resume, 320);
+        Add(resumeButton);
+        // Intro reanuda: el foco nunca queda en una acción con efectos como Guardar.
+        resumeButton.CallDeferred(Control.MethodName.GrabFocus);
         if (session.IsLocal || session.Client.LocalPlayer?.Role >= Role.Admin) Add(Ui.Btn(Loc.T("menu_save"), save));
         Add(Ui.Btn(Loc.T("menu_settings"), settings));
         Add(Ui.Btn(Loc.T(session.IsLocal ? "menu_to_title" : "menu_leave"), leave));
@@ -600,7 +677,7 @@ public partial class Hud : Control
                 Add(Ui.Row(UiTheme.M, Ui.Icon(ItemVisuals.IconOf(item), 24), Ui.Text($"{Loc.T("panel_rate_real")}: {real}/min", UiTheme.Body, rateColor), Ui.Text($"{Loc.T("panel_rate_theory")}: {perMinute:0.#}/min", UiTheme.Small, Ui.Dim)));
             }
         }
-        else if (def.Kind is not (MachineKind.Generator or MachineKind.Shuttle))
+        else if (def.Kind is not (MachineKind.Generator or MachineKind.Shuttle or MachineKind.Terminal))
         {
             Add(Ui.Text(Loc.T("panel_capacity", def.Capacity.ToString()), UiTheme.Small, Ui.Dim));
             var content = new HFlowContainer();
@@ -667,26 +744,48 @@ public partial class Hud : Control
 
         if (def.Kind == MachineKind.Terminal)
         {
+            // Antes de vender se ve qué hay, a cuánto y cuánto da; se puede vender por objeto o todo (INC-16).
+            Add(Ui.Text(Loc.T("panel_capacity", def.Capacity.ToString()), UiTheme.Small, Ui.Dim));
+            var goods = m.In.Items.ToList();
+            var totalValue = goods.Sum(kv => kv.Value * w.SellPrice(kv.Key));
             var row = new HBoxContainer();
-            row.AddChild(Ui.Btn(Loc.T("panel_sell_all"), () =>
+            row.AddThemeConstantOverride("separation", UiTheme.S);
+            var sellAll = Ui.Btn(goods.Count == 0 ? Loc.T("panel_sell_all") : Loc.T("panel_sell_all_value", totalValue.ToString("N0")), () =>
             {
                 foreach (var kv in m.In.Items.ToList())
                     client.Send(new Command { Type = CommandType.Sell, A = id, Text = kv.Key, Amount = kv.Value });
                 Sfx.Play("sell");
-            }));
+            });
+            sellAll.Disabled = goods.Count == 0;
+            sellAll.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            row.AddChild(sellAll);
             row.AddChild(Ui.Btn($"{Loc.T("panel_auto_sell")}: {(m.AutoSell ? "ON" : "OFF")}", () =>
                 client.Send(new Command { Type = CommandType.SetAutoSell, A = id, B = m.AutoSell ? 0 : 1 })));
             Add(row);
-            foreach (var kv in m.In.Items.ToList())
+            if (goods.Count == 0) Add(Ui.Text(Loc.T("hud_empty"), UiTheme.Body, Ui.Dim));
+            foreach (var kv in goods)
             {
                 var item = kv.Key;
+                var qty = kv.Value;
+                var price = w.SellPrice(item);
                 var reserve = m.Reserves.GetValueOrDefault(item);
                 var rr = new HBoxContainer();
-                rr.AddChild(Ui.Text($"{Loc.T("panel_reserve")} {Loc.T("item_" + item)}: {reserve}", 16));
+                rr.AddThemeConstantOverride("separation", UiTheme.S);
+                var label = Ui.Text($"{qty} {Loc.T("item_" + item)} × {price} ¤ = {qty * price:N0} ¤", UiTheme.Body);
+                label.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+                rr.AddChild(Ui.Icon(ItemVisuals.IconOf(item), 24));
+                rr.AddChild(label);
+                rr.AddChild(Ui.Btn(Loc.T("panel_sell_item"), () =>
+                {
+                    client.Send(new Command { Type = CommandType.Sell, A = id, Text = item, Amount = qty });
+                    Sfx.Play("sell");
+                }));
+                rr.AddChild(Ui.Text($"{Loc.T("panel_reserve")}: {reserve}", UiTheme.Small, Ui.Dim));
                 rr.AddChild(Ui.Btn("−10", () => client.Send(new Command { Type = CommandType.SetAutoSell, A = id, B = m.AutoSell ? 1 : 0, Text = item, Amount = Math.Max(0, reserve - 10) })));
                 rr.AddChild(Ui.Btn("+10", () => client.Send(new Command { Type = CommandType.SetAutoSell, A = id, B = m.AutoSell ? 1 : 0, Text = item, Amount = reserve + 10 })));
                 Add(rr);
             }
+            Add(Ui.Para(Loc.T("panel_reserve_hint"), UiTheme.Caption, Ui.Dim));
         }
 
         if (def.Kind is not (MachineKind.Generator or MachineKind.Shuttle or MachineKind.Radiator))
@@ -817,10 +916,14 @@ public partial class Hud : Control
         var w = client.World!;
         var me = client.LocalPlayer!;
         Clear();
-        _centerBody.CustomMinimumSize = new Vector2(1160, 0);
+        // Dimensionado sobre el hueco libre, a cualquier resolución y escala: el pie queda siempre visible.
+        var safe = SafeArea();
+        var panelWidth = Mathf.Min(1160f, safe.Size.X - 40);
+        var columnWidth = (panelWidth - UiTheme.XL - 20) / 2;
+        _centerBody.CustomMinimumSize = new Vector2(panelWidth, 0);
         Add(Ui.Heading(Loc.T("tech_title")));
-        var viewportHeight = GetViewportRect().Size.Y;
-        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(1160, Mathf.Max(320, viewportHeight - 240)), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        Add(Ui.Para(Loc.T("tech_stock_rule"), UiTheme.Small, Ui.Dim));
+        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(panelWidth, Mathf.Max(180, safe.Size.Y - 150)), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         var columns = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         columns.AddThemeConstantOverride("separation", UiTheme.XL);
         scroll.AddChild(columns);
@@ -828,7 +931,7 @@ public partial class Hud : Control
         scroll.ScrollVertical = (int)_techScroll;
         scroll.GetVScrollBar().ValueChanged += v => _techScroll = v;
 
-        var left = new VBoxContainer { CustomMinimumSize = new Vector2(560, 0), SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        var left = new VBoxContainer { CustomMinimumSize = new Vector2(columnWidth, 0), SizeFlagsHorizontal = SizeFlags.ExpandFill };
         left.AddThemeConstantOverride("separation", UiTheme.M);
         columns.AddChild(left);
         left.AddChild(Ui.Text(Loc.T("tech_contracts"), UiTheme.Heading, Ui.Ink));
@@ -861,14 +964,16 @@ public partial class Hud : Control
             }
             if (c.Event != null && !done) card.AddChild(Ui.Para(Loc.T("event_hint"), UiTheme.Caption, Ui.Amber));
             if (locked) card.AddChild(Ui.Para($"{Loc.T("tech_requires")}: {Loc.T("upgrade_" + c.Requires)}", UiTheme.Small, Ui.Warn));
-            var b = Ui.Btn(done ? Loc.T("tech_done") : locked ? Loc.T("tech_locked") : ready ? Loc.T("tech_deliver") : Loc.T("tech_gather"),
+            var shortText = done || locked ? "" : Ui.Missing(w.CheckCost(me, 0, c.Items));
+            var b = Ui.Btn(done ? Loc.T("tech_done") : locked ? Loc.T("tech_locked") : ready ? Loc.T("tech_deliver") : shortText.Length > 0 ? Loc.T("cost_lacking", shortText) : Loc.T("tech_gather"),
                 () => client.Send(new Command { Type = CommandType.FulfillContract, Text = id }));
             b.Disabled = done || !ready;
+            b.AutowrapMode = TextServer.AutowrapMode.WordSmart;
             card.AddChild(b);
             left.AddChild(Card(card));
         }
 
-        var right = new VBoxContainer { CustomMinimumSize = new Vector2(560, 0), SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        var right = new VBoxContainer { CustomMinimumSize = new Vector2(columnWidth, 0), SizeFlagsHorizontal = SizeFlags.ExpandFill };
         right.AddThemeConstantOverride("separation", UiTheme.M);
         columns.AddChild(right);
         right.AddChild(Ui.Text(Loc.T("tech_upgrades"), UiTheme.Heading, Ui.Ink));
@@ -876,14 +981,17 @@ public partial class Hud : Control
         {
             var done = w.Upgrades.Contains(u.Id);
             var locked = u.Requires != null && !w.Upgrades.Contains(u.Requires);
-            var afford = w.CanAfford(me, u.Credits, u.Cost);
+            var report = w.CheckCost(me, u.Credits, u.Cost);
+            var afford = report.Ok;
             var id = u.Id;
             var card = new VBoxContainer();
             card.AddThemeConstantOverride("separation", UiTheme.S);
             card.AddChild(Ui.Text(Loc.T("upgrade_" + u.Id), UiTheme.Body, done ? Ui.Dim : Ui.Ink));
             card.AddChild(Ui.Para(Loc.T("upgrade_" + u.Id + "_d"), UiTheme.Small, Ui.Dim));
             if (locked) card.AddChild(Ui.Para($"{Loc.T("tech_requires")}: {Loc.T("upgrade_" + u.Requires)}", UiTheme.Small, Ui.Warn));
-            var b = Ui.Btn(done ? Loc.T("tech_done") : locked ? Loc.T("tech_locked") : $"{Loc.T("tech_buy")} — {Ui.Cost(u.Credits, u.Cost)}{(afford ? "" : " · " + Loc.T("cost_missing"))}",
+            // El mismo desglose que aplicará el servidor: qué falta exactamente y cuánto hay.
+            if (!done && !locked && !afford) card.AddChild(Ui.Para(Loc.T("cost_lacking", Ui.Missing(report)), UiTheme.Small, Ui.Bad));
+            var b = Ui.Btn(done ? Loc.T("tech_done") : locked ? Loc.T("tech_locked") : $"{Loc.T("tech_buy")} — {Ui.Cost(u.Credits, u.Cost)}",
                 () => client.Send(new Command { Type = CommandType.BuyUpgrade, Text = id }));
             b.Disabled = done || locked || !afford;
             card.AddChild(b);

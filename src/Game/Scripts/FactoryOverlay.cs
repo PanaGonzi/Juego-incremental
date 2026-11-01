@@ -53,7 +53,7 @@ public partial class LookReadout : PanelContainer
             _progress = m.Progress;
             _since = _clock;
             _cycle = Math.Max(0.1, w.ReadMachine(m).CycleSeconds);
-            _hint.Text = Controls.KeyName("chain_trace");
+            _hint.Text = Loc.T("look_chain_hint");
         }
         // Como en el panel: el servidor replica al cambiar de estado; entre medias se estima.
         var running = m.Status is MachineStatus.Working or MachineStatus.LowPower or MachineStatus.Overheated;
@@ -66,10 +66,14 @@ public partial class LookReadout : PanelContainer
             var bad = m.Status is MachineStatus.NoPower or MachineStatus.LowPower or MachineStatus.Overheated;
             var color = bad ? Ui.Bad : stopped ? Ui.Warn : Ui.Good;
             _glyph.Texture = Ui.Glyph(Ui.StatusGlyph(m.Status));
-            _state.Text = Loc.T("look_" + m.Status);
             _state.AddThemeColorOverride("font_color", color);
             _bar.AddThemeStyleboxOverride("fill", UiTheme.Box(color, new Color(0, 0, 0, 0), 0, 0, 0, 2));
         }
+        // Parada sin materiales pero con producción lista: lo útil es saber que se puede recoger.
+        var ready = m.Out.Total;
+        var state = Loc.T("look_" + m.Status);
+        if (ready > 0 && m.Status == MachineStatus.NoInput) state = $"{state} · {Loc.T("look_collect", ready.ToString())}";
+        if (_state.Text != state) _state.Text = state;
         Visible = true;
     }
 }

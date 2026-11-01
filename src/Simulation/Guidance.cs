@@ -61,7 +61,7 @@ public sealed partial class World
 
     /// <summary>
     /// Lo disponible para cualquier pago: mochila más los contenedores del planeta (depósito, cajas, terminales, estaciones y plataformas).
-    /// La misma regla sirve para contratos, mejoras y construcciones. Ver D-047.
+    /// La misma regla sirve para contratos, mejoras y construcciones. Ver D-045.
     /// </summary>
     public long PlanetStock(PlayerState p, string item)
     {
@@ -80,7 +80,10 @@ public sealed partial class World
         Lines = cost.Select(kv => new CostLine(kv.Key, PlanetStock(p, kv.Key), kv.Value)).ToList(),
     };
 
-    /// <summary>Descuenta primero de la mochila y luego de los contenedores. Quien llama ya comprobó que alcanza.</summary>
+    /// <summary>
+    /// Descuenta de la mochila, luego de los almacenes y por último de lo que está en tránsito o a la venta
+    /// (terminales, estaciones y plataformas). Quien llama ya comprobó que alcanza.
+    /// </summary>
     private void TakeFromPlanet(PlayerState p, IReadOnlyDictionary<string, long> cost)
     {
         foreach (var (item, qty) in cost)
@@ -89,10 +92,9 @@ public sealed partial class World
             var fromBag = Math.Min(left, p.Bag.Get(item));
             if (fromBag > 0) p.Bag.TryRemove(item, fromBag);
             left -= fromBag;
-            foreach (var m in _machineList)
+            foreach (var m in _machineList.Where(m => CountsAsPlanetStock(m, p.Planet)).OrderBy(m => Content.Machines[m.Def].Kind == MachineKind.Storage ? 0 : 1))
             {
                 if (left == 0) break;
-                if (!CountsAsPlanetStock(m, p.Planet)) continue;
                 var take = Math.Min(left, m.In.Get(item));
                 if (take == 0) continue;
                 m.In.TryRemove(item, take);

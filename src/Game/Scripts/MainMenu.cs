@@ -205,8 +205,17 @@ public partial class MainMenu : Control
 
 public static class SettingsForm
 {
+    /// <summary>Qué hace Esc con este formulario abierto en partida: retroceder un nivel.</summary>
+    public static Action? Escape { get; set; }
+
+    private static readonly (int w, int h)[] Resolutions =
+    {
+        (1280, 720), (1366, 768), (1600, 900), (1920, 1080), (2560, 1080), (2560, 1440), (3440, 1440), (3840, 2160),
+    };
+
     public static void Build(Container box, Settings prefs, Action back)
     {
+        Escape = back;
         box.AddChild(Ui.Heading(Loc.T("settings_title")));
         var tabs = new TabContainer { CustomMinimumSize = new Vector2(600, 430), TabAlignment = TabBar.AlignmentMode.Left };
         box.AddChild(tabs);
@@ -278,7 +287,30 @@ public static class SettingsForm
         });
         Toggle(display, "settings_shadows", prefs.Shadows, v => prefs.Shadows = v);
         Toggle(display, "settings_glow", prefs.Glow, v => prefs.Glow = v);
-        Toggle(display, "settings_fullscreen", prefs.Fullscreen, v => { prefs.Fullscreen = v; prefs.ApplyDisplay(); });
+        // Modo y tamaño se aplican al momento y se recuerdan. La resolución solo decide en ventana: a pantalla completa manda la del monitor.
+        var resolution = new OptionButton { CustomMinimumSize = new Vector2(220, UiTheme.ButtonHeight), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        Segments(display, "settings_window_mode", "", new (string, Func<bool>, Action)[]
+        {
+            (Loc.T("window_mode_windowed"), () => prefs.EffectiveDisplayMode == 0, () => { prefs.DisplayMode = 0; prefs.ApplyDisplay(); resolution.Disabled = false; }),
+            (Loc.T("window_mode_borderless"), () => prefs.EffectiveDisplayMode == 1, () => { prefs.DisplayMode = 1; prefs.ApplyDisplay(); resolution.Disabled = true; }),
+            (Loc.T("window_mode_exclusive"), () => prefs.EffectiveDisplayMode == 2, () => { prefs.DisplayMode = 2; prefs.ApplyDisplay(); resolution.Disabled = true; }),
+        });
+        var screen = DisplayServer.ScreenGetSize(DisplayServer.WindowGetCurrentScreen());
+        var current = DisplayServer.WindowGetSize();
+        var sizes = Resolutions.Where(r => r.w <= screen.X && r.h <= screen.Y).Append((screen.X, screen.Y)).Append((current.X, current.Y)).Distinct().OrderBy(r => r.Item1).ThenBy(r => r.Item2).ToList();
+        foreach (var (w, h) in sizes) resolution.AddItem($"{w} × {h}");
+        resolution.Selected = sizes.IndexOf((current.X, current.Y));
+        resolution.Disabled = prefs.EffectiveDisplayMode != 0;
+        resolution.ItemSelected += index =>
+        {
+            (prefs.WindowWidth, prefs.WindowHeight) = sizes[(int)index];
+            prefs.ApplyDisplay();
+            prefs.Save();
+        };
+        var resolutionLabel = Ui.Text(Loc.T("settings_resolution"), UiTheme.Small, Ui.Ink);
+        resolutionLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        display.AddChild(Ui.Row(UiTheme.M, resolutionLabel, resolution));
+        display.AddChild(Ui.Para(Loc.T("settings_resolution_hint"), UiTheme.Caption, Ui.Dim));
         Slider(display, "settings_fov", 60, 110, 1, prefs.Fov, v => $"{v:0}°", v => prefs.Fov = v);
 
         var ui = Section("settings_tab_interface");
@@ -318,7 +350,7 @@ public static class SettingsForm
         input.AddChild(Ui.Btn(Loc.T("settings_controls"), () =>
         {
             foreach (var c in box.GetChildren()) { box.RemoveChild(c); c.QueueFree(); }
-            ControlsForm(box, back);
+            ControlsForm(box, prefs, back);
         }));
 
         var close = Ui.Btn(Loc.T("menu_back"), back);
@@ -326,8 +358,14 @@ public static class SettingsForm
         close.CallDeferred(Control.MethodName.GrabFocus);
     }
 
-    private static void ControlsForm(Container box, Action back)
+    private static void ControlsForm(Container box, Settings prefs, Action back)
     {
+        void ToSettings()
+        {
+            foreach (var c in box.GetChildren()) { box.RemoveChild(c); c.QueueFree(); }
+            Build(box, prefs, back);
+        }
+        Escape = ToSettings;
         box.AddChild(Ui.Heading(Loc.T("settings_controls")));
         var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(460, 520) };
         var list = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
@@ -344,7 +382,7 @@ public static class SettingsForm
                 {
                     if (key != Key.None) Controls.Rebind(id, key);
                     foreach (var c in box.GetChildren()) { box.RemoveChild(c); c.QueueFree(); }
-                    ControlsForm(box, back);
+                    ControlsForm(box, prefs, back);
                 });
                 box.AddChild(capture);
             });
@@ -355,9 +393,9 @@ public static class SettingsForm
         {
             Controls.ResetAll();
             foreach (var c in box.GetChildren()) { box.RemoveChild(c); c.QueueFree(); }
-            ControlsForm(box, back);
+            ControlsForm(box, prefs, back);
         }));
-        box.AddChild(Ui.Btn(Loc.T("menu_back"), back));
+        box.AddChild(Ui.Btn(Loc.T("menu_back"), ToSettings));
     }
 }
 

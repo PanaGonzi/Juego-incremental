@@ -465,7 +465,7 @@ public partial class AutoTest : Node
         Check(v.CurrentTool == Tool.Link, "la casilla 2 de la barra selecciona la cinta");
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.WheelDown, Pressed = true });
         await Wait(0.1);
-        Check(v.CurrentTool == Tool.Remove, "la ruedecilla pasa a la casilla siguiente");
+        Check(v.CurrentTool == Tool.Rail, "la ruedecilla pasa a la casilla siguiente y se salta Desmontar");
         Key(Godot.Key.Key1);
         await Wait(0.1);
         Check(v.CurrentTool == Tool.Cutter && !v.IsStowed, "la casilla 1 saca la multiherramienta");
@@ -1337,7 +1337,7 @@ public partial class AutoTest : Node
         Check(await Until(() => plan().State == BeltPlanState.Ready, 8), "recalcula al retirar el punto");
         var preview = plan().Route!.ToList();
         Check(!preview.Contains(waypoint) || !first.SequenceEqual(preview), "la ruta ya no depende del punto");
-        var toPort = plan().ToPort;
+        var toPort = plan().EntryPort;
         await Wait(0.5);
         await Shot("long_04_antes_de_construir");
 

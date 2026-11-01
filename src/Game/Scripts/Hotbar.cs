@@ -321,6 +321,10 @@ public partial class Hotbar : Control
     private readonly GameView _view;
     private readonly List<HotbarSlot> _slots = new();
     private double _refresh;
+    private HBoxContainer _row = null!;
+
+    /// <summary>Altura a la que empieza la barra, medida: los paneles centrales terminan antes.</summary>
+    public float TopY => _row == null ? GetViewportRect().Size.Y - 104 : _row.GetGlobalRect().Position.Y;
 
     public Hotbar(GameView view)
     {
@@ -332,6 +336,7 @@ public partial class Hotbar : Control
     {
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore, Alignment = BoxContainer.AlignmentMode.Center };
+        _row = row;
         row.AddThemeConstantOverride("separation", 6);
         AddChild(row);
         row.SetAnchorsAndOffsetsPreset(LayoutPreset.CenterBottom);

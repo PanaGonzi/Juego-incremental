@@ -59,6 +59,22 @@ public class QaFixesTests
     }
 
     [Fact]
+    public void Stored_materials_go_before_goods_waiting_to_be_sold()
+    {
+        var (w, p) = Fixture.NewWorld();
+        var crate = Crate(w, p);
+        var terminal = Fixture.Find(w, "export_terminal");
+        terminal.In.Add("ingot", 20);
+        crate.In.Add("ingot", 12);
+        w.Credits = 1000;
+
+        Assert.True(w.Apply(p, new Command { Type = CommandType.BuyUpgrade, Text = "tech_assembly" }).Ok);
+
+        Assert.Equal(20, terminal.In.Get("ingot"));
+        Assert.Equal(2, crate.In.Get("ingot"));
+    }
+
+    [Fact]
     public void Failed_purchase_touches_nothing()
     {
         var (w, p) = Fixture.NewWorld();
