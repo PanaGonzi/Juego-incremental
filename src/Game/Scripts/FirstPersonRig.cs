@@ -760,7 +760,7 @@ public partial class FirstPersonRig : Node3D
         public RigMode Mode;
         public Tool Tool;
         public Vector3 Velocity;
-        public bool OnFloor, Sprinting, Working, BobOn;
+        public bool OnFloor, Sprinting, Working, BobOn, Calm;
         public float BobScale, WallDistance;
         public Vector2 Look;
         public Vector3? Target;
@@ -786,6 +786,7 @@ public partial class FirstPersonRig : Node3D
     private Vector3 _shake;
     private bool _wasOnFloor = true;
     private float _lastVy;
+    private bool _calm;
     private readonly RandomNumberGenerator _rng = new() { Seed = 4242 };
     private Color _screenColor = new(1f, 0.67f, 0.25f);
 
@@ -838,8 +839,9 @@ public partial class FirstPersonRig : Node3D
     /// <summary>Un golpe del cabezal, sincronizado con el comando enviado al servidor.</summary>
     public void OnHit()
     {
-        _hitV += 7f;
-        _shake = new Vector3(_rng.RandfRange(-1, 1), _rng.RandfRange(-1, 1), 0) * 0.0035f;
+        // «Reducir efectos»: el golpe se nota en el cabezal, no sacude los brazos.
+        _hitV += _calm ? 2.2f : 7f;
+        if (!_calm) _shake = new Vector3(_rng.RandfRange(-1, 1), _rng.RandfRange(-1, 1), 0) * 0.0035f;
     }
 
     /// <summary>Pulsación sobre la consola: el dedo baja a la pantalla.</summary>
@@ -854,6 +856,7 @@ public partial class FirstPersonRig : Node3D
     public void Tick(float dt, in Input i)
     {
         _time += dt;
+        _calm = i.Calm;
         UpdateMode(dt, i);
         Layers(dt, i);
         PoseTool(dt, i);
@@ -907,7 +910,7 @@ public partial class FirstPersonRig : Node3D
 
         // Salto y aterrizaje.
         if (!i.OnFloor) _lastVy = i.Velocity.Y;
-        if (i.OnFloor && !_wasOnFloor && _lastVy < -1f) _landV -= Mathf.Clamp(-_lastVy * 0.16f, 0.2f, 1.1f);
+        if (i.OnFloor && !_wasOnFloor && _lastVy < -1f) _landV -= Mathf.Clamp(-_lastVy * 0.16f, 0.2f, 1.1f) * (_calm ? 0.25f : 1f);
         _wasOnFloor = i.OnFloor;
         var airTarget = i.OnFloor ? 0f : Mathf.Clamp(-i.Velocity.Y * 0.0075f, -0.028f, 0.03f);
         _air = Mathf.Lerp(_air, airTarget, 1f - Mathf.Exp(-dt * 9f));
@@ -918,11 +921,12 @@ public partial class FirstPersonRig : Node3D
         var near = Mathf.Clamp(1f - (i.WallDistance - 0.42f) / 0.62f, 0f, 1f);
         _retract = Mathf.Lerp(_retract, near, 1f - Mathf.Exp(-dt * 10f));
 
-        var breath = Mathf.Sin(_time * 1.32f);
-        var breath2 = Mathf.Sin(_time * 0.71f + 1.2f);
+        var quiet = _calm ? 0.35f : 1f;
+        var breath = Mathf.Sin(_time * 1.32f) * quiet;
+        var breath2 = Mathf.Sin(_time * 0.71f + 1.2f) * quiet;
         var stepX = Mathf.Cos(_walkPhase) * 0.0068f * _walk * strength;
         var stepY = -Mathf.Abs(Mathf.Sin(_walkPhase)) * 0.0078f * _walk * strength;
-        var roll = Mathf.Cos(_walkPhase) * 0.012f * _walk * strength;
+        var roll = Mathf.Cos(_walkPhase) * 0.012f * _walk * strength * quiet;
         _sway.Position = new Vector3(stepX + _sway2.X + breath2 * 0.0007f, stepY + _sway2.Y + breath * 0.0017f + _air + _land * 0.05f, _land * 0.012f + _retract * 0.1f);
         _sway.Rotation = new Vector3(breath * 0.0028f + _land * 0.05f - _sway2.Y * 0.7f + _retract * 0.42f, -_sway2.X * 0.8f, roll + _sway2.X * 0.45f);
 
@@ -967,7 +971,7 @@ public partial class FirstPersonRig : Node3D
         _boom = Mathf.Clamp(_boom + _boomV * dt, 0f, MaxBoom);
 
         // Golpeo rítmico: el cabezal entra y sale y el cuerpo recibe un eco pequeño.
-        var strike = Mathf.Max(0f, _hit) * 0.34f + Mathf.Sin(_time * 21f) * 0.012f * _work;
+        var strike = Mathf.Max(0f, _hit) * 0.34f + Mathf.Sin(_time * 21f) * 0.012f * _work * (_calm ? 0.2f : 1f);
         var head2 = _boom + strike * _work;
         pos += basis * new Vector3(0, -0.012f, -0.018f) * _work;
         pos += basis * new Vector3(0, 0, _hit * 0.016f) + _shake;
@@ -1045,6 +1049,8 @@ public partial class ImpactEffects : Node3D
 {
     private readonly Dictionary<ImpactKind, GpuParticles3D> _flow = new();
     private readonly Dictionary<ImpactKind, GpuParticles3D> _burst = new();
+    private readonly List<(StandardMaterial3D material, float energy)> _glowing = new();
+    private bool _calm;
 
     public override void _Ready()
     {
@@ -1054,6 +1060,19 @@ public partial class ImpactEffects : Node3D
             _burst[kind] = Emitter(kind, true);
         }
     }
+
+    /// <summary>«Reducir efectos»: menos partículas y chispas sin destello. Cambiar Amount reinicia el emisor, así que solo se hace al cambiar el ajuste.</summary>
+    private void SyncCalm()
+    {
+        if (_calm == Scenery.Calm) return;
+        _calm = Scenery.Calm;
+        foreach (var emitter in _flow.Values) emitter.Amount = _calm ? 4 : 14;
+        foreach (var emitter in _burst.Values) emitter.Amount = _calm ? 7 : 26;
+        foreach (var (material, energy) in _glowing) material.EmissionEnergyMultiplier = _calm ? Mathf.Min(energy, 0.8f) : energy;
+    }
+
+    /// <summary>Partículas de un estallido con el ajuste vigente, para la comprobación del ajuste.</summary>
+    public int BurstAmount => _burst.Values.First().Amount;
 
     private GpuParticles3D Emitter(ImpactKind kind, bool burst)
     {
@@ -1096,6 +1115,7 @@ public partial class ImpactEffects : Node3D
             material.EmissionEnabled = true;
             material.Emission = color;
             material.EmissionEnergyMultiplier = emission;
+            _glowing.Add((material, emission));
         }
         Mesh mesh = kind switch
         {
@@ -1130,6 +1150,7 @@ public partial class ImpactEffects : Node3D
     /// <summary>Emisión continua mientras el cabezal trabaja, o nada si kind es nulo.</summary>
     public void Work(ImpactKind? kind, Vector3 at, Vector3 towards)
     {
+        SyncCalm();
         foreach (var (k, emitter) in _flow)
         {
             var on = k == kind;
@@ -1145,6 +1166,7 @@ public partial class ImpactEffects : Node3D
 
     public void Burst(ImpactKind kind, Vector3 at)
     {
+        SyncCalm();
         var emitter = _burst[kind];
         emitter.GlobalPosition = at;
         emitter.Restart();
@@ -1240,6 +1262,15 @@ public partial class RemoteToolView : Node3D
     private Node3D _toolRoot = null!, _rotor = null!, _deviceRoot = null!, _forearm = null!;
     private float _work, _spin, _time;
     private byte _equipped = 255;
+
+    /// <summary>Solo para los encuadres fijos del menú: muestra la herramienta sin estado replicado.</summary>
+    public bool StartEquipped;
+
+    public override void _Process(double delta)
+    {
+        if (StartEquipped) Tick((float)delta, Networking.PlayerAction.Cutter, false);
+        else SetProcess(false);
+    }
 
     public override void _Ready()
     {

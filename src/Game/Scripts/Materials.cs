@@ -61,13 +61,15 @@ public static class Materials
         // Vidrio.
         ["glass"] = new(Layer.Steel, new Color(0.55f, 0.72f, 0.8f, 0.24f), 0f, 0.08f, 0, 0, Pass.Glass),
         // Óxido y chatarra.
-        ["rust"] = new(Layer.Rust, new Color(0.15f, 0.07f, 0.033f), 0.45f, 0.5f),
-        ["rustlight"] = new(Layer.Rust, new Color(0.23f, 0.12f, 0.055f), 0.5f, 0.45f),
+        ["rust"] = new(Layer.Rust, new Color(0.115f, 0.054f, 0.027f), 0.5f, 0.6f),
+        ["rustlight"] = new(Layer.Rust, new Color(0.18f, 0.094f, 0.045f), 0.55f, 0.52f),
         // Mineral.
         ["rock"] = new(Layer.Rock, new Color(0.26f, 0.22f, 0.2f), 0f, 0.5f),
         ["rock_cold"] = new(Layer.Rock, new Color(0.15f, 0.145f, 0.16f), 0f, 0.5f),
         ["redrock"] = new(Layer.Rock, new Color(0.62f, 0.28f, 0.14f), 0f, 0.5f),
         ["regolith"] = new(Layer.Regolith, new Color(0.09f, 0.062f, 0.05f), 0f, 0.5f),
+        // Mismo tono que el suelo de Plutón: lo que apoya en él se funde, sin un disco de otro color.
+        ["soil"] = new(Layer.Regolith, new Color(0.042f, 0.029f, 0.024f), 0f, 0.55f),
         ["ice"] = new(Layer.Ice, new Color(0.78f, 0.9f, 1f), 0f, 0.35f, 0.5f),
         ["crust"] = new(Layer.Ice, new Color(0.86f, 0.92f, 0.98f), 0f, 0.55f),
         ["ore"] = new(Layer.Rock, new Color(0.72f, 0.36f, 0.62f), 0.65f, 0.3f, 0.5f),
@@ -124,9 +126,21 @@ public static class Materials
           float metal = v_metal;
           float rough = clamp(d.b*v_rough*2.0,0.05,1.0);
           float wear = COLOR.a;
+          // De cerca la textura se queda corta: segunda escala fina, solo a menos de 8 m para no gastar lejos.
+          float close = 1.0-smoothstep(2.5,8.0,length(VERTEX));
+          vec2 nmap = d.rg;
+          float fine = 0.0;
+          if (close>0.001){
+            vec3 uvn = vec3(UV*5.3+vec2(0.37,0.11),v_layer);
+            vec4 d2 = texture(detail_tex,uvn);
+            fine = (texture(albedo_tex,uvn).a-0.5)*close;
+            nmap += (d2.rg-0.5)*close*0.9;
+            rough = clamp(rough*(1.0+(d2.b-0.5)*0.7*close),0.05,1.0);
+            col *= 1.0+fine*0.55;
+          }
           // Pintura: aristas y rozaduras dejan ver el acero. Resto: la arista solo recoge más luz.
           float painted = float(v_layer<0.5)+float(abs(v_layer-6.0)<0.5);
-          float chip = painted*smoothstep(0.62,0.7,wear*0.42+a.a*0.55);
+          float chip = painted*smoothstep(0.62,0.66,wear*0.42+a.a*0.55+fine*0.16);
           col = mix(col,vec3(0.42,0.42,0.44),chip);
           metal = mix(metal,1.0,chip);
           rough = mix(rough,0.42,chip);
@@ -142,7 +156,7 @@ public static class Materials
           METALLIC = metal;
           ROUGHNESS = rough;
           SPECULAR = 0.45;
-          NORMAL_MAP = vec3(d.rg,1.0);
+          NORMAL_MAP = vec3(nmap,1.0);
           AO = d.a;
           AO_LIGHT_AFFECT = 0.25;
           EMISSION = COLOR.rgb*v_emit;
@@ -191,7 +205,13 @@ public static class Materials
     {
         Industrial.SetShaderParameter("dust_color", new Vector3(color.R, color.G, color.B));
         Industrial.SetShaderParameter("dust_amount", amount);
+        DustColor = new Vector3(color.R, color.G, color.B);
+        DustChanged?.Invoke();
     }
+
+    /// <summary>Color de polvo vigente, para materiales que no comparten el industrial (bastidor de las cintas).</summary>
+    public static Vector3 DustColor { get; private set; } = new(0.055f, 0.04f, 0.036f);
+    public static event Action? DustChanged;
 
     private static readonly Dictionary<string, StandardMaterial3D> StandardCache = new();
 

@@ -381,6 +381,8 @@
   "action_hotbar_7": "Barra rápida 7",
   "action_hotbar_8": "Barra rápida 8",
   "action_hotbar_9": "Barra rápida 9",
+  "settings_reduce_effects": "Reducir efectos",
+  "settings_reduce_effects_hint": "Limita partículas, sacudidas y destellos: menos vapor y polvo, chispas sin brillo, baliza fija y sin destellos en pantalla.",
   "settings_bob_intensity": "Intensidad del balanceo",
   "prompt_too_far": "Acércate para alcanzarlo",
   "prompt_stowed": "[{hotbar_1}] Sacar la multiherramienta",

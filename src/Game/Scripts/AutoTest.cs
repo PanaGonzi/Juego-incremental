@@ -232,6 +232,10 @@ public partial class AutoTest : Node
             {
                 _main.StartSession(GameSession.Local(_main, BeltWorld(), "autotest-belts", null, _main.Prefs));
             }
+            else if (_args.GetValueOrDefault("scenario") == "zone")
+            {
+                _main.StartSession(GameSession.Local(_main, BeltWorld(), "autotest-zone", null, _main.Prefs));
+            }
             else if (_args.GetValueOrDefault("scenario") == "manage")
             {
                 _main.StartSession(GameSession.Local(_main, ManageWorld(), "autotest-manage", null, _main.Prefs));
@@ -293,6 +297,7 @@ public partial class AutoTest : Node
             else if (_args.GetValueOrDefault("scenario") == "beltsv4") await BeltMigrationScenario();
             else if (_args.GetValueOrDefault("scenario") == "beltslong") await BeltLongScenario();
             else if (_args.GetValueOrDefault("scenario") == "manage") await ManageScenario();
+            else if (_args.GetValueOrDefault("scenario") == "zone") await ZoneScenario();
             else if (_args.GetValueOrDefault("scenario") == "fp") await FirstPersonScenario();
             else if (_args.GetValueOrDefault("scenario") == "travel") await TravelScenario();
             else if (_args.GetValueOrDefault("scenario") == "halloween") await HalloweenScenario();
@@ -620,6 +625,115 @@ public partial class AutoTest : Node
         Check(W.Stats.GetValueOrDefault("built.smelter") == 1, "fábrica conservada");
         await Wait(1.5);
         await Shot("11_reanudado");
+    }
+
+    /// <summary>
+    /// Zona inicial con entrada inyectada: hitos sin colisión fuera de la zona edificable, niveles de todos los sonidos,
+    /// respuesta a cada acción importante y «Reducir efectos» aplicado de verdad. No comprueba cómo se oye: solo mide niveles.
+    /// </summary>
+    private async Task ZoneScenario()
+    {
+        var v = _view!;
+        var client = v.Session.Client;
+        var server = v.Session.Runner!.Server.World;
+
+        // Hitos.
+        var landmarks = FindLandmarks(v).ToList();
+        Check(landmarks.Count == Terrain.Landmarks.Length, $"{landmarks.Count} hitos en la escena");
+        foreach (var m in landmarks)
+        {
+            var p = m.GlobalPosition;
+            var d = Mathf.Max(Mathf.Abs(p.X), Mathf.Abs(p.Z));
+            var box = m.Mesh.GetAabb();
+            Log($"Hito {m.Name}: a {new Vector2(p.X, p.Z).Length():0} m de la base, alto {box.Size.Y:0} m, {m.Mesh.GetFaces().Length / 3} triángulos");
+            Check(d > Terrain.Walkable && m.FindChildren("*", nameof(CollisionObject3D), true, false).Count == 0, $"{m.Name} fuera de los muros y sin colisión");
+        }
+
+        // Niveles de todos los sonidos generados, medidos sobre sus muestras.
+        foreach (var (name, peak, rms, jump) in Sfx.Levels())
+        {
+            Log($"Sonido {name}: pico {peak:0.0} dBFS, eficaz {rms:0.0} dBFS, salto de bucle {jump:0.000}");
+            Check(peak <= -1f, $"{name} sin saturar");
+            Check(peak >= -24f, $"{name} con nivel utilizable");
+            Check(jump < 0.08f, $"{name} sin salto de bucle");
+        }
+
+        // Respuesta a las acciones, por la ruta normal de comandos.
+        var fx = v.Feedback;
+        Check(fx.Places == 0 && fx.Links == 0, "cargar el mundo no dispara la respuesta de construir");
+        var depot = W.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
+        Check(await Build("storage_crate", 8, -8), "colocar");
+        Check(await Until(() => fx.Places == 1, 2), $"respuesta al colocar: {fx.Places}");
+        var crate = W.Machines.Values.Last(m => m.Def == "storage_crate");
+        client.Send(World.LinkCommand(depot.Id, crate.Id, W.RouteBelt(depot.Id, crate.Id, 200000).Cells));
+        Check(await Until(() => fx.Links == 1, 3), $"respuesta al conectar la cinta: {fx.Links}");
+        await WalkTo(new Vector3(18, 0, -8));
+        v.AimAt(new Vector3(16, 0.4f, -16));
+        await Wait(0.25);
+        await Shot("zone_cinta_recien_conectada");
+        client.Send(new Command { Type = CommandType.Remove, A = crate.Id });
+        Check(await Until(() => fx.Removals >= 1, 3), $"respuesta al desmontar: {fx.Removals}");
+        await Wait(0.2);
+        await Shot("zone_desmontar");
+
+        var terminal = server.Machines.Values.First(m => m.Def == "export_terminal" && m.Planet == 0);
+        terminal.In.Add("ingot", 40);
+        server.DirtySimMachines.Add(terminal.Id);
+        var (terminalX, terminalZ) = W.MachineCenterMm(W.Machines[terminal.Id]);
+        await WalkTo(new Vector3(terminalX / 1000f + 5, 0, terminalZ / 1000f + 5));
+        client.Send(new Command { Type = CommandType.Sell, A = terminal.Id, Text = "ingot", Amount = 40 });
+        Check(await Until(() => fx.Sales >= 1, 3), $"respuesta al vender: {fx.Sales}");
+
+        var goal = W.Content.Objectives[W.ObjectiveIndex];
+        server.Stats[goal.Stat] = goal.Qty;
+        Check(await Until(() => fx.Objectives >= 1, 3), $"respuesta al cumplir un objetivo: {fx.Objectives}");
+
+        var flashes = fx.Flashes;
+        var upgrade = W.Content.Upgrades.Values.First(u => !W.Upgrades.Contains(u.Id) && u.Id == "tech_logistics");
+        server.Credits += upgrade.Credits;
+        foreach (var kv in upgrade.Cost) server.DepotOf(0)!.In.Add(kv.Key, kv.Value);
+        server.DirtySimMachines.Add(depot.Id);
+        await Wait(0.3);
+        client.Send(new Command { Type = CommandType.BuyUpgrade, Text = upgrade.Id });
+        Check(await Until(() => fx.UpgradeCount >= 1, 3), $"respuesta a la mejora: {fx.UpgradeCount}");
+        Check(fx.Flashes > flashes, "la mejora da destello con los efectos normales");
+
+        // Nivel real del bus maestro con todos los sonidos de acción a la vez: el peor caso de mezcla.
+        await WalkTo(new Vector3(16, 0, -6));
+        var peakBus = -200f;
+        foreach (var name in new[] { "place", "belt_link", "dismantle", "upgrade", "objective", "sell", "build", "remove" }) Sfx.Play(name);
+        for (var i = 0; i < 60; i++)
+        {
+            await Wait(0.02);
+            peakBus = Mathf.Max(peakBus, Mathf.Max(AudioServer.GetBusPeakVolumeLeftDb(0, 0), AudioServer.GetBusPeakVolumeRightDb(0, 0)));
+        }
+        Log($"Bus maestro con ocho sonidos a la vez: pico {peakBus:0.0} dB, dispositivo {AudioServer.OutputDevice}");
+        Check(peakBus <= 0f, "la suma de voces no pasa de 0 dB tras el limitador");
+
+        // Reducir efectos.
+        Check(v.Impacts.BurstAmount == 26, "partículas normales antes del ajuste");
+        var vents = v.Activity.MaxVentAmount;
+        _main.Prefs.ReduceEffects = true;
+        Scenery.Current!.ApplyPrefs(_main.Prefs);
+        v.Impacts.Burst(ImpactKind.Scrap, v.PlayerPosition + Vector3.Forward * 3);
+        Check(v.Impacts.BurstAmount == 7, $"estallido limitado: {v.Impacts.BurstAmount}");
+        await Wait(0.8);
+        Check(v.Activity.MaxVentAmount < vents && v.Activity.ActiveVents <= 3, $"vapor limitado: {v.Activity.MaxVentAmount} partículas, {v.Activity.ActiveVents} emisores");
+        flashes = fx.Flashes;
+        fx.UpgradeBought();
+        Check(fx.Flashes == flashes, "sin destello de pantalla con el ajuste");
+        _main.Prefs.ReduceEffects = false;
+        Scenery.Current.ApplyPrefs(_main.Prefs);
+        Check(client.HashMismatches == 0, $"sin divergencias ({client.HashChecks} comprobaciones)");
+    }
+
+    private static IEnumerable<MeshInstance3D> FindLandmarks(Node node)
+    {
+        foreach (var child in node.GetChildren())
+        {
+            if (child is MeshInstance3D m && m.Name.ToString().StartsWith("hito_")) yield return m;
+            foreach (var deeper in FindLandmarks(child)) yield return deeper;
+        }
     }
 
     /// <summary>Mide render y simulación local en un mundo grande, cerca de la fábrica y mirando a lo lejos.</summary>

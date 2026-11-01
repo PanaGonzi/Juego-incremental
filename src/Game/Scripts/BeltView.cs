@@ -23,41 +23,116 @@ public partial class BeltView : Node3D
     private const float ItemRange = 120f;
     private const float AnimRange = 90f;
 
-    private static readonly ShaderMaterial BandMaterial = new() { Shader = new Shader { Code = """
+    private static readonly ShaderMaterial BandMaterial = MakeBand();
+
+    private static ShaderMaterial MakeBand()
+    {
+        var band = new ShaderMaterial { Shader = new Shader { Code = """
         shader_type spatial;
+        render_mode cull_back, diffuse_burley;
+        uniform sampler2DArray albedo_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+        uniform sampler2DArray detail_tex : filter_linear_mipmap_anisotropic, repeat_enable;
         instance uniform float offset = 0.0;
         instance uniform float jam = 0.0;
+        instance uniform float pulse = -100.0;
         void fragment(){
           float x = abs(UV.x - 0.5) * 2.0;
           float along = UV.y - offset;
+          // Goma real del atlas, en metros: se desplaza con la banda.
+          vec3 uvw = vec3(UV.x / 0.8, along / 0.8, 2.0);
+          vec4 tex = texture(albedo_tex, uvw);
+          vec4 det = texture(detail_tex, uvw);
+          // Tacos transversales cada 12,5 cm, con relieve por el mapa de normales; el centro está más gastado.
+          float rib = fract(along * 8.0);
+          float cleat = smoothstep(0.0, 0.1, rib) * (1.0 - smoothstep(0.26, 0.36, rib));
+          float slope = (smoothstep(0.0, 0.1, rib) - smoothstep(0.26, 0.36, rib)) * (rib < 0.18 ? 1.0 : -1.0);
+          float worn = 1.0 - smoothstep(0.1, 0.75, x);
+          vec3 rubber = vec3(0.03, 0.03, 0.033) * (0.7 + tex.r * 1.1) * (1.0 + cleat * 0.45) + vec3(0.012, 0.011, 0.01) * worn;
+          // Flecha pintada y desconchada: indica el sentido sin parecer un letrero luminoso.
           float c = fract(along * 0.5 + x * 0.16);
-          float chevron = smoothstep(0.0, 0.012, c) * (1.0 - smoothstep(0.06, 0.072, c)) * (1.0 - smoothstep(0.5, 0.58, x));
-          float ribs = step(0.5, fract(along * 7.0)) * 0.012;
-          vec3 rubber = vec3(0.05, 0.05, 0.055) + ribs;
-          vec3 mark = mix(vec3(0.85, 0.56, 0.14), vec3(0.95, 0.14, 0.08), jam);
-          ALBEDO = mix(rubber, mark, chevron * 0.75);
-          ROUGHNESS = 0.82;
+          float chevron = smoothstep(0.0, 0.012, c) * (1.0 - smoothstep(0.05, 0.062, c)) * (1.0 - smoothstep(0.5, 0.58, x));
+          chevron *= smoothstep(0.25, 0.42, tex.a + 0.12 + jam);
+          vec3 mark = mix(vec3(0.72, 0.46, 0.1), vec3(0.95, 0.14, 0.08), jam);
+          ALBEDO = mix(rubber, mark, chevron * 0.8);
+          ROUGHNESS = mix(0.86, 0.68, worn * 0.5 + cleat * 0.2);
           METALLIC = 0.0;
-          EMISSION = mark * chevron * (0.06 + jam * 0.45);
+          SPECULAR = 0.28;
+          NORMAL_MAP = vec3(det.r, det.g + slope * 0.22, 1.0);
+          AO = mix(0.7, 1.0, cleat);
+          float wave = exp(-pow((UV.y - pulse) * 1.1, 2.0));
+          EMISSION = mark * chevron * (0.025 + jam * 0.45) + vec3(1.0, 0.62, 0.22) * wave * (1.0 - x * 0.5) * 0.9;
         }
         """ } };
+        band.SetShaderParameter("albedo_tex", Materials.AlbedoArray);
+        band.SetShaderParameter("detail_tex", Materials.DetailArray);
+        return band;
+    }
 
-    private static readonly StandardMaterial3D FrameMaterial = new()
+    /// <summary>Bastidor: pintura y desgaste del mismo atlas que las máquinas, proyectados en el mundo. Sigue siendo una sola superficie.</summary>
+    private static readonly ShaderMaterial FrameMaterial = MakeFrame();
+
+    private static ShaderMaterial MakeFrame()
     {
-        VertexColorUseAsAlbedo = true,
-        Roughness = 0.55f,
-        Metallic = 0.5f,
-    };
+        var frame = new ShaderMaterial { Shader = new Shader { Code = """
+        shader_type spatial;
+        render_mode cull_back, diffuse_burley;
+        uniform sampler2DArray albedo_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+        uniform sampler2DArray detail_tex : filter_linear_mipmap_anisotropic, repeat_enable;
+        uniform vec3 dust_color = vec3(0.055, 0.04, 0.036);
+        varying vec3 wp;
+        varying vec3 wn;
+        void vertex(){
+          wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+          wn = NORMAL;
+        }
+        void fragment(){
+          vec3 an = abs(wn);
+          vec2 uv = an.y > 0.6 ? wp.xz : an.x > an.z ? wp.zy : wp.xy;
+          vec3 uvw = vec3(uv / 2.0, 0.0);
+          vec4 a = texture(albedo_tex, uvw);
+          vec4 d = texture(detail_tex, uvw);
+          vec2 nmap = d.rg;
+          float fine = 0.0;
+          float close = 1.0 - smoothstep(2.5, 8.0, length(VERTEX));
+          if (close > 0.001){
+            vec3 uvn = vec3(uv / 0.38 + vec2(0.37, 0.11), 0.0);
+            nmap += (texture(detail_tex, uvn).rg - 0.5) * close * 0.9;
+            fine = (texture(albedo_tex, uvn).a - 0.5) * close;
+          }
+          vec3 col = a.rgb * COLOR.rgb * (1.0 + fine * 0.55);
+          // Rozaduras: acero visible, sobre todo en lo que más se pisa y se golpea.
+          float chip = smoothstep(0.6, 0.64, a.a * 0.72 + fine * 0.16 + 0.12);
+          float metal = mix(0.12, 1.0, chip);
+          float rough = mix(clamp(d.b * 1.1, 0.3, 1.0), 0.42, chip);
+          col = mix(col, vec3(0.42, 0.42, 0.44), chip);
+          float dust = clamp(smoothstep(0.75, 0.0, wp.y + (a.a - 0.5) * 0.5) * 0.7 + smoothstep(0.7, 0.95, wn.y) * (0.15 + a.a * 0.5), 0.0, 1.0) * 0.62;
+          ALBEDO = mix(col, dust_color, dust);
+          METALLIC = metal * (1.0 - dust);
+          ROUGHNESS = mix(rough, 0.92, dust);
+          SPECULAR = 0.42;
+          NORMAL_MAP = vec3(nmap, 1.0);
+          AO = d.a;
+          AO_LIGHT_AFFECT = 0.25;
+        }
+        """ } };
+        frame.SetShaderParameter("albedo_tex", Materials.AlbedoArray);
+        frame.SetShaderParameter("detail_tex", Materials.DetailArray);
+        frame.SetShaderParameter("dust_color", Materials.DustColor);
+        Materials.DustChanged += () => frame.SetShaderParameter("dust_color", Materials.DustColor);
+        return frame;
+    }
 
-    private static readonly Color Steel = new(0.34f, 0.36f, 0.39f);
-    private static readonly Color DarkSteel = new(0.17f, 0.18f, 0.2f);
-    private static readonly Color Support = new(0.72f, 0.56f, 0.16f);
+    // Lineales: la misma paleta de GUIA_VISUAL.md, con gris cálido y amarillo de señalización.
+    private static readonly Color Steel = new(0.2f, 0.2f, 0.195f);
+    private static readonly Color DarkSteel = new(0.075f, 0.08f, 0.09f);
+    private static readonly Color Support = new(0.52f, 0.34f, 0.045f);
 
     private struct VisualItem
     {
         public string Item;
         public float Pos;
         public float Err;
+        public float Seed;   // -1..1, fijo para cada objeto: giro y desvío, para que la carga no parezca una fila clonada
     }
 
     private sealed class BeltVisual
@@ -75,6 +150,8 @@ public partial class BeltView : Node3D
         public VisualItem[] Items = Array.Empty<VisualItem>();
         public int Count;
         public bool Elevated;
+        public float Pulse = -1;
+        public float Length;
     }
 
     private sealed class ItemBatch
@@ -94,6 +171,10 @@ public partial class BeltView : Node3D
     private int _planet = -1;
     private int _stamp = int.MinValue;
 
+    /// <summary>Cinta nueva o retirada con la partida en marcha: la respuesta visual y sonora está en ActionFeedback.</summary>
+    public event Action<Vector3>? BeltAdded;
+    public event Action<Vector3>? BeltRemoved;
+
     public int DrawnItems { get; private set; }
     public int DrawnBelts => _belts.Count;
 
@@ -107,6 +188,7 @@ public partial class BeltView : Node3D
     {
         if (planet == _planet && structuralStamp == _stamp) return;
         if (planet != _planet) Clear();
+        var fresh = planet != _planet; // cargar el planeta no es construir
         _planet = planet;
         _stamp = structuralStamp;
         var seen = new HashSet<int>();
@@ -119,10 +201,17 @@ public partial class BeltView : Node3D
             var key = KeyOf(w, l);
             if (_belts.TryGetValue(l.Id, out var v) && v.Key == key) continue;
             if (v != null) FreeChunks(v);
-            _belts[l.Id] = Build(w, l, key);
+            var built = Build(w, l, key);
+            _belts[l.Id] = built;
+            if (v == null && !fresh)
+            {
+                if (!Scenery.Calm) built.Pulse = 0;
+                BeltAdded?.Invoke(built.Center + Vector3.Up * BandY);
+            }
         }
         foreach (var id in _belts.Keys.Where(k => !seen.Contains(k)).ToList())
         {
+            if (!fresh) BeltRemoved?.Invoke(_belts[id].Center + Vector3.Up * BandY);
             FreeChunks(_belts[id]);
             _belts.Remove(id);
         }
@@ -181,6 +270,7 @@ public partial class BeltView : Node3D
         }
         visual.Center = (min + max) / 2;
         visual.Radius = (max - min).Length() / 2;
+        for (var i = 0; i < points.Length - 1; i++) visual.Length += points[i].DistanceTo(points[i + 1]);
 
         // Una malla por tramo: la distancia de dibujo se mide desde cada uno y una cinta larga no desaparece entera.
         var along = 0f;
@@ -308,6 +398,7 @@ public partial class BeltView : Node3D
     private sealed class Geometry
     {
         public readonly List<Vector3> V = new();
+        public readonly List<float> T = new();
         public readonly List<Vector3> N = new();
         public readonly List<Vector2> Uv = new();
         public readonly List<Color> C = new();
@@ -317,7 +408,13 @@ public partial class BeltView : Node3D
         {
             var start = V.Count;
             V.Add(a); V.Add(b); V.Add(c); V.Add(d);
-            for (var i = 0; i < 4; i++) { N.Add(n); C.Add(color); }
+            var tangent = (b - a).Normalized();
+            for (var i = 0; i < 4; i++)
+            {
+                N.Add(n);
+                C.Add(color);
+                T.Add(tangent.X); T.Add(tangent.Y); T.Add(tangent.Z); T.Add(1f);
+            }
             Uv.Add(uvA ?? Vector2.Zero); Uv.Add(uvB ?? Vector2.Zero); Uv.Add(uvC ?? Vector2.Zero); Uv.Add(uvD ?? Vector2.Zero);
             // Godot considera cara frontal la de sentido horario vista desde fuera.
             var clockwise = (b - a).Cross(c - a).Dot(n) < 0;
@@ -339,6 +436,24 @@ public partial class BeltView : Node3D
             Quad(center - z - x - y, center - z + x - y, center - z + x + y, center - z - x + y, -az, color);
         }
 
+        /// <summary>Cilindro de ocho caras a lo largo de axis: rodillos, tambores y ejes.</summary>
+        public void Prism(Vector3 center, Vector3 axis, Vector3 up, float radius, float halfLength, Color color)
+        {
+            var side = axis.Cross(up).Normalized();
+            Vector3 Rim(int i) => (up * Mathf.Cos(i * Mathf.Tau / 8) + side * Mathf.Sin(i * Mathf.Tau / 8)) * radius;
+            for (var i = 0; i < 8; i++)
+            {
+                var r0 = Rim(i);
+                var r1 = Rim(i + 1);
+                Quad(center + r0 - axis * halfLength, center + r1 - axis * halfLength, center + r1 + axis * halfLength, center + r0 + axis * halfLength, (r0 + r1).Normalized(), color);
+            }
+            foreach (var sign in new[] { -1f, 1f })
+            {
+                var c = center + axis * (sign * halfLength);
+                for (var i = 0; i < 3; i++) Quad(c + Rim(0), c + Rim(i * 2 + 1), c + Rim(i * 2 + 2), c + Rim(i * 2 + 3), axis * sign, color * 0.8f);
+            }
+        }
+
         public void Commit(ArrayMesh mesh, Material material)
         {
             if (V.Count == 0) return;
@@ -346,6 +461,7 @@ public partial class BeltView : Node3D
             arrays.Resize((int)Mesh.ArrayType.Max);
             arrays[(int)Mesh.ArrayType.Vertex] = V.ToArray();
             arrays[(int)Mesh.ArrayType.Normal] = N.ToArray();
+            arrays[(int)Mesh.ArrayType.Tangent] = T.ToArray();
             arrays[(int)Mesh.ArrayType.TexUV] = Uv.ToArray();
             arrays[(int)Mesh.ArrayType.Color] = C.ToArray();
             arrays[(int)Mesh.ArrayType.Index] = I.ToArray();
@@ -420,13 +536,21 @@ public partial class BeltView : Node3D
             var s = Side(t);
             var up = s.Cross(t).Normalized();
             if (up.Y < 0) up = -up;
-            frame.Box(p[i] + Vector3.Down * 0.19f, new Vector3(HalfWidth + 0.05f, 0.05f, 0.05f), s, up, t, DarkSteel);
+            // Rodillo de retorno que asoma bajo el faldón, con su eje hasta el bastidor.
+            frame.Prism(p[i] + Vector3.Down * 0.2f, s, up, 0.055f, HalfWidth + 0.02f, DarkSteel);
+            frame.Prism(p[i] + Vector3.Down * 0.2f, s, up, 0.018f, HalfWidth + 0.085f, Steel);
         }
         foreach (var i in new[] { 0, p.Length - 1 }.Where(i => i >= start && i <= end))
         {
+            // Remate: tambor sobre el que da la vuelta la banda, con dos cartelas y su eje. Sin caja encima de la goma.
             var t = Tangent(p, i);
             var s = Side(t);
-            frame.Box(p[i] + Vector3.Down * 0.05f, new Vector3(HalfWidth + 0.1f, 0.13f, 0.13f), s, Vector3.Up, t, Support);
+            var outward = i == 0 ? -t : t;
+            var axle = p[i] + Vector3.Down * 0.14f + outward * 0.03f;
+            frame.Prism(axle, s, Vector3.Up, 0.135f, HalfWidth - 0.01f, DarkSteel);
+            frame.Prism(axle, s, Vector3.Up, 0.028f, HalfWidth + 0.13f, Steel);
+            foreach (var sign in new[] { -1f, 1f })
+                frame.Box(axle + s * sign * (HalfWidth + 0.055f) + Vector3.Up * 0.02f, new Vector3(0.02f, 0.17f, 0.2f), s, Vector3.Up, t, Support);
         }
         if (elevated)
         {
@@ -447,14 +571,28 @@ public partial class BeltView : Node3D
             var groundUnder = GroundHeight(p[i].X, p[i].Z);
             var legHalf = (top - groundUnder) / 2;
             var bridgeLeg = p[i].Y - groundUnder > BandY + 0.3f;
-            var spread = HalfWidth + 0.02f + (elevated ? 0.12f : 0f);
-            var width = elevated ? 0.11f : 0.05f;
+            var spread = HalfWidth + (elevated ? 0.14f : 0.1f);
+            var width = elevated ? 0.11f : 0.04f;
+            // Travesaño que recoge el bastidor: las patas ya no atraviesan el faldón.
+            frame.Box(p[i] + Vector3.Down * 0.165f, new Vector3(spread + 0.03f, 0.025f, 0.045f), s, Vector3.Up, t, DarkSteel);
             foreach (var sign in new[] { -1f, 1f })
             {
                 var foot = p[i] + s * sign * spread;
                 foot.Y = GroundHeight(foot.X, foot.Z);
-                frame.Box(foot + Vector3.Up * legHalf, new Vector3(width, legHalf, width), s, Vector3.Up, t, bridgeLeg || elevated ? Support : Steel);
-                frame.Box(foot + Vector3.Up * 0.02f, new Vector3(width + 0.09f, 0.02f, width + 0.09f), s, Vector3.Up, t, DarkSteel);
+                var legColor = bridgeLeg || elevated ? Support : Steel;
+                frame.Box(foot + Vector3.Up * legHalf, new Vector3(width * 0.6f, legHalf, width), s, Vector3.Up, t, legColor);
+                // Cartela diagonal del bastidor a la pata, y zapata con dos pernos.
+                var brace = p[i] + s * sign * (HalfWidth - 0.1f) + Vector3.Down * 0.17f;
+                var knee = foot + Vector3.Up * Mathf.Max(0.08f, legHalf);
+                var run = knee - brace;
+                if (run.Length() > 0.05f && !elevated)
+                {
+                    var dir = run.Normalized();
+                    frame.Box((brace + knee) / 2, new Vector3(0.012f, run.Length() / 2, 0.022f), dir.Cross(t).Normalized(), dir, t, legColor * 0.8f);
+                }
+                frame.Box(foot + Vector3.Up * 0.012f, new Vector3(width + 0.07f, 0.012f, width + 0.09f), s, Vector3.Up, t, DarkSteel);
+                foreach (var along2 in new[] { -1f, 1f })
+                    frame.Box(foot + t * along2 * (width + 0.05f) + Vector3.Up * 0.03f, new Vector3(0.016f, 0.012f, 0.016f), s, Vector3.Up, t, Steel);
             }
             if (bridgeLeg || elevated)
             {
@@ -515,12 +653,12 @@ public partial class BeltView : Node3D
             }
             if (match >= 0)
             {
-                result[count++] = new VisualItem { Item = item, Pos = old[match].Pos, Err = slot - old[match].Pos };
+                result[count++] = new VisualItem { Item = item, Pos = old[match].Pos, Err = slot - old[match].Pos, Seed = old[match].Seed };
                 oldIndex = match - 1;
             }
             else
             {
-                result[count++] = new VisualItem { Item = item, Pos = slot, Err = 0 };
+                result[count++] = new VisualItem { Item = item, Pos = slot, Err = 0, Seed = Mathf.Sin((slot + l.SlotsVersion) * 12.9898f) };
             }
         }
         // Se guarda de cola a cabeza para avanzar desde el final del arreglo.
@@ -569,6 +707,12 @@ public partial class BeltView : Node3D
                 continue;
             }
             if (!v.Blocked) v.Offset += hops * SlotLength * delta;
+            if (v.Pulse >= 0)
+            {
+                // Destello que recorre la cinta recién conectada, de la máquina de origen a la de destino.
+                v.Pulse = Scenery.Calm || v.Pulse > v.Length + 3f ? -1 : v.Pulse + delta * Mathf.Max(14f, v.Length / 0.8f);
+                foreach (var (node, _, _) in v.Chunks) node.SetInstanceShaderParameter("pulse", v.Pulse < 0 ? -100f : v.Pulse);
+            }
             var jam = v.Blocked ? 1f : 0f;
             var jamChanged = jam != v.ShownJam;
             v.ShownJam = jam;
@@ -623,6 +767,15 @@ public partial class BeltView : Node3D
         if (lenXz < 1e-4f) { zx = 0; zz = 1; lenXz = 1; }
         zx /= lenXz;
         zz /= lenXz;
+        // Desvío y giro propios del objeto, sin salirse de la banda: aproximación de primer orden, sin trigonometría por objeto.
+        var side = item.Seed * 0.09f;
+        p.X += zz * side;
+        p.Z += -zx * side;
+        var turn = item.Seed * 2.7f % 0.32f;
+        (zx, zz) = (zx + zz * turn, zz - zx * turn);
+        var norm = 1f / Mathf.Sqrt(1f + turn * turn);
+        zx *= norm;
+        zz *= norm;
         var buffer = b.Buffer;
         buffer[o] = zz * scale; buffer[o + 1] = 0; buffer[o + 2] = zx * scale; buffer[o + 3] = p.X;
         buffer[o + 4] = 0; buffer[o + 5] = scale; buffer[o + 6] = 0; buffer[o + 7] = p.Y + b.Lift;
@@ -668,6 +821,29 @@ public partial class BeltView : Node3D
         distance = nearest;
         return best;
     }
+
+    /// <summary>Punto de las cintas con carga en marcha más cercanas: solo para situar su sonido. Hasta dos, por tramo.</summary>
+    public IReadOnlyList<Vector3> NearestMoving(Vector3 player)
+    {
+        _moving.Clear();
+        float best0 = float.MaxValue, best1 = float.MaxValue;
+        Vector3 at0 = default, at1 = default;
+        foreach (var v in _belts.Values)
+        {
+            if (v.Blocked || v.Count == 0) continue;
+            foreach (var (_, center, radius) in v.Chunks)
+            {
+                var d = center.DistanceSquaredTo(player) - radius * radius;
+                if (d < best0) { (best1, at1) = (best0, at0); (best0, at0) = (d, center); }
+                else if (d < best1) { (best1, at1) = (d, center); }
+            }
+        }
+        if (best0 < float.MaxValue) _moving.Add(at0);
+        if (best1 < float.MaxValue) _moving.Add(at1);
+        return _moving;
+    }
+
+    private readonly List<Vector3> _moving = new();
 
     /// <summary>Punto medio de la banda; para apuntar desde las pruebas.</summary>
     public Vector3 CenterOfBelt(int id) => _belts.TryGetValue(id, out var v) ? v.Points[v.Points.Length / 2] : Vector3.Zero;

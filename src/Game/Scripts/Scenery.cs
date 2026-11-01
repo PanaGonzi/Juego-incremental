@@ -107,6 +107,59 @@ public static class Terrain
         return Smooth(0.47f, 0.6f, large + (clear - 1f) * 0.25f);
     }
 
+    /// <summary>Hitos de la zona inicial de Plutón, fuera de los muros: norte, este, oeste y sur de la base.</summary>
+    public static readonly (string id, float x, float z, float yaw)[] Landmarks =
+    {
+        ("tower", -26f, -236f, 0f),
+        ("crane", 226f, 34f, 200f),
+        ("dome", -240f, 28f, 25f),
+        ("wreck", 18f, 232f, 8f),
+    };
+
+    private static readonly Vector2[][] Trails = BuildTrails();
+
+    /// <summary>Pistas viejas de la base a cada hito: ligeras curvas, para seguirlas a pie.</summary>
+    private static Vector2[][] BuildTrails()
+    {
+        var list = new Vector2[Landmarks.Length][];
+        for (var i = 0; i < Landmarks.Length; i++)
+        {
+            var end = new Vector2(Landmarks[i].x, Landmarks[i].z);
+            var dir = end.Normalized();
+            var side = new Vector2(-dir.Y, dir.X);
+            var points = new Vector2[10];
+            for (var k = 0; k < points.Length; k++)
+            {
+                var t = k / (float)(points.Length - 1);
+                var bend = Mathf.Sin(t * Mathf.Pi * (1.4f + i * 0.3f) + i) * 13f * Mathf.Sin(t * Mathf.Pi);
+                points[k] = dir * 34f + (end - dir * 34f) * t + side * bend;
+            }
+            list[i] = points;
+        }
+        return list;
+    }
+
+    /// <summary>Máscara y distancia con signo a la pista más cercana. Solo aspecto: la colisión sigue siendo el plano.</summary>
+    private static (float mask, float across) TrailAt(float x, float z)
+    {
+        if (Mathf.Abs(x) > 212f || Mathf.Abs(z) > 212f) return (0, 0);
+        var p = new Vector2(x, z);
+        var best = 6f;
+        var across = 0f;
+        foreach (var points in Trails)
+        for (var i = 0; i < points.Length - 1; i++)
+        {
+            var a = points[i];
+            var ab = points[i + 1] - a;
+            var t = Mathf.Clamp((p - a).Dot(ab) / ab.LengthSquared(), 0, 1);
+            var d = (a + ab * t).DistanceTo(p);
+            if (d >= best) continue;
+            best = d;
+            across = ab.Cross(p - a) >= 0 ? d : -d;
+        }
+        return (1 - Smooth(2.6f, 5.2f, best), Mathf.Clamp(across, -4f, 4f));
+    }
+
     /// <summary>Coordenadas: 2 m en la zona jugable, y paso creciente hasta el horizonte. Sin juntas en T.</summary>
     private static float[] Coordinates()
     {
@@ -159,7 +212,9 @@ public static class Terrain
                 nor[k] = new Vector3(-dx, 1, -dz).Normalized();
                 tan[k * 4] = 1;
                 tan[k * 4 + 3] = 1;
-                col[k] = new Color(IceMask(planet, xs[i], xs[j]), 0, 0);
+                // G: máscara de la pista; B: distancia con signo a su eje (±4 m), que el sombreador convierte en rodadas.
+                var (trail, across) = planet == 0 ? TrailAt(xs[i], xs[j]) : (0f, 0f);
+                col[k] = new Color(IceMask(planet, xs[i], xs[j]), trail, 0.5f + across / 8f);
             }
         });
         System.Threading.Tasks.Parallel.For(0, n - 1, j =>
@@ -219,11 +274,17 @@ public static class Terrain
           soil *= ra.rgb*1.5;
           soil *= mix(1.0,rn.r*1.6,near*0.6);
           soil *= 0.72+m2.g*0.56;
+          // Pista antigua: suelo apisonado y más claro, con dos rodadas y el borde roto por el grano.
+          float trail = COLOR.g*smoothstep(0.2,0.55,COLOR.g+(ra.a-0.5)*0.5+(m2.r-0.5)*0.4);
+          float sd = (COLOR.b-0.5)*8.0;
+          soil = mix(soil,soil*1.42+vec3(0.009,0.0068,0.0058),trail*0.85);
+          soil *= 1.0-trail*0.5*(1.0-smoothstep(0.1,0.42,abs(abs(sd)-1.05)))*(0.55+ra.a*0.5);
           // Hielo: láminas con polígonos de convección y borde irregular según el grano del suelo.
           vec3 uvi = vec3(wp.xz/11.0,4.0);
           vec4 ia = texture(albedo_tex,uvi);
           vec4 id = texture(detail_tex,uvi);
           float edge = COLOR.r+(m2.r-0.5)*0.55+(m2.g-0.5)*0.3+(ra.a-0.5)*0.22;
+          edge -= trail*0.5;
           float ice = smoothstep(0.42,0.5,edge);
           float frost = smoothstep(0.22,0.46,edge)*(1.0-ice);
           float polygon = 1.0-smoothstep(0.0,0.75,m1.a);
@@ -368,6 +429,11 @@ public sealed class Scenery
     /// <summary>Entorno activo: los ajustes se aplican al momento, en partida y en el menú.</summary>
     public static Scenery? Current { get; private set; }
 
+    /// <summary>«Reducir efectos» vigente: lo consultan todos los efectos, sin rehacer nada al cambiarlo.</summary>
+    public static bool Calm { get; private set; }
+
+    private readonly List<DustDrift> _drifts = new();
+
     /// <summary>Dirección hacia el sol: rasante y a tres cuartos del encuadre inicial, para que las máquinas modelen volumen.</summary>
     private static readonly Vector3 SunPluto = new Vector3(0.62f, 0.38f, 0.68f).Normalized();
     private static readonly Vector3 SunMars = new Vector3(-0.42f, 0.58f, 0.7f).Normalized();
@@ -376,6 +442,7 @@ public sealed class Scenery
     {
         _root = root;
         Current = this;
+        Calm = prefs.ReduceEffects;
         SkyMat = new ShaderMaterial { Shader = new Shader { Code = Terrain.SkyShader } };
         var env = new Godot.Environment
         {
@@ -481,6 +548,9 @@ public sealed class Scenery
         Sun.ShadowEnabled = prefs.Shadows;
         Env.Environment.GlowEnabled = prefs.Glow;
         ApplyQuality(prefs.Quality);
+        if (Calm == prefs.ReduceEffects) return;
+        Calm = prefs.ReduceEffects;
+        foreach (var dust in _drifts) dust.Amount = Calm ? DustDrift.CalmAmount : DustDrift.FullAmount;
     }
 
     private Node3D BuildDressing(int planet)
@@ -489,8 +559,10 @@ public sealed class Scenery
         ScatterGround(node, planet);
         ScatterBoulders(node, planet);
         BuildRuins(node, planet);
-        var dust = new DustDrift(planet == 1);
+        if (planet == 0) BuildLandmarks(node);
+        var dust = new DustDrift(planet == 1) { Amount = Calm ? DustDrift.CalmAmount : DustDrift.FullAmount };
         node.AddChild(dust);
+        _drifts.Add(dust);
         return node;
     }
 
@@ -582,10 +654,36 @@ public sealed class Scenery
             x *= m;
             z *= m;
             var s = (Mathf.Pow(rng.Next(), 2.6f) * 18f + 1.4f) / 6f;
+            // Los hitos quedan despejados: ninguna roca los tapa ni los atraviesa.
+            if (planet == 0 && NearLandmark(x, z)) continue;
             var basis = Basis.FromEuler(new Vector3(rng.Range(-0.08f, 0.08f), rng.Range(0, 6.28f), rng.Range(-0.08f, 0.08f))).Scaled(new Vector3(s, s, s));
             lists[i % 3].Add(new Transform3D(basis, new Vector3(x, Terrain.Height(planet, x, z) + s * 0.6f, z)));
         }
         for (var i = 0; i < 3; i++) AddInstances(parent, meshes[i], lists[i], 0, true);
+    }
+
+    private static bool NearLandmark(float x, float z)
+    {
+        var at = new Vector2(x, z);
+        return Terrain.Landmarks.Any(l => new Vector2(l.x, l.z).DistanceTo(at) < (l.id is "crane" or "wreck" ? 96f : 58f));
+    }
+
+    /// <summary>Hitos para orientarse: mallas sueltas, sin cuerpo físico y fuera de la zona caminable.</summary>
+    private static void BuildLandmarks(Node3D parent)
+    {
+        foreach (var (id, x, z, yaw) in Terrain.Landmarks)
+        {
+            var mesh = id switch
+            {
+                "tower" => Models.LandmarkTower(),
+                "crane" => Models.LandmarkCrane(),
+                "dome" => Models.LandmarkDome(),
+                _ => Models.LandmarkWreck(),
+            };
+            var root = new MeshInstance3D { Name = "hito_" + id, Mesh = mesh, Position = new Vector3(x, Terrain.Height(0, x, z) - 0.6f, z), RotationDegrees = new Vector3(0, yaw, 0) };
+            parent.AddChild(root);
+            if (id == "tower") root.AddChild(new LandmarkBeacon { Position = new Vector3(0, Models.BeaconHeight, 0) });
+        }
     }
 
     /// <summary>Puntos de referencia en el horizonte. Plutón: colonia minera abandonada. Marte: cúpulas y antenas.</summary>
@@ -622,7 +720,10 @@ public sealed class Scenery
             b.Tube("steel_dark", 1f, 10, new Vector3(5, 4, 5), new Vector3(9, 8, 5), new Vector3(9, 8, 14));
         }
         var mesh = b.Commit();
-        foreach (var (x, z, yaw) in new[] { (-235f, -180f, 20f), (240f, -120f, 130f), (250f, 170f, 250f), (-110f, 245f, 80f), (90f, -255f, 310f), (-260f, 90f, 175f) })
+        // En Plutón la colonia se queda en cuatro restos: seis copias iguales competían con los hitos.
+        foreach (var (x, z, yaw) in planet == 0
+            ? new[] { (-235f, -180f, 20f), (240f, -120f, 130f), (250f, 170f, 250f), (-110f, 245f, 80f) }
+            : new[] { (-235f, -180f, 20f), (240f, -120f, 130f), (250f, 170f, 250f), (-110f, 245f, 80f), (90f, -255f, 310f), (-260f, 90f, 175f) })
             parent.AddChild(new MeshInstance3D { Mesh = mesh, Position = new Vector3(x, Terrain.Height(planet, x, z) - 1, z), RotationDegrees = new Vector3(0, yaw, 0) });
     }
 }
@@ -700,7 +801,8 @@ public partial class MenuScene : Node3D
             _goods.Add((multi, i * BeltLength / 22f, i % 2 == 0 ? 0.22f : -0.22f));
         }
         // Encuadres fijos para documentar modelos con capturas del juego (--menu-view).
-        if (CmdArgs.Parse().TryGetValue("menu-view", out var view))
+        var hasView = CmdArgs.Parse().TryGetValue("menu-view", out var view);
+        if (hasView)
             _fixedView = view switch
             {
                 "extractor" => (new Vector3(17, 2.2f, 2), new Vector3(12, 2.6f, -6)),
@@ -710,9 +812,29 @@ public partial class MenuScene : Node3D
                 "terminal" => (new Vector3(-9, 2.2f, 13), new Vector3(-13, 1.6f, 7)),
                 "scrap" => (new Vector3(9.4f, 1.3f, 10.2f), new Vector3(7, 0.3f, 8)),
                 "items" => (new Vector3(0.2f, 1.25f, 4.5f), new Vector3(0.2f, 0.55f, 3f)),
+                "paint" => (new Vector3(5.6f, 1.75f, 0.2f), new Vector3(3.6f, 1.3f, -1.9f)),
+                "train" => (new Vector3(36f, 2.6f, 8f), new Vector3(30f, 1.4f, 15f)),
+                "station" => (new Vector3(36f, 3f, -19f), new Vector3(30f, 1.6f, -27f)),
+                "astronaut" => (new Vector3(-23.2f, 1.45f, 7f), new Vector3(-22f, 1.1f, 9f)),
                 _ => null,
             };
         AddChild(beltRoot);
+        // Piezas que solo aparecen en sus encuadres de documentación.
+        if (view == "train")
+        {
+            AddChild(new MeshInstance3D { Mesh = Models.Locomotive(), Position = new Vector3(30, 0, 18), RotationDegrees = new Vector3(0, 90, 0) });
+            var wagon = new MeshInstance3D { Mesh = Models.Wagon(), Position = new Vector3(37.5f, 0, 18), RotationDegrees = new Vector3(0, 90, 0) };
+            wagon.AddChild(new MeshInstance3D { Mesh = Models.WagonLoad(), Position = new Vector3(0, 0.95f, 0), Scale = new Vector3(1, 1.1f, 1) });
+            AddChild(wagon);
+        }
+        if (view == "station") Place("station", 30, -30);
+        if (view == "astronaut")
+        {
+            var person = new Node3D { Position = new Vector3(-22, 0, 9), RotationDegrees = new Vector3(0, 195, 0) };
+            person.AddChild(new MeshInstance3D { Mesh = Models.Astronaut() });
+            person.AddChild(new RemoteToolView { Position = new Vector3(-0.3f, 1.02f, 0.42f), RotationDegrees = new Vector3(0, 180, 0), StartEquipped = true });
+            AddChild(person);
+        }
 
         _camera = new Camera3D { Fov = 50, Far = 3000, Near = 0.1f, Current = true };
         AddChild(_camera);
@@ -746,6 +868,9 @@ public partial class MenuScene : Node3D
 /// <summary>Polvo a ras de suelo que acompaña a la cámara. Pocas partículas: se ve el viento, no tapa nada.</summary>
 public partial class DustDrift : GpuParticles3D
 {
+    public const int FullAmount = 90;
+    public const int CalmAmount = 30;
+
     public DustDrift(bool mars)
     {
         var material = new ParticleProcessMaterial
@@ -760,7 +885,6 @@ public partial class DustDrift : GpuParticles3D
             ScaleMin = 0.6f,
             ScaleMax = 1.6f,
         };
-        Amount = 90;
         Lifetime = 7;
         Preprocess = 7;
         LocalCoords = false;
