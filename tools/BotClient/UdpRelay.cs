@@ -19,6 +19,8 @@ sealed class UdpRelay : IDisposable
     private volatile bool _running = true;
     public long Dropped;
     public long Forwarded;
+    /// <summary>Si existe, cada datagrama queda anotado con su propiedad y secuencia de LiteNetLib (BUG-005).</summary>
+    public System.IO.StreamWriter? Trace;
     public int LocalPort => ((IPEndPoint)_front.Client.LocalEndPoint!).Port;
 
     public UdpRelay(string host, int port, int rttMs, int jitterMs, int lossPercent, int seed)
@@ -49,7 +51,9 @@ sealed class UdpRelay : IDisposable
                     roll = _rng.Next(100);
                     jitter = _jitterMs > 0 ? _rng.Next(_jitterMs + 1) : 0;
                 }
-                if (roll < _lossPercent)
+                var dropped = roll < _lossPercent;
+                Note(data, toServer, dropped);
+                if (dropped)
                 {
                     Interlocked.Increment(ref Dropped);
                     continue;
@@ -58,6 +62,33 @@ sealed class UdpRelay : IDisposable
             }
             catch (SocketException) when (_running) { }
             catch (Exception e) when (e is SocketException or ObjectDisposedException) { return; }
+        }
+    }
+
+    private void Note(byte[] data, bool toServer, bool dropped)
+    {
+        if (Trace is not { } trace || data.Length < 1) return;
+        var stamp = System.Diagnostics.Stopwatch.GetTimestamp();
+        var side = toServer ? 'C' : 'S';
+        void Line(int at, int length)
+        {
+            var sequence = length >= 3 ? BitConverter.ToUInt16(data, at + 1) : 0;
+            var channel = length >= 4 ? data[at + 3] : 0;
+            lock (trace) trace.WriteLine($"{stamp},{side},{(dropped ? 1 : 0)},{data[at] & 0x1F},{sequence},{channel},{length}");
+        }
+        const int Merged = 13;
+        if ((data[0] & 0x1F) != Merged)
+        {
+            Line(0, data.Length);
+            return;
+        }
+        for (var at = 1; at + 2 < data.Length;)
+        {
+            int size = BitConverter.ToUInt16(data, at);
+            at += 2;
+            if (size == 0 || at + size > data.Length) break;
+            Line(at, size);
+            at += size;
         }
     }
 

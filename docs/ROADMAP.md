@@ -76,7 +76,7 @@ Cómo leer las columnas: **Implementado** es que el código existe. **Comprobado
 | E-8 | A | Revisión independiente de calidad y rendimiento con cintas cargadas | no | medidas parciales en PERFORMANCE y T-019 | La revisión independiente no se ha hecho |
 | E-9 | M | Divisores y combinadores | sustituida por C-3 | — | — |
 | E-10 | M | Acabado de Marte y del resto de máquinas | en parte: terreno y cielo de Marte, plataforma de carga | `artifacts/qa/0.5-marte/` | El resto de máquinas |
-| E-11 | M | BUG-005: picos de respuesta | lectura de RTT explicada y reducida | T-021 | Causa del pico real: sin medir |
+| E-11 | M | BUG-005: picos de respuesta | causa medida y mitigada: reenvío 1,3×RTT y lectura cada 5 ms | T-021, T-023, relé en un PC | Picos con pérdidas seguidas; canales separados sin probar; redes reales |
 
 ## A0.6 — Construcción, gestión y primeros 30 minutos
 

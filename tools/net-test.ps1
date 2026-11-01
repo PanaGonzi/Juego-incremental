@@ -13,6 +13,7 @@ param(
     [int]$Travelers = 0,
     [string]$Scenario = '',
     [string]$BinDir = '',
+    [switch]$Trace,
     [switch]$Abuser
 )
 $ErrorActionPreference = 'Stop'
@@ -36,6 +37,7 @@ $Content = "$Repo\content"
 
 $extraServer = @()
 if ($Scenario -ne '') { $extraServer = @('--load-test-scenario', $Scenario) }
+if ($Trace) { $extraServer += @('--trace-commands', "`"$Out\server-commands.csv`"") }
 $srv = Start-Process $Server -PassThru -NoNewWindow -RedirectStandardOutput "$Out\server.log" -RedirectStandardError "$Out\server.err" `
     -ArgumentList (@('--port', $Port, '--world', 'test', '--profile', 'test', '--data-root', "`"$DataRoot`"", '--metrics', "`"$Out\metrics.csv`"", '--load-test-unlock', '--content', "`"$Content`"", '--autosave', '30', '--stop-file', "`"$Out\stop.txt`"") + $extraServer)
 Start-Sleep -Milliseconds 800
@@ -48,6 +50,7 @@ for ($i = 0; $i -lt $Clients; $i++) {
     $a = @('--port', $Port, '--seconds', $Seconds, '--index', $i, '--behaviour', $behaviour, '--content', "`"$Content`"")
     if ($Latency -ge 0) { $a += @('--latency', $Latency, '--jitter', $Jitter, '--loss', $Loss) }
     if ($Reconnect -gt 0 -and $i % 4 -eq 3) { $a += @('--reconnect-every', $Reconnect) }
+    if ($Trace) { $a += @('--trace', "`"$Out`"") }
     $procs += Start-Process $Bot -PassThru -NoNewWindow -ArgumentList $a -RedirectStandardOutput "$Out\bot$i.log" -RedirectStandardError "$Out\bot$i.err"
     Start-Sleep -Milliseconds 150
 }

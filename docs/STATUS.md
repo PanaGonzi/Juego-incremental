@@ -10,7 +10,8 @@
 
 - **Comprobado con recorridos automáticos y xUnit, en un PC:** cintas, construcción, gestión, zona, tren, viaje, Marte, Halloween, ausencia, dos clientes sobre la misma fábrica con anfitrión y dedicado, y 12 clientes con el 13.º rechazado (T-018 a T-022).
 - **Comprobado con entradas reales de Windows:** solo hasta `0.5.0-qa2`, y en parte.
-- **No hecho:** revisión independiente de rendimiento (E-8); acabado del resto de máquinas (E-10); causa de BUG-005 (E-11).
+- **No hecho:** revisión independiente de rendimiento (E-8).
+- **Mitigado sin resolver del todo:** BUG-005: causa medida y respuesta mejorada, pero con pérdida siguen los picos (T-023).
 
 **Pendiente con controles reales:** lista concreta en [PENDIENTE_CONTROLES_REALES](PENDIENTE_CONTROLES_REALES.md). Toma el foco y el ratón: solo cuando el titular no esté usando el equipo. No detiene el resto del trabajo.
 

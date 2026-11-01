@@ -38,6 +38,12 @@ public sealed class LiteNetTransport : ITransport
     public event Action<int, byte[], int>? Received;
     public event Action<int, string>? Disconnected;
 
+    /// <summary>
+    /// Espera antes de reenviar, en veces el RTT. El valor de LiteNetLib 2.1.5 es 2,1, unos 420 ms con 200 ms de RTT, y el canal ordenado
+    /// retiene todo lo que viene detrás de lo perdido. Con 1,3 la orden de 150 ms y 3 % baja de p99 729-980 a 541-623 ms sin más tráfico (T-023).
+    /// </summary>
+    private const float ResendRttMultiplier = 1.3f;
+
     private LiteNetTransport()
     {
         _net = new NetManager(_listener)
@@ -59,6 +65,7 @@ public sealed class LiteNetTransport : ITransport
         };
         _listener.PeerConnectedEvent += peer =>
         {
+            peer.ResendRttMultiplier = ResendRttMultiplier;
             _peers[peer.Id] = peer;
             Connected?.Invoke(peer.Id);
         };

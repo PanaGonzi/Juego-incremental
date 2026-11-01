@@ -77,6 +77,9 @@ var server = new GameServer(world, transport, new ServerOptions
     AutosaveSeconds = autosave,
     Log = Log,
 });
+// Medición por etapas (BUG-005): solo con --trace-commands.
+StreamWriter? commandTrace = args2.TryGetValue("trace-commands", out var tracePath) ? new StreamWriter(tracePath) : null;
+if (commandTrace != null) server.TraceCommand = (key, request, stamp) => commandTrace.WriteLine($"{key},{request},{stamp}");
 var runner = new ServerRunner(server);
 runner.Start();
 Log($"PLUTON servidor {Protocol.GameVersion} protocolo {Protocol.Version} contenido {content.Revision} en UDP {port}, máximo {maxPlayers}");
@@ -127,6 +130,7 @@ while (!quit.Wait(500))
 
 Log("Cerrando: guardando mundo");
 runner.Stop(save: runner.Fault == null);
+commandTrace?.Dispose();
 runner.Dispose();
 Log("Cerrado");
 

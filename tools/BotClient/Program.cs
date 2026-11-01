@@ -28,6 +28,14 @@ if (map.TryGetValue("latency", out var latency))
     port = relay.LocalPort;
 }
 
+// Medición por etapas (BUG-005): las marcas de Stopwatch son comparables entre procesos de un mismo PC.
+System.IO.StreamWriter? commandTrace = null;
+if (map.TryGetValue("trace", out var traceDir))
+{
+    commandTrace = new System.IO.StreamWriter(System.IO.Path.Combine(traceDir, $"cmd{index}.csv"));
+    if (relay != null) relay.Trace = new System.IO.StreamWriter(System.IO.Path.Combine(traceDir, $"relay{index}.csv"));
+}
+
 var content = ContentDb.Load(map.GetValueOrDefault("content", ContentDb.LocateDirectory()));
 var total = Stopwatch.StartNew();
 long ok = 0, failed = 0, chats = 0, moves = 0, reconnects = 0, connectMsSum = 0, connects = 0;
@@ -45,10 +53,16 @@ while (total.Elapsed.TotalSeconds < seconds)
     var client = new GameClient(content, LiteNetTransport.Dial(host, port), key, protocolLabel);
     // Respuesta de la aplicación, medida aparte del RTT que informa el transporte.
     var sentAt = new Dictionary<uint, long>();
-    client.CommandSent += id => sentAt[id] = total.ElapsedMilliseconds;
+    var sentStamp = new Dictionary<uint, long>();
+    client.CommandSent += id =>
+    {
+        sentAt[id] = total.ElapsedMilliseconds;
+        if (commandTrace != null) sentStamp[id] = Stopwatch.GetTimestamp();
+    };
     client.ResultReceived += (id, r) =>
     {
         if (sentAt.Remove(id, out var at)) commandMs.Add(total.ElapsedMilliseconds - at);
+        if (commandTrace != null && sentStamp.Remove(id, out var sentTs)) commandTrace.WriteLine($"{key},{id},{sentTs},{Stopwatch.GetTimestamp()}");
         if (r.Ok) ok++;
         else
         {
@@ -133,6 +147,8 @@ while (total.Elapsed.TotalSeconds < seconds)
     if (total.Elapsed.TotalSeconds < seconds) reconnects++;
 }
 
+commandTrace?.Flush();
+if (relay?.Trace is { } relayTrace) lock (relayTrace) relayTrace.Flush();
 Report();
 Environment.Exit(mismatches == 0 ? 0 : 5);
 

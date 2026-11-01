@@ -26,6 +26,33 @@ Los resultados de un tipo no demuestran otro. Todo se ejecutó en una sola máqu
 | T-020 | 01-11-2026 | I | Regresión del cliente exportado: cintas, cinta larga, gestión, zona, tren, viaje, Marte, Halloween, ausencia, construcción y bucle completo | Correcto, sin eventos de GPU. Construcción y bucle con `-NoCapture`: omiten la captura del ratón y las comprobaciones de entrada, para no interferir con el titular. Esas comprobaciones, y el escenario `fp`, **no repetidas** en esta build |
 | T-021 | 01-11-2026 | R | BUG-005, 12 clientes 45 s con relé UDP. Respuesta real = desde enviar la orden hasta recibir su resultado | Ping 1000 ms: 150/0 % RTT 203, resp. máx. 356; 150/3 % RTT 1006, resp. máx. 1560; 50/0 % RTT 105, resp. máx. 251; 50/1 % RTT 602, resp. máx. 652. Ping 500 ms: 150/0 % RTT 203, resp. máx. 376; 150/3 % RTT 514, resp. máx. 1354; 50/1 % RTT 331, resp. máx. 623; 100/2 % RTT 514, resp. máx. 699. Sin divergencias |
 | T-022 | 01-11-2026 | I | Sobre el paquete `alpha-0.5.0-qa4` (1f7f047): `coopfactory` con anfitrión y dedicado, bucle con `-NoCapture`; 247 xUnit antes de exportar | Correcto, sin eventos de GPU. T-019 a T-021 son de la build anterior; desde entonces solo cambian el modelo de la plataforma y la versión. No repetidos aquí: `fp`, `InputPaths`, migración `beltsv4`, entradas reales |
+| T-023 | 01-11-2026 | R | BUG-005 por etapas, sobre el código exacto de LiteNetLib 2.1.5 (descompilado): 12 clientes, 40 s, relé con 150 ms y jitter 20. Marcas de reloj comunes en cliente, relé y servidor. Tabla abajo | Causa identificada; respuesta real mejorada, picos no eliminados. Ver tabla. Sin divergencias |
+
+## T-023: tiempo de orden a resultado, en ms
+
+Cada fila es un ensayo de 40 s con unas 450 órdenes. «>500» cuenta órdenes de más de 500 ms. La pérdida es en el relé, en un solo PC.
+
+| Configuración | Red | p50 | p99 | Máx. | >500 | Ida p50 | Vuelta p50 | Reenvío p50 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Antes | 150/0 % | 278 | 343 | 345 | 0 | 156 | 110 | — |
+| Antes | 150/3 % | 279 | 916 | 1156 | 39 | 157 | 110 | 416-418 |
+| Antes | 150/3 % | 279 | 980 | 1514 | 34 | 156 | 110 | 409-421 |
+| Antes | 150/3 % | 279 | 729 | 947 | 37 | 156 | 110 | 419-420 |
+| Lectura cada 5 ms | 150/0 % | 233 | 268 | 281 | 0 | 123 | 110 | — |
+| Lectura cada 5 ms | 150/3 % | 234 | 807 | 1074 | 40 | 123 | 110 | 420-422 |
+| Lectura cada 5 ms | 150/3 % | 234 | 832 | 1225 | 39 | 123 | 110 | 418-436 |
+| Lectura + reenvío 1,3 | 150/0 % | 231 | 265 | 281 | 0 | 122 | 109 | — |
+| Lectura + reenvío 1,3 | 150/3 % | 231 | 541 | 623 | 11 | 122 | 109 | 264-266 |
+| Lectura + reenvío 1,3 | 150/3 % | 232 | 556 | 1009 | 11 | 123 | 110 | 264-281 |
+| Lectura + reenvío 1,3 | 150/3 % | 233 | 623 | 685 | 23 | 123 | 110 | 264-279 |
+
+Lectura de los datos:
+
+- **Sin pérdida no hay picos.** En los tres ensayos «Antes» con pérdida, las 110 órdenes de más de 500 ms tenían un datagrama fiable perdido a menos de 1 s en su sentido; ninguna quedó sin esa pérdida. Esa ventana es amplia: indica coincidencia, no prueba cada caso. La retención por orden no se midió paquete a paquete.
+- **El reenvío coincide con la fórmula de la 2.1.5:** `25 + RTT×2,1`, unos 420 ms con 190 ms de RTT. Con 1,3 pasa a unos 265 ms, también la fórmula. Un ping perdido sigue contando como muestra igual a su intervalo: confirmado en `LiteNetPeer` de la 2.1.5.
+- **Leer la red solo por tick** añadía de media 33 ms a la ida en cualquier red, con o sin pérdida.
+- **Coste:** sin pérdida, los datagramas fiables no aumentan (3044 con 2,1 y 2929 con 1,3). El contador de reenvíos innecesarios de `trace-analyze` da cifras parecidas (unas 800) en todos los ensayos, también con 0 % y con cualquier multiplicador: no distingue copias reales y no sirve como medida.
+- **Con redes con mucho jitter** un reenvío más temprano puede duplicar paquetes sin necesidad; no se ha medido.
 
 ## Errores que estas pruebas encontraron
 

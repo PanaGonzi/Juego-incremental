@@ -250,11 +250,15 @@ public sealed class GameServer : IDisposable
         return true;
     }
 
+    /// <summary>Solo para medir (BUG-005): clave del jugador, número de orden y marca de tiempo al aplicarla.</summary>
+    public Action<string, uint, long>? TraceCommand;
+
     private void HandleCommand(Session s, BinaryReader r)
     {
         var request = r.ReadUInt32();
         var command = CommandCodec.Read(r);
         if (command.Text.Length > 64) { Violation(s); return; }
+        TraceCommand?.Invoke(s.Player!.Key, request, System.Diagnostics.Stopwatch.GetTimestamp());
 
         var recent = _recent.TryGetValue(s.Player!.Key, out var existing)
             ? existing
@@ -360,6 +364,9 @@ public sealed class GameServer : IDisposable
     }
 
     /// <summary>Procesa red y, si procede, avanza un tick. La llama el bucle del hilo del servidor.</summary>
+    /// <summary>Entre ticks: atiende lo recibido sin esperar al siguiente. Mismo hilo que Tick, así que no hay carreras con la simulación.</summary>
+    public void PollBetweenTicks() => _transport.Poll();
+
     public void Tick()
     {
         _transport.Poll();
@@ -647,6 +654,7 @@ public sealed class ServerRunner : IDisposable
     private volatile bool _running = true;
     private readonly object _metricsLock = new();
     private readonly List<double> _tickMs = new();
+    private const int PollMs = 5;
     public long TicksLate { get; private set; }
     public Exception? Fault { get; private set; }
 
@@ -670,7 +678,9 @@ public sealed class ServerRunner : IDisposable
                 var now = clock.Elapsed.TotalMilliseconds;
                 if (now < next)
                 {
-                    Thread.Sleep(Math.Max(1, (int)(next - now)));
+                    // Una orden no espera al tick para aplicarse: esperar suponía de 0 a 100 ms de más a la ida (BUG-005).
+                    Server.PollBetweenTicks();
+                    Thread.Sleep(Math.Clamp((int)(next - now), 1, PollMs));
                     continue;
                 }
                 var t0 = clock.Elapsed.TotalMilliseconds;
