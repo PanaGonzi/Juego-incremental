@@ -769,7 +769,7 @@ public partial class FirstPersonRig : Node3D
     // Posturas de reposo en el espacio de la cámara.
     private static readonly Vector3 ToolPos = new(0.335f, -0.25f, -0.58f);
     private static readonly Vector3 ToolRot = new(0.06f, 0.3f, -0.03f);
-    private static readonly Vector3 DevicePos = new(-0.01f, -0.165f, -0.44f);
+    private static readonly Vector3 DevicePos = new(-0.01f, -0.15f, -0.44f);
     private static readonly Vector3 DeviceRot = new(0.86f, 0.045f, 0.06f);
     private static readonly Vector3 ReachPos = new(-0.17f, -0.2f, -0.42f);
     private const float NeckZ = -0.262f, NeckY = 0.09f, MaxBoom = 2.6f;
@@ -1059,9 +1059,9 @@ public partial class ImpactEffects : Node3D
     {
         var (color, emission, speedMin, speedMax, gravity, size, life, spread) = kind switch
         {
-            ImpactKind.Ice => (new Color(0.78f, 0.9f, 1f, 0.75f), 0.12f, 0.5f, 2.2f, -1.1f, 0.05f, 0.62f, 80f),
-            ImpactKind.Rock => (new Color(0.34f, 0.2f, 0.15f), 0f, 1.2f, 3.2f, -3.6f, 0.045f, 0.6f, 60f),
-            _ => (new Color(1f, 0.62f, 0.24f), 2.6f, 1.8f, 4.6f, -3.1f, 0.022f, 0.46f, 65f),
+            ImpactKind.Ice => (new Color(0.78f, 0.9f, 1f, 0.7f), 0.12f, 0.3f, 1.3f, -0.9f, 0.05f, 0.55f, 70f),
+            ImpactKind.Rock => (new Color(0.34f, 0.2f, 0.15f), 0f, 0.7f, 2.2f, -4f, 0.04f, 0.5f, 55f),
+            _ => (new Color(1f, 0.62f, 0.24f), 2.6f, 0.9f, 2.6f, -3.6f, 0.014f, 0.34f, 60f),
         };
         var scale = new Curve();
         scale.AddPoint(new Vector2(0, 1));
@@ -1136,7 +1136,8 @@ public partial class ImpactEffects : Node3D
             if (on)
             {
                 emitter.GlobalPosition = at + towards * 0.08f;
-                ((ParticleProcessMaterial)emitter.ProcessMaterial).Direction = (towards + Vector3.Up * 0.8f).Normalized();
+                // Salen sobre todo hacia arriba y a los lados: nunca directos a la cámara, donde se verían enormes.
+                ((ParticleProcessMaterial)emitter.ProcessMaterial).Direction = (towards * 0.3f + Vector3.Up).Normalized();
             }
             if (emitter.Emitting != on) emitter.Emitting = on;
         }

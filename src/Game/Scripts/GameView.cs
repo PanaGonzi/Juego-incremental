@@ -1923,7 +1923,9 @@ public partial class GameView : Node3D
         _working = cutting;
         _impacts.Work(cutting ? impact : null, _aimPoint, (_camera.GlobalPosition - _aimPoint).Normalized());
         UpdateHighlight(blocked ? null : highlight, highlightColor);
-        _targetBar.Set(blocked ? null : progress, progressColor);
+        // Mientras trabaja, el cabezal ocupa esa zona: basta con el estado y la barra de vida.
+        if (cutting) prompt = "";
+        _targetBar.Set(blocked || _tool != Tool.Cutter ? null : progress, progressColor);
         _hud.SetPrompt(blocked ? "" : status, statusColor, blocked ? "" : prompt);
     }
 
@@ -1968,6 +1970,12 @@ public partial class GameView : Node3D
         _pitch = Mathf.Atan2(d.Y, new Vector2(d.X, d.Z).Length());
         _body.Rotation = new Vector3(0, _yaw, 0);
         _head.Rotation = new Vector3(_pitch, 0, 0);
+    }
+
+    public void InjectRemoteForTest(Vector3 at, float yaw, byte action)
+    {
+        OnRemoteMoved(9000, at.X, at.Y, at.Z, yaw);
+        OnRemoteAction(9000, action);
     }
 
     public void SetRailShape(byte shape) => _railShape = shape;

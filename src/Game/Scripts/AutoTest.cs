@@ -248,6 +248,7 @@ public partial class AutoTest : Node
 
             if (_args.ContainsKey("measure")) await MeasureScenario();
             else if (_args.GetValueOrDefault("scenario") == "rail") await RailScenario();
+            else if (_args.GetValueOrDefault("scenario") == "fp") await FirstPersonScenario();
             else if (_args.GetValueOrDefault("scenario") == "travel") await TravelScenario();
             else if (_args.GetValueOrDefault("scenario") == "halloween") await HalloweenScenario();
             else if (_args.GetValueOrDefault("scenario") == "mars") await MarsScenario();
@@ -265,6 +266,53 @@ public partial class AutoTest : Node
             Check(false, "excepción: " + e);
         }
         Finish();
+    }
+
+    /// <summary>Primera persona: entrada real, trabajo, consola, inventario doble y el modelo externo de otro jugador.</summary>
+    private async Task FirstPersonScenario()
+    {
+        var v = _view!;
+        await InputPaths();
+        await Shot("fp_reposo");
+
+        // Inventario doble junto al depósito, con una transferencia exacta por el mismo comando de la interfaz.
+        var depot = W.Machines.Values.First(m => m.Def == "depot");
+        var c = CenterOf(depot);
+        await WalkTo(new Vector3(c.X, 0, c.Z + 6.5f));
+        v.AimAt(c);
+        await Wait(0.2);
+        var client = v.Session.Client;
+        var before = client.LocalPlayer!.Bag.Get("scrap");
+        Check(before >= 2, $"hay chatarra en la mochila: {before}");
+        v.OpenInventory(InventoryTab.Items, depot.Id);
+        await Wait(0.3);
+        Check(v.Inventory.BagSlotCount > 0 && v.Inventory.MachineId == depot.Id, "inventario doble con la mochila y el depósito");
+        var inside = depot.In.Get("scrap");
+        client.Send(new Command { Type = CommandType.Insert, A = depot.Id, Text = "scrap", Amount = 2 });
+        var moved = await Until(() => client.LocalPlayer!.Bag.Get("scrap") == before - 2, 3);
+        await Wait(0.2);
+        Check(moved && W.Machines[depot.Id].In.Get("scrap") == inside + 2, "transferencia parcial exacta confirmada por el servidor");
+        await Shot("fp_inventario_doble");
+        v.ClosePanelForTest();
+        await Wait(0.2);
+        Check(!v.PanelIsOpen, "el inventario se cierra");
+
+        // Otro jugador, inyectado por la misma entrada que usa la red: herramienta en cada estado.
+        var at = v.PlayerPosition + new Vector3(0, 0, 3.4f);
+        v.AimAt(at + Vector3.Up);
+        foreach (var (name, action) in new[]
+        {
+            ("fp_remoto_trabajando", Pluton.Networking.PlayerAction.Pack(Pluton.Networking.PlayerAction.Cutter, true)),
+            ("fp_remoto_consola", Pluton.Networking.PlayerAction.Device),
+            ("fp_remoto_guardada", Pluton.Networking.PlayerAction.Stowed),
+        })
+        {
+            v.InjectRemoteForTest(at, 0, action);
+            await Wait(0.4);
+            v.InjectRemoteForTest(at, 0, action);
+            await Wait(0.2);
+            await Shot(name);
+        }
     }
 
     private async Task JoinedScenario()
