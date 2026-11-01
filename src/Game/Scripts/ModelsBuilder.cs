@@ -504,6 +504,8 @@ public static partial class Models
         public Builder Port(float x, float z, bool output, float y = 0.62f)
         {
             var dir = z >= 0 ? 1f : -1f;
+            // Conducto hacia el cuerpo: la boca nunca queda como una caja suelta.
+            Box("steel_dark", x, y, z - dir * 0.55f, 0.92f, 0.68f, 0.9f);
             Box("steel_dark", x, y, z - dir * 0.06f, 1.08f, 0.84f, 0.2f);
             Box("dark", x, y, z + dir * 0.045f, 0.82f, 0.58f, 0.02f, bevel: 0);
             Box(output ? "signal" : "cream", x, y + 0.5f, z - dir * 0.02f, 1.08f, 0.14f, 0.14f);

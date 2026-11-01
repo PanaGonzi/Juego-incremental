@@ -710,24 +710,26 @@ public static partial class Models
 
     private static readonly Dictionary<string, ArrayMesh> DebrisCache = new();
 
-    /// <summary>Chapa arrancada: se dobla por un eje, se abarquilla y acaba en borde roto.</summary>
-    private static void ScrapSheet(Builder b, Rng r, string mat, Vector3 at)
+    /// <summary>Chapa arrancada: pliegue vivo, torsión, ondas y contorno desgarrado. Nunca un rectángulo limpio.</summary>
+    private static void ScrapSheet(Builder b, Rng r, string mat, Vector3 at, float size = 1f)
     {
-        var fold = r.Range(0.8f, 2.4f);
-        var twist = r.Range(-1.3f, 1.3f);
-        var curl = r.Range(-0.6f, 0.6f);
-        var w = r.Range(0.7f, 1.2f);
-        var d = r.Range(0.8f, 1.5f);
+        var crease = r.Range(0.25f, 0.7f) * (r.Next() < 0.5f ? -1 : 1);
+        var creaseAt = r.Range(-0.2f, 0.25f);
+        var twist = r.Range(-1.6f, 1.6f);
+        var w = r.Range(0.5f, 0.85f) * size;
+        var d = r.Range(0.6f, 1.05f) * size;
         var seed = r.Range(0, 100);
-        var tf = new Transform3D(Basis.FromEuler(new Vector3(r.Range(-0.5f, 0.5f), r.Range(0, 6.28f), r.Range(-0.5f, 0.5f))), at);
-        b.Sheet(mat, tf, w, d, 6, 7, (u, v) =>
+        var tf = new Transform3D(Basis.FromEuler(new Vector3(r.Range(-0.7f, 0.7f), r.Range(0, 6.28f), r.Range(-0.7f, 0.7f))), at);
+        b.Sheet(mat, tf, w, d, 8, 9, (u, v) =>
         {
             var t = v / d;
-            var bend = Mathf.Sin(Mathf.Clamp(t * 2 + 0.3f, -1, 1) * 1.2f) * fold * 0.28f;
-            var y = bend + t * t * curl + u * t * twist * 0.6f;
-            var tear = Terrain.Noise3(new Vector3(u * 7 + seed, 0, v * 5)) * 0.1f;
-            return new Vector3(u + tear * Mathf.Sign(u), y + 0.1f + tear * 0.5f, v * (1 - Mathf.Abs(y) * 0.2f));
-        }, 0.03f, u => Terrain.Noise3(new Vector3(u * 11 + seed, 3, 0)) * 0.22f);
+            var fold = Mathf.Abs(t - creaseAt) * crease;
+            var y = fold + u * t * twist + (Terrain.Noise3(new Vector3(u * 9 + seed, 1, v * 9)) - 0.5f) * 0.09f;
+            var tear = Terrain.Noise3(new Vector3(u * 13 + seed, 5, v * 13));
+            var edgeU = Mathf.Abs(u) / (w * 0.5f);
+            var jag = 1 - Mathf.Pow(edgeU, 3) * tear * 0.45f;
+            return new Vector3(u * (1 - tear * 0.38f * Mathf.Abs(t) * 2), y + 0.22f, v * jag);
+        }, 0.025f, u => Terrain.Noise3(new Vector3(u * 17 + seed, 3, 0)) * 0.3f * size);
     }
 
     /// <summary>Viga en H retorcida: dos alas y alma siguiendo la misma curva.</summary>
@@ -764,9 +766,12 @@ public static partial class Models
                 var dark = def == "shadow_scrap";
                 // Base de tierra removida para que el montón apoye en el suelo.
                 b.Rock(dark ? "rock" : "regolith", 0, 0, 0, 1.05f, 0.22f, 0.95f, variant + 3, 1);
-                for (var i = 0; i < 3; i++) ScrapSheet(b, r, i == 0 ? (dark ? "dark" : "signal") : i == 1 ? "rust" : "rustlight", Near(0.4f));
+                // Mucho metal oxidado, poca pintura: el naranja queda como resto reconocible, no como masa.
+                for (var i = 0; i < 6; i++)
+                    ScrapSheet(b, r, i == 0 ? (dark ? "dark" : "signal") : i == 3 ? "hull" : i % 2 == 0 ? "rust" : "rustlight", Near(0.55f), i == 0 ? 0.55f : r.Range(0.6f, 1f));
                 BentBeam(b, r, dark ? "steel_dark" : "rust", Near(0.25f));
-                if (variant != 1) BentBeam(b, r, dark ? "rust" : "steel_dark", Near(0.4f));
+                BentBeam(b, r, dark ? "rust" : "steel_dark", Near(0.4f));
+                if (variant != 1) BentBeam(b, r, "rustlight", Near(0.5f));
                 // Bidón aplastado, o tubo arrancado con su brida.
                 if (variant == 2)
                 {

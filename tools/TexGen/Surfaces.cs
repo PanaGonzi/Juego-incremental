@@ -18,7 +18,7 @@ public static class Surfaces
     {
         ("metal_pintado", Painted, 2.2f),
         ("acero", Steel, 1.2f),
-        ("goma", Rubber, 3.5f),
+        ("goma", Rubber, 1.4f),
         ("roca", Rock, 6f),
         ("hielo", Ice, 3.5f),
         ("regolito", Regolith, 3.2f),

@@ -64,6 +64,8 @@ Celda 2 m. Ojo a 1,62 m. Barandilla 0,9 m, escalón de zapata 0,25 m, boca de ci
 
 ## Presupuestos
 
+Los triángulos por modelo son objetivo de diseño, no medidos uno a uno; los dibujos y tiempos sí están medidos.
+
 | Elemento | Presupuesto |
 | --- | --- |
 | Máquina | ≤ 8000 triángulos; 1 superficie opaca y, si tiene vidrio, otra |

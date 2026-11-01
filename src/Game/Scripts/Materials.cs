@@ -61,13 +61,13 @@ public static class Materials
         // Vidrio.
         ["glass"] = new(Layer.Steel, new Color(0.55f, 0.72f, 0.8f, 0.24f), 0f, 0.08f, 0, 0, Pass.Glass),
         // Óxido y chatarra.
-        ["rust"] = new(Layer.Rust, new Color(0.26f, 0.12f, 0.055f), 0.45f, 0.5f),
-        ["rustlight"] = new(Layer.Rust, new Color(0.38f, 0.21f, 0.1f), 0.5f, 0.45f),
+        ["rust"] = new(Layer.Rust, new Color(0.15f, 0.07f, 0.033f), 0.45f, 0.5f),
+        ["rustlight"] = new(Layer.Rust, new Color(0.23f, 0.12f, 0.055f), 0.5f, 0.45f),
         // Mineral.
         ["rock"] = new(Layer.Rock, new Color(0.26f, 0.22f, 0.2f), 0f, 0.5f),
         ["rock_cold"] = new(Layer.Rock, new Color(0.15f, 0.145f, 0.16f), 0f, 0.5f),
         ["redrock"] = new(Layer.Rock, new Color(0.62f, 0.28f, 0.14f), 0f, 0.5f),
-        ["regolith"] = new(Layer.Regolith, new Color(0.3f, 0.21f, 0.17f), 0f, 0.5f),
+        ["regolith"] = new(Layer.Regolith, new Color(0.09f, 0.062f, 0.05f), 0f, 0.5f),
         ["ice"] = new(Layer.Ice, new Color(0.78f, 0.9f, 1f), 0f, 0.35f, 0.5f),
         ["crust"] = new(Layer.Ice, new Color(0.86f, 0.92f, 0.98f), 0f, 0.55f),
         ["ore"] = new(Layer.Rock, new Color(0.72f, 0.36f, 0.62f), 0.65f, 0.3f, 0.5f),
@@ -100,7 +100,7 @@ public static class Materials
         render_mode cull_back, diffuse_burley, specular_schlick_ggx;
         uniform sampler2DArray albedo_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
         uniform sampler2DArray detail_tex : filter_linear_mipmap_anisotropic, repeat_enable;
-        uniform vec3 dust_color = vec3(0.13,0.1,0.09);
+        uniform vec3 dust_color = vec3(0.055,0.04,0.036);
         uniform float dust_amount = 0.7;
         varying flat float v_layer;
         varying flat float v_metal;

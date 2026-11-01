@@ -451,7 +451,7 @@ public sealed class Scenery
         SkyMat.SetShaderParameter("fill_horizon", mars ? new Vector3(0.6f, 0.36f, 0.24f) : new Vector3(0.26f, 0.3f, 0.42f));
         SkyMat.SetShaderParameter("fill_ground", mars ? new Vector3(0.16f, 0.08f, 0.05f) : new Vector3(0.05f, 0.04f, 0.04f));
 
-        Materials.SetDust(mars ? new Color(0.27f, 0.11f, 0.05f) : new Color(0.1f, 0.078f, 0.07f), mars ? 0.85f : 0.65f);
+        Materials.SetDust(mars ? new Color(0.27f, 0.11f, 0.05f) : new Color(0.055f, 0.04f, 0.036f), mars ? 0.85f : 0.65f);
         foreach (var (id, node) in _dressing) node.Visible = id == planet;
         if (!_dressing.ContainsKey(planet))
         {
@@ -634,7 +634,8 @@ public partial class MenuScene : Node3D
     private readonly List<(Node3D node, Vector3 axis, float speed)> _spin = new();
     private readonly List<(Node3D node, Vector3 rest, float phase)> _pump = new();
     private Camera3D _camera = null!;
-    private MultiMesh _ingots = null!, _ores = null!;
+    private readonly List<(MultiMesh multi, float offset, float side)> _goods = new();
+    private (Vector3 eye, Vector3 target)? _fixedView;
     private double _time;
     private const float BeltLength = 18f;
 
@@ -690,10 +691,27 @@ public partial class MenuScene : Node3D
         }
         var beltRoot = new Node3D { Position = new Vector3(0, 0, 3f) };
         beltRoot.AddChild(new MeshInstance3D { Mesh = belt.Commit() });
-        _ingots = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = ItemVisuals.MeshOf("ingot"), InstanceCount = 12 };
-        _ores = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = ItemVisuals.MeshOf("ore"), InstanceCount = 12 };
-        beltRoot.AddChild(new MultiMeshInstance3D { Multimesh = _ingots });
-        beltRoot.AddChild(new MultiMeshInstance3D { Multimesh = _ores });
+        // Toda la gama de objetos pasa por la cinta: es también el muestrario de sus mallas.
+        var items = new[] { "scrap", "recovered", "ore", "ingot", "parts", "ice", "coolant", "cryo_module", "silicon_ore", "wafer", "nav_core" };
+        for (var i = 0; i < items.Length; i++)
+        {
+            var multi = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = ItemVisuals.MeshOf(items[i]), InstanceCount = 2 };
+            beltRoot.AddChild(new MultiMeshInstance3D { Multimesh = multi });
+            _goods.Add((multi, i * BeltLength / 22f, i % 2 == 0 ? 0.22f : -0.22f));
+        }
+        // Encuadres fijos para documentar modelos con capturas del juego (--menu-view).
+        if (CmdArgs.Parse().TryGetValue("menu-view", out var view))
+            _fixedView = view switch
+            {
+                "extractor" => (new Vector3(17, 2.2f, 2), new Vector3(12, 2.6f, -6)),
+                "smelter" => (new Vector3(7, 2f, 5), new Vector3(2, 2f, -4)),
+                "depot" => (new Vector3(-13, 2f, 1), new Vector3(-9, 1.8f, -8)),
+                "rtg" => (new Vector3(-7, 1.9f, 11), new Vector3(-3, 1.3f, 6)),
+                "terminal" => (new Vector3(-9, 2.2f, 13), new Vector3(-13, 1.6f, 7)),
+                "scrap" => (new Vector3(9.4f, 1.3f, 10.2f), new Vector3(7, 0.3f, 8)),
+                "items" => (new Vector3(0.2f, 1.25f, 4.5f), new Vector3(0.2f, 0.55f, 3f)),
+                _ => null,
+            };
         AddChild(beltRoot);
 
         _camera = new Camera3D { Fov = 50, Far = 3000, Near = 0.1f, Current = true };
@@ -706,12 +724,17 @@ public partial class MenuScene : Node3D
         var t = (float)_time;
         foreach (var (node, axis, speed) in _spin) node.RotateObjectLocal(axis, (float)delta * speed);
         foreach (var (node, rest, phase) in _pump) node.Position = rest + new Vector3(0, Mathf.Sin(t * 1.6f + phase) * 0.3f, 0);
-        for (var i = 0; i < 12; i++)
+        var flow = _fixedView == null ? t * 0.8f : 0f;
+        foreach (var (multi, offset, side) in _goods)
+            for (var i = 0; i < 2; i++)
+            {
+                var at = Mathf.PosMod(flow + offset + i * BeltLength / 2f, BeltLength) - BeltLength / 2;
+                multi.SetInstanceTransform(i, new Transform3D(Basis.Identity, new Vector3(at, 0.53f, side)));
+            }
+        if (_fixedView is { } fixedView)
         {
-            var at = Mathf.PosMod(t * 0.8f + i * BeltLength / 12f, BeltLength) - BeltLength / 2;
-            _ingots.SetInstanceTransform(i, new Transform3D(Basis.Identity, new Vector3(at, 0.53f, 0.22f)));
-            var at2 = Mathf.PosMod(t * 0.8f + (i + 0.5f) * BeltLength / 12f, BeltLength) - BeltLength / 2;
-            _ores.SetInstanceTransform(i, new Transform3D(Basis.Identity, new Vector3(at2, 0.53f, -0.22f)));
+            _camera.LookAtFromPosition(fixedView.eye, fixedView.target, Vector3.Up);
+            return;
         }
         // Desplazamiento muy lento: la escena respira sin distraer de los botones.
         var sway = Mathf.Sin(t * 0.05f);
