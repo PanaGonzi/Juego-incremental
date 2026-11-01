@@ -41,7 +41,11 @@ internal sealed class RigMaterials
         Screen = Make(new Color(0.03f, 0.05f, 0.06f), 0f, 0.18f);
         Screen.EmissionEnabled = true;
         Screen.Emission = new Color(1f, 0.67f, 0.25f);
-        Screen.EmissionEnergyMultiplier = 1.5f;
+        Screen.EmissionEnergyMultiplier = 1.25f;
+        Screen.EmissionOperator = BaseMaterial3D.EmissionOperatorEnum.Multiply;
+        Screen.EmissionTexture = ScreenGrid();
+        Screen.Uv1Triplanar = true;
+        Screen.Uv1Scale = new Vector3(14f, 14f, 14f);
     }
 
     private StandardMaterial3D Make(Color albedo, float metal, float rough, Texture2D? normal = null, float scale = 1f)
@@ -63,6 +67,23 @@ internal sealed class RigMaterials
             m.ZClipScale = ClipScale;
         }
         return m;
+    }
+
+    /// <summary>Retícula de plano técnico para la pantalla de la consola: se lee como una interfaz, no como una lámpara.</summary>
+    private static Texture2D ScreenGrid()
+    {
+        const int size = 64;
+        var image = Image.CreateEmpty(size, size, true, Image.Format.Rgba8);
+        for (var y = 0; y < size; y++)
+        for (var x = 0; x < size; x++)
+        {
+            var major = x % 32 <= 1 || y % 32 <= 1;
+            var minor = x % 8 == 0 || y % 8 == 0;
+            var v = major ? 1f : minor ? 0.42f : 0.14f;
+            image.SetPixel(x, y, new Color(v, v, v));
+        }
+        image.GenerateMipmaps();
+        return ImageTexture.CreateFromImage(image);
     }
 
     private static Texture2D WeaveNormal() => NormalFrom((x, y) =>
@@ -463,7 +484,7 @@ internal static class RigModels
         k.Xf = new Transform3D(basis, origin);
         Hand(k, mt, Grip);
         var wrist = k.Xf * new Vector3(0, 0, 0.088f);
-        Sleeve(k, mt, wrist, (basis * Vector3.Back).Normalized(), new Vector3(0.21f, -0.42f, 0.46f));
+        Sleeve(k, mt, wrist, (basis * Vector3.Back).Normalized(), new Vector3(0.115f, -0.335f, 0.475f));
         return k.Commit();
     }
 
@@ -480,7 +501,7 @@ internal static class RigModels
         k.Xf = new Transform3D(basis * mirror, center - basis * grip);
         Hand(k, mt, Grip);
         var wrist = k.Xf * new Vector3(0, 0, 0.088f);
-        Sleeve(k, mt, wrist, (basis * Vector3.Back).Normalized(), new Vector3(-0.42f, -0.44f, 0.36f));
+        Sleeve(k, mt, wrist, (basis * Vector3.Back).Normalized(), new Vector3(-0.6f, -0.385f, 0.25f));
         return k.Commit();
     }
 
@@ -506,7 +527,7 @@ internal static class RigModels
         k.Xf = new Transform3D(basis * mirror, new Vector3(-0.054f, -0.052f, 0.012f));
         Hand(k, mt, Cradle);
         var wrist = k.Xf * new Vector3(0, 0, 0.088f);
-        Sleeve(k, mt, wrist, (basis * Vector3.Back).Normalized(), new Vector3(-0.3f, -0.34f, 0.3f));
+        Sleeve(k, mt, wrist, (basis * Vector3.Back).Normalized(), new Vector3(-0.34f, 0.05f, 0.62f));
         return k.Commit();
     }
 
@@ -514,11 +535,11 @@ internal static class RigModels
     public static ArrayMesh RightArmPointing(RigMaterials mt)
     {
         var k = new MeshKit();
-        var basis = Frame(new Vector3(0.88f, 0.1f, -0.45f), new Vector3(0.12f, 0.92f, 0.36f));
-        k.Xf = new Transform3D(basis, new Vector3(0.1f, 0.1f, 0.048f));
+        var basis = Frame(new Vector3(0.35f, 0.42f, -0.73f), new Vector3(-0.3f, 0.85f, 0.35f));
+        k.Xf = new Transform3D(basis, new Vector3(0.125f, 0.062f, 0.055f));
         Hand(k, mt, Point);
         var wrist = k.Xf * new Vector3(0, 0, 0.088f);
-        Sleeve(k, mt, wrist, (basis * Vector3.Back).Normalized(), new Vector3(0.42f, -0.3f, 0.34f));
+        Sleeve(k, mt, wrist, (basis * Vector3.Back).Normalized(), new Vector3(0.46f, 0.117f, 0.54f));
         return k.Commit();
     }
 
@@ -746,9 +767,9 @@ public partial class FirstPersonRig : Node3D
     }
 
     // Posturas de reposo en el espacio de la cámara.
-    private static readonly Vector3 ToolPos = new(0.205f, -0.232f, -0.38f);
-    private static readonly Vector3 ToolRot = new(0.05f, 0.125f, -0.025f);
-    private static readonly Vector3 DevicePos = new(-0.015f, -0.262f, -0.4f);
+    private static readonly Vector3 ToolPos = new(0.335f, -0.25f, -0.58f);
+    private static readonly Vector3 ToolRot = new(0.06f, 0.3f, -0.03f);
+    private static readonly Vector3 DevicePos = new(-0.01f, -0.165f, -0.44f);
     private static readonly Vector3 DeviceRot = new(0.86f, 0.045f, 0.06f);
     private static readonly Vector3 ReachPos = new(-0.17f, -0.2f, -0.42f);
     private const float NeckZ = -0.262f, NeckY = 0.09f, MaxBoom = 2.6f;

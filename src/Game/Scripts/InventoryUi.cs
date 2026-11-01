@@ -604,7 +604,9 @@ public partial class InventoryUi : Control
         {
             _machineTitle.Text = Loc.T("inv_no_machine_title");
             _machineStatus.Text = "";
+            _machineStatus.Visible = false;
             _machineInputs.Text = "";
+            _machineInputs.Visible = false;
             _machineEmpty.Text = Loc.T("inv_no_machine");
             _machineEmpty.Visible = true;
             _machinePanelButton.Visible = false;
@@ -613,10 +615,12 @@ public partial class InventoryUi : Control
         }
         var def = w.Content.Machines[machine.Def];
         _machinePanelButton.Visible = true;
+        _machineStatus.Visible = true;
         _machineTitle.Text = Loc.T("machine_" + machine.Def);
         _machineStatus.Text = $"{Loc.T("panel_status")}: {Loc.T("status_" + machine.Status)}" + (def.Capacity > 0 ? $"   ·   {Loc.T("panel_capacity", def.Capacity.ToString())}" : "");
         var source = def.Kind == MachineKind.Production ? machine.Out : machine.In;
         _machineInputs.Text = def.Kind == MachineKind.Production ? $"{Loc.T("panel_input")}: {Ui.Amounts(machine.In.Items)}" : "";
+        _machineInputs.Visible = _machineInputs.Text.Length > 0;
         var data = new Dictionary<string, (long qty, bool usable, string tip)>();
         foreach (var (item, qty) in source.Items) data[item] = (qty, true, Tooltip(w, item, false));
         Sync(_machineGrid, _machineSlots, data, false);
@@ -784,7 +788,7 @@ public partial class InventoryUi : Control
             _hoverEntry = null;
             foreach (var d in defs)
             {
-                var card = new EntryCard(this, "build:" + d.Id, new Vector2(340, 86));
+                var card = new EntryCard(this, "build:" + d.Id, new Vector2(354, 86));
                 _catalogCards.Add(card);
                 _catalogGrid.AddChild(card);
             }

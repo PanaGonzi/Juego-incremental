@@ -342,6 +342,7 @@
   "hotbar_empty_tip": "Drag a tool or building here",
   "hotbar_locked": "You have not unlocked this building yet",
   "hotbar_full": "The hotbar is full: drop onto a slot to replace it",
+  "tool_cutter_short": "Multitool",
   "tool_cutter_d": "Cuts scrap, ice and rock. Hold left click close to the target.",
   "tool_link_d": "Connects two machines to carry material.",
   "tool_remove_d": "Removes machines and rails; cost and contents return to the depot.",

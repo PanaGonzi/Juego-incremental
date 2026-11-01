@@ -71,7 +71,7 @@ public partial class MachineThumbnails : Node
 {
     private static MachineThumbnails? _instance;
     private static readonly Dictionary<string, ImageTexture> Cache = new();
-    private readonly Queue<string> _queue = new();
+    private static readonly Queue<string> Pending = new();
     private SubViewport? _viewport;
     private string _current = "";
     private int _wait;
@@ -89,7 +89,7 @@ public partial class MachineThumbnails : Node
         var empty = Image.CreateEmpty(96, 96, false, Image.Format.Rgba8);
         texture = ImageTexture.CreateFromImage(empty);
         Cache[def] = texture;
-        _instance?._queue.Enqueue(def);
+        Pending.Enqueue(def);
         return texture;
     }
 
@@ -105,8 +105,8 @@ public partial class MachineThumbnails : Node
             _viewport = null;
             return;
         }
-        if (_queue.Count == 0) return;
-        _current = _queue.Dequeue();
+        if (Pending.Count == 0) return;
+        _current = Pending.Dequeue();
         _viewport = Render(_current);
         AddChild(_viewport);
         _wait = 3;
@@ -147,10 +147,10 @@ public partial class MachineThumbnails : Node
             },
         };
         vp.AddChild(camera);
-        camera.LookAtFromPosition(center + new Vector3(0.62f, 0.55f, 1f).Normalized() * (radius * 4.35f), center, Vector3.Up, true);
+        camera.Transform = new Transform3D(Basis.Identity, center + new Vector3(0.62f, 0.55f, 1f).Normalized() * (radius * 4.35f)).LookingAt(center, Vector3.Up);
         var sun = new DirectionalLight3D { LightEnergy = 1.5f, LightColor = new Color(1f, 0.95f, 0.88f) };
         vp.AddChild(sun);
-        sun.LookAtFromPosition(new Vector3(3, 6, 5), Vector3.Zero, Vector3.Up);
+        sun.Transform = new Transform3D(Basis.Identity, new Vector3(3, 6, 5)).LookingAt(Vector3.Zero, Vector3.Up);
         return vp;
     }
 }
@@ -266,7 +266,7 @@ public partial class HotbarSlot : PanelContainer
         box.AddChild(_name);
     }
 
-    public void Show(string entry, bool selected, bool lacking, bool editing, string keyName)
+    public void Display(string entry, bool selected, bool lacking, bool editing, string keyName)
     {
         MouseFilter = editing ? MouseFilterEnum.Stop : MouseFilterEnum.Ignore;
         Visible = entry.Length > 0 || editing;
@@ -278,7 +278,7 @@ public partial class HotbarSlot : PanelContainer
             if (entry.Length > 0) _iconHolder.AddChild(EntryInfo.Icon(entry, 44));
             _selected = !selected; // obliga a repintar
         }
-        _name.Text = entry.Length > 0 ? EntryInfo.Name(entry) : Loc.T("hotbar_empty");
+        _name.Text = entry == HotbarLayout.Cutter ? Loc.T("tool_cutter_short") : entry.Length > 0 ? EntryInfo.Name(entry) : Loc.T("hotbar_empty");
         _name.Modulate = entry.Length > 0 ? Colors.White : new Color(1, 1, 1, 0.45f);
         if (selected != _selected || lacking != _lacking)
         {
@@ -288,8 +288,6 @@ public partial class HotbarSlot : PanelContainer
                 selected ? new Color(0.22f, 0.16f, 0.07f, 0.95f) : SlotStyle.Slot,
                 selected ? Ui.Amber : lacking ? new Color(0.7f, 0.33f, 0.28f, 0.9f) : SlotStyle.Line,
                 selected ? 2 : 1));
-            Scale = Vector2.One;
-            OffsetBottom = selected ? -4 : 0;
         }
         TooltipText = entry.Length > 0 ? $"{EntryInfo.Name(entry)}\n{Loc.T("hotbar_tip")}" : Loc.T("hotbar_empty_tip");
     }
@@ -338,13 +336,14 @@ public partial class Hotbar : Control
 
     public override void _Ready()
     {
-        SetAnchorsAndOffsetsPreset(LayoutPreset.CenterBottom);
-        GrowHorizontal = GrowDirection.Both;
-        GrowVertical = GrowDirection.Begin;
-        OffsetBottom = -12;
+        SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore, Alignment = BoxContainer.AlignmentMode.Center };
         row.AddThemeConstantOverride("separation", 6);
         AddChild(row);
+        row.SetAnchorsAndOffsetsPreset(LayoutPreset.CenterBottom);
+        row.GrowHorizontal = GrowDirection.Both;
+        row.GrowVertical = GrowDirection.Begin;
+        row.OffsetBottom = -12;
         for (var i = 0; i < HotbarLayout.Slots; i++)
         {
             var slot = new HotbarSlot(_view, i);
@@ -379,7 +378,7 @@ public partial class Hotbar : Control
                 if (def.Length > 0 && w.Content.Machines.TryGetValue(def, out var d))
                     lacking = !w.CanAfford(me, d.Credits, d.Cost) || d.Unlock != null && !w.Upgrades.Contains(d.Unlock);
             }
-            _slots[i].Show(entry, entry.Length > 0 && entry == active, lacking, editing, Controls.KeyName("hotbar_" + (i + 1)));
+            _slots[i].Display(entry, entry.Length > 0 && entry == active, lacking, editing, Controls.KeyName("hotbar_" + (i + 1)));
         }
     }
 }

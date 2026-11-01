@@ -340,6 +340,7 @@
   "hotbar_empty_tip": "Arrastra aquí una herramienta o construcción",
   "hotbar_locked": "Aún no has desbloqueado esta construcción",
   "hotbar_full": "La barra rápida está llena: suelta sobre una casilla para sustituirla",
+  "tool_cutter_short": "Multiútil",
   "tool_cutter_d": "Corta chatarra, hielo y roca. Mantén el clic izquierdo cerca del objetivo.",
   "tool_link_d": "Conecta dos máquinas para transportar material.",
   "tool_remove_d": "Retira máquinas y vías; su coste y contenido vuelven al depósito.",

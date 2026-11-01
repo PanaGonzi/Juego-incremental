@@ -408,8 +408,20 @@ public partial class AutoTest : Node
         var id = d.Id;
         Input.ActionPress("primary");
         var cut = await Until(() => !W.DebrisById.TryGetValue(id, out var left) || left.Hp < hp, 4);
+        await Wait(0.3);
+        Check(v.IsWorking, "el cabezal trabaja mientras se mantiene el clic");
+        await Shot("00_trabajando");
         Input.ActionRelease("primary");
+        await Wait(0.1);
+        Check(!v.IsWorking, "al soltar se interrumpe el trabajo");
         Check(cut, "mantener el clic izquierdo corta");
+
+        // Pose de construcción con la consola.
+        Key(Godot.Key.Key5);
+        await Wait(0.9);
+        await Shot("00_construccion");
+        Key(Godot.Key.Key1);
+        await Wait(0.2);
 
         v.TestCapture = false;
         v.UpdateMouseMode();
