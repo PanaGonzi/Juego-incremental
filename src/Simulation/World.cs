@@ -526,10 +526,9 @@ public sealed partial class World
     private CommandResult Place(PlayerState p, string defId, int x, int z, int rot)
     {
         rot = ((rot % 4) + 4) % 4;
-        var error = CheckPlacement(p.Planet, defId, x, z, rot, -1, out var nodeId);
+        var error = PlacementSiteError(p, defId, x, z, rot, out var nodeId);
         if (error != null) return CommandResult.Fail(error);
         var def = Content.Machines[defId];
-        if (!InRange(p, x * (long)B.CellSizeMm, z * (long)B.CellSizeMm, B.BuildRangeMm)) return CommandResult.Fail("err_range");
         if (!Pay(p, def.Credits, def.Cost)) return CommandResult.Fail("err_cost");
 
         var m = new Machine { Id = NextId++, Def = defId, Planet = p.Planet, X = x, Z = z, Rot = rot, NodeId = nodeId };
@@ -550,23 +549,17 @@ public sealed partial class World
 
     private CommandResult Remove(PlayerState p, int id)
     {
-        if (!Machines.TryGetValue(id, out var m) || m.Planet != p.Planet) return CommandResult.Fail("err_gone");
-        if (m.Builtin) return CommandResult.Fail("err_builtin");
-        var (cx, cz) = MachineCenterMm(m);
-        if (!InRange(p, cx, cz, B.BuildRangeMm)) return CommandResult.Fail("err_range");
-        foreach (var t in Trains.Values)
-            if (t.StationA == id || t.StationB == id) return CommandResult.Fail("err_rail_occupied");
-        var depot = DepotOf(m.Planet);
-        if (depot == null) return CommandResult.Fail("err_invalid");
+        var error = RemoveMachineError(p, id);
+        if (error != null) return CommandResult.Fail(error);
+        var m = Machines[id];
+        var depot = DepotOf(m.Planet)!;
 
         // Regla documentada: coste y contenido vuelven al depósito, aunque supere su capacidad.
-        var def = Content.Machines[m.Def];
-        foreach (var (item, qty) in def.Cost) depot.In.Add(item, qty * B.RefundPermille / 1000);
-        AddCredits(def.Credits * B.RefundPermille / 1000);
-        foreach (var kv in m.In.Items) depot.In.Add(kv.Key, kv.Value);
-        foreach (var kv in m.Out.Items) depot.In.Add(kv.Key, kv.Value);
-        if (m.Processing && def.Recipe != null)
-            foreach (var (item, qty) in Content.Recipes[def.Recipe].Inputs) depot.In.Add(item, qty);
+        // El reparto es el mismo que muestra PreviewRemoveMachine.
+        var recovery = new RemovalPreview();
+        AddMachineRecovery(m, recovery);
+        foreach (var (item, qty) in recovery.Items) depot.In.Add(item, qty);
+        AddCredits(recovery.Credits);
         DirtyMachines.Add(depot.Id);
 
         // Las cintas conectadas devuelven su carga y su coste con la misma regla que al retirarlas a mano.

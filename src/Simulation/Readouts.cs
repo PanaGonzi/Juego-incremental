@@ -22,8 +22,116 @@ public sealed class MachineReadout
     public long PowerDemand;
 }
 
+/// <summary>Grupo del catálogo de construcción. Se deduce del tipo de máquina: no es un dato aparte que pueda desalinearse.</summary>
+public enum MachineCategory : byte { Production, Extraction, Energy, Logistics, Storage }
+
+/// <summary>Lo que devolvería desmontar algo ahora: mismas cuentas que el servidor. Con Error, no se puede desmontar.</summary>
+public sealed class RemovalPreview
+{
+    public string? Error;
+    public long Credits;
+    /// <summary>Objetos que irían al depósito del planeta: coste, contenido y carga de cintas.</summary>
+    public readonly Dictionary<string, long> Items = new();
+    /// <summary>Cintas conectadas que se retirarían con la máquina.</summary>
+    public int Belts;
+
+    public void Add(string item, long qty)
+    {
+        if (qty > 0) Items[item] = Items.GetValueOrDefault(item) + qty;
+    }
+}
+
 public sealed partial class World
 {
+    public static MachineCategory CategoryOf(MachineDef def) => def.Kind switch
+    {
+        MachineKind.Production => def.Node != null ? MachineCategory.Extraction : MachineCategory.Production,
+        MachineKind.Generator or MachineKind.Radiator => MachineCategory.Energy,
+        MachineKind.Station or MachineKind.Shuttle or MachineKind.CargoPad => MachineCategory.Logistics,
+        _ => MachineCategory.Storage,
+    };
+
+    /// <summary>Validez del lugar para este jugador, sin mirar el coste: el servidor y el fantasma usan esta misma regla.</summary>
+    public string? PlacementSiteError(PlayerState p, string defId, int x, int z, int rot, out int nodeId)
+    {
+        var error = CheckPlacement(p.Planet, defId, x, z, rot, -1, out nodeId);
+        if (error != null) return error;
+        return InRange(p, x * (long)B.CellSizeMm, z * (long)B.CellSizeMm, B.BuildRangeMm) ? null : "err_range";
+    }
+
+    /// <summary>Motivo por el que este jugador no puede desmontar la máquina, o null. Compartido con el servidor.</summary>
+    public string? RemoveMachineError(PlayerState p, int id)
+    {
+        if (!Machines.TryGetValue(id, out var m) || m.Planet != p.Planet) return "err_gone";
+        if (m.Builtin) return "err_builtin";
+        var (cx, cz) = MachineCenterMm(m);
+        if (!InRange(p, cx, cz, B.BuildRangeMm)) return "err_range";
+        foreach (var t in Trains.Values)
+            if (t.StationA == id || t.StationB == id) return "err_rail_occupied";
+        return DepotOf(m.Planet) == null ? "err_invalid" : null;
+    }
+
+    /// <summary>Coste, contenido y materia del ciclo en curso de la máquina, sin sus cintas.</summary>
+    private void AddMachineRecovery(Machine m, RemovalPreview r)
+    {
+        var def = Content.Machines[m.Def];
+        foreach (var (item, qty) in def.Cost) r.Add(item, qty * B.RefundPermille / 1000);
+        r.Credits += def.Credits * B.RefundPermille / 1000;
+        foreach (var kv in m.In.Items) r.Add(kv.Key, kv.Value);
+        foreach (var kv in m.Out.Items) r.Add(kv.Key, kv.Value);
+        if (m.Processing && def.Recipe != null)
+            foreach (var (item, qty) in Content.Recipes[def.Recipe].Inputs) r.Add(item, qty);
+    }
+
+    /// <summary>Lo pagado y la carga real de una cinta, con la regla de DismantleBelt.</summary>
+    private void AddBeltRecovery(Link l, RemovalPreview r)
+    {
+        r.Credits += l.Paid * B.RefundPermille / 1000;
+        foreach (var item in l.Slots)
+            if (item != null) r.Add(item, 1);
+    }
+
+    /// <summary>El saldo tiene tope: se muestra lo que entraría de verdad.</summary>
+    private RemovalPreview CapCredits(RemovalPreview r)
+    {
+        r.Credits = Math.Min(r.Credits, Math.Max(0, B.MaxCredits - Credits));
+        return r;
+    }
+
+    public RemovalPreview PreviewRemoveMachine(PlayerState p, int id)
+    {
+        var r = new RemovalPreview { Error = RemoveMachineError(p, id) };
+        if (!Machines.TryGetValue(id, out var m)) return r;
+        AddMachineRecovery(m, r);
+        foreach (var l in Links.Values)
+        {
+            if (l.From != id && l.To != id) continue;
+            AddBeltRecovery(l, r);
+            r.Belts++;
+        }
+        return CapCredits(r);
+    }
+
+    public RemovalPreview PreviewRemoveBelt(PlayerState p, int id)
+    {
+        var r = new RemovalPreview();
+        if (!Links.TryGetValue(id, out var l) || l.Planet != p.Planet)
+        {
+            r.Error = "err_gone";
+            return r;
+        }
+        if (DepotOf(l.Planet) == null) r.Error = "err_invalid";
+        AddBeltRecovery(l, r);
+        return CapCredits(r);
+    }
+
+    public RemovalPreview PreviewRemoveRail(PlayerState p, int id)
+    {
+        var r = new RemovalPreview { Error = RemoveRailError(p, id) };
+        if (RailSegments.TryGetValue(id, out var s)) r.Credits = RailRefund(s);
+        return CapCredits(r);
+    }
+
     /// <summary>Energía del planeta según estados replicados: el cliente no conoce los acumulados internos del servidor.</summary>
     public (long supply, long demand) PowerEstimate(int planet)
     {

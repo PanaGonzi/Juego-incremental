@@ -234,16 +234,26 @@ public sealed partial class World
 
     private CommandResult RemoveRail(PlayerState p, int id)
     {
-        if (!RailSegments.TryGetValue(id, out var s) || s.Planet != p.Planet) return CommandResult.Fail("err_gone");
-        if (s.OwnerStation >= 0) return CommandResult.Fail("err_builtin");
-        if (SegmentInUse(id)) return CommandResult.Fail("err_rail_occupied");
-        var a = RailNodes[s.A];
-        if (!InRange(p, a.X * (long)B.CellSizeMm, a.Z * (long)B.CellSizeMm, B.BuildRangeMm + 40000)) return CommandResult.Fail("err_range");
-        var refund = RailMath.Cells(a, RailNodes[s.B], s.Shape).Count * R.CreditsPerCell;
+        var error = RemoveRailError(p, id);
+        if (error != null) return CommandResult.Fail(error);
+        var s = RailSegments[id];
+        var refund = RailRefund(s);
         RemoveSegment(s);
         AddCredits(refund);
         return CommandResult.Success;
     }
+
+    /// <summary>Motivo por el que este jugador no puede retirar el tramo, o null. Compartido con la previsualización.</summary>
+    public string? RemoveRailError(PlayerState p, int id)
+    {
+        if (!RailSegments.TryGetValue(id, out var s) || s.Planet != p.Planet) return "err_gone";
+        if (s.OwnerStation >= 0) return "err_builtin";
+        if (SegmentInUse(id)) return "err_rail_occupied";
+        var a = RailNodes[s.A];
+        return InRange(p, a.X * (long)B.CellSizeMm, a.Z * (long)B.CellSizeMm, B.BuildRangeMm + 40000) ? null : "err_range";
+    }
+
+    private long RailRefund(RailSegment s) => RailMath.Cells(RailNodes[s.A], RailNodes[s.B], s.Shape).Count * R.CreditsPerCell;
 
     /// <summary>Crea los nodos y el tramo propios de una estación recién colocada.</summary>
     private void AttachStation(Machine m)
