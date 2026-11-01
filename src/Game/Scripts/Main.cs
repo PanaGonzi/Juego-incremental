@@ -208,6 +208,9 @@ public sealed class Settings
     public string Language { get; set; } = "es";
     public bool Fullscreen { get; set; }
     public bool CameraBob { get; set; } = true;
+    public float BobIntensity { get; set; } = 1f;
+    public List<string> Hotbar { get; set; } = new();
+    public int ControlsVersion { get; set; }
     public bool Shadows { get; set; } = true;
     public bool Glow { get; set; } = true;
     public float EventAmbience { get; set; } = 0.7f;

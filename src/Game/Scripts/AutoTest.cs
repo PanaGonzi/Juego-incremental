@@ -117,7 +117,7 @@ public partial class AutoTest : Node
     private async Task CutDebris(Debris d)
     {
         var pos = DebrisPos(d);
-        var approach = _view!.PlayerPosition.DirectionTo(pos) * -4f + pos;
+        var approach = _view!.PlayerPosition.DirectionTo(pos) * -3f + pos;
         approach.Y = 0;
         await WalkTo(approach);
         _view.SetTool(Tool.Cutter);
@@ -260,6 +260,7 @@ public partial class AutoTest : Node
             else if (_args.GetValueOrDefault("scenario") == "rail") await RailScenario();
             else if (_args.GetValueOrDefault("scenario") == "belts") await BeltScenario();
             else if (_args.GetValueOrDefault("scenario") == "beltsv4") await BeltMigrationScenario();
+            else if (_args.GetValueOrDefault("scenario") == "fp") await FirstPersonScenario();
             else if (_args.GetValueOrDefault("scenario") == "travel") await TravelScenario();
             else if (_args.GetValueOrDefault("scenario") == "halloween") await HalloweenScenario();
             else if (_args.GetValueOrDefault("scenario") == "mars") await MarsScenario();
@@ -277,6 +278,53 @@ public partial class AutoTest : Node
             Check(false, "excepción: " + e);
         }
         Finish();
+    }
+
+    /// <summary>Primera persona: entrada real, trabajo, consola, inventario doble y el modelo externo de otro jugador.</summary>
+    private async Task FirstPersonScenario()
+    {
+        var v = _view!;
+        await InputPaths();
+        await Shot("fp_reposo");
+
+        // Inventario doble junto al depósito, con una transferencia exacta por el mismo comando de la interfaz.
+        var depot = W.Machines.Values.First(m => m.Def == "depot");
+        var c = CenterOf(depot);
+        await WalkTo(new Vector3(c.X, 0, c.Z + 6.5f));
+        v.AimAt(c);
+        await Wait(0.2);
+        var client = v.Session.Client;
+        var before = client.LocalPlayer!.Bag.Get("scrap");
+        Check(before >= 2, $"hay chatarra en la mochila: {before}");
+        v.OpenInventory(InventoryTab.Items, depot.Id);
+        await Wait(0.3);
+        Check(v.Inventory.BagSlotCount > 0 && v.Inventory.MachineId == depot.Id, "inventario doble con la mochila y el depósito");
+        var inside = depot.In.Get("scrap");
+        client.Send(new Command { Type = CommandType.Insert, A = depot.Id, Text = "scrap", Amount = 2 });
+        var moved = await Until(() => client.LocalPlayer!.Bag.Get("scrap") == before - 2, 3);
+        await Wait(0.2);
+        Check(moved && W.Machines[depot.Id].In.Get("scrap") == inside + 2, "transferencia parcial exacta confirmada por el servidor");
+        await Shot("fp_inventario_doble");
+        v.ClosePanelForTest();
+        await Wait(0.2);
+        Check(!v.PanelIsOpen, "el inventario se cierra");
+
+        // Otro jugador, inyectado por la misma entrada que usa la red: herramienta en cada estado.
+        var at = v.PlayerPosition + new Vector3(0, 0, 3.4f);
+        v.AimAt(at + Vector3.Up);
+        foreach (var (name, action) in new[]
+        {
+            ("fp_remoto_trabajando", Pluton.Networking.PlayerAction.Pack(Pluton.Networking.PlayerAction.Cutter, true)),
+            ("fp_remoto_consola", Pluton.Networking.PlayerAction.Device),
+            ("fp_remoto_guardada", Pluton.Networking.PlayerAction.Stowed),
+        })
+        {
+            v.InjectRemoteForTest(at, 0, action);
+            await Wait(0.4);
+            v.InjectRemoteForTest(at, 0, action);
+            await Wait(0.2);
+            await Shot(name);
+        }
     }
 
     private async Task JoinedScenario()
@@ -335,9 +383,9 @@ public partial class AutoTest : Node
         Key(Godot.Key.L);
         await Wait(0.1);
         Check(v.CurrentTool == Tool.Link, "L selecciona el enlazador");
-        Key(Godot.Key.Q);
+        Key(Godot.Key.Z);
         await Wait(0.1);
-        Check(v.CurrentTool == Tool.Cutter, "Q cancela y vuelve al cortador");
+        Check(v.CurrentTool == Tool.Cutter, "Z cancela y vuelve a la multiherramienta");
 
         Controls.Rebind("tool_link", Godot.Key.K);
         Key(Godot.Key.L);
@@ -350,27 +398,49 @@ public partial class AutoTest : Node
         Controls.Rebind("rotate", Godot.Key.K);
         Check(Controls.KeyNames("tool_link") == "—" || !Controls.KeyNames("tool_link").Contains("K"), "una tecla no queda asignada a dos acciones");
         Controls.ResetAll();
-        Key(Godot.Key.Q);
+        Key(Godot.Key.Z);
         await Wait(0.1);
         Key(Godot.Key.L);
         await Wait(0.1);
         Check(v.CurrentTool == Tool.Link, "restaurar controles recupera L");
-        Key(Godot.Key.Q);
+        Key(Godot.Key.Z);
         await Wait(0.1);
 
         Key(Godot.Key.Tab);
         await Wait(0.2);
-        Check(v.PanelIsOpen && Input.MouseMode == Input.MouseModeEnum.Visible, "Tab abre el panel y libera el ratón");
+        Check(v.InventoryOpen && Input.MouseMode == Input.MouseModeEnum.Visible, "Tab abre el inventario y libera el ratón");
+        await Shot("00_inventario");
+        Key(Godot.Key.Tab);
+        await Wait(0.2);
+        Check(!v.InventoryOpen && Input.MouseMode == Input.MouseModeEnum.Captured, "otra pulsación de Tab lo cierra y recupera el ratón");
+        Key(Godot.Key.Tab);
+        await Wait(0.2);
         Key(Godot.Key.Escape);
         await Wait(0.2);
-        Check(!v.PanelIsOpen && !v.IsPaused, "Esc cierra el panel sin pausar");
+        Check(!v.PanelIsOpen && !v.IsPaused, "Esc cierra el inventario sin pausar");
 
-        Key(Godot.Key.B);
+        Key(Godot.Key.Q);
         await Wait(0.2);
-        Check(v.PanelIsOpen, "B abre el menú de construcción");
+        Check(v.InventoryOpen && v.Inventory.CurrentTab == InventoryTab.Catalog, "Q abre el catálogo de construcción");
+        await Wait(0.4);
         await Shot("00_menu_construir");
         Key(Godot.Key.Escape);
         await Wait(0.2);
+
+        Key(Godot.Key.Key2);
+        await Wait(0.1);
+        Check(v.CurrentTool == Tool.Link, "la casilla 2 de la barra selecciona la cinta");
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.WheelDown, Pressed = true });
+        await Wait(0.1);
+        Check(v.CurrentTool == Tool.Remove, "la ruedecilla pasa a la casilla siguiente");
+        Key(Godot.Key.Key1);
+        await Wait(0.1);
+        Check(v.CurrentTool == Tool.Cutter && !v.IsStowed, "la casilla 1 saca la multiherramienta");
+        Key(Godot.Key.Key1);
+        await Wait(0.1);
+        Check(v.IsStowed, "repetir la casilla 1 la guarda");
+        Key(Godot.Key.Key1);
+        await Wait(0.1);
 
         var serverWorld = v.Session.Runner!.Server.World;
         var running = serverWorld.Tick;
@@ -390,7 +460,7 @@ public partial class AutoTest : Node
         // Corte con el botón real sobre el escombro más cercano
         var d = W.DebrisById.Values.Where(x => x.Def == "scrap_pile").OrderBy(x => DebrisPos(x).DistanceSquaredTo(v.PlayerPosition)).First();
         var pos = DebrisPos(d);
-        var approach = v.PlayerPosition.DirectionTo(pos) * -4f + pos;
+        var approach = v.PlayerPosition.DirectionTo(pos) * -3f + pos;
         await WalkTo(new Vector3(approach.X, 0, approach.Z));
         v.AimAt(pos);
         await Wait(0.2);
@@ -398,8 +468,20 @@ public partial class AutoTest : Node
         var id = d.Id;
         Input.ActionPress("primary");
         var cut = await Until(() => !W.DebrisById.TryGetValue(id, out var left) || left.Hp < hp, 4);
+        await Wait(0.3);
+        Check(v.IsWorking, "el cabezal trabaja mientras se mantiene el clic");
+        await Shot("00_trabajando");
         Input.ActionRelease("primary");
+        await Wait(0.1);
+        Check(!v.IsWorking, "al soltar se interrumpe el trabajo");
         Check(cut, "mantener el clic izquierdo corta");
+
+        // Pose de construcción con la consola.
+        Key(Godot.Key.Key5);
+        await Wait(0.9);
+        await Shot("00_construccion");
+        Key(Godot.Key.Key1);
+        await Wait(0.2);
 
         v.TestCapture = false;
         v.UpdateMouseMode();
