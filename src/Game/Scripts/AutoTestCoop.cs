@@ -159,6 +159,7 @@ public partial class AutoTest
     private async Task CoopSignals(Pluton.Networking.GameClient client)
     {
         await Barrier("senales_listo");
+        client.ResultReceived += (id, r) => { if (!r.Ok) Log($"orden {id} rechazada: {r.Error}, jugador en {Me.X:0},{Me.Z:0}"); };
         const int X = 0, Length = 8;
         var z = -16;
         if (CoopIsA)

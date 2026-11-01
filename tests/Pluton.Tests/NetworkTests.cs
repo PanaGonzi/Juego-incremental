@@ -211,6 +211,40 @@ public class NetworkTests
         Assert.Equal(ClientState.InGame, second.State);
     }
 
+    /// <summary>El cliente numera desde 1 en cada sesión: la primera orden tras reconectar no puede recibir la respuesta guardada de la sesión anterior.</summary>
+    [Fact]
+    public void First_command_after_reconnecting_is_applied_not_answered_from_the_old_session()
+    {
+        var world = World.CreateNew(Fixture.Content);
+        world.Upgrades.Add("tech_rail");
+        world.Credits = 1000;
+        foreach (var d in world.DebrisById.Values.Where(d => d.Z is > -40 and < -20 && d.X is > -10 and < 20).ToList()) world.DebrisById.Remove(d.Id);
+        world.Reindex();
+        world.ClearReplicationState();
+        using var h = new NetHarness(null, world);
+        var first = h.Join(KeyA);
+        CommandResult? answer = null;
+        first.ResultReceived += (_, r) => answer = r;
+        first.Send(new Command { Type = CommandType.PlaceRail, A = 0, B = -30, C = 8, D = -30, Amount = 9 });
+        h.Pump(() => answer != null);
+        Assert.False(answer!.Value.Ok);
+
+        first.Dispose();
+        h.Clients.Remove(first);
+        h.Settle(200);
+
+        var again = h.Join(KeyA);
+        var player = h.Server.World.Players[KeyA];
+        player.X = 8;
+        player.Z = -60;
+        answer = null;
+        again.ResultReceived += (_, r) => answer = r;
+        again.Send(new Command { Type = CommandType.PlaceRail, A = 0, B = -30, C = 8, D = -30 });
+        h.Pump(() => answer != null);
+        Assert.True(answer!.Value.Ok, answer.Value.Error);
+        Assert.Single(h.Server.World.RailSegments);
+    }
+
     [Fact]
     public void Retried_request_is_applied_once()
     {

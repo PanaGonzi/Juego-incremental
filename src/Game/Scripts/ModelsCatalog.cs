@@ -983,6 +983,21 @@ public static partial class Models
         return mesh;
     }
 
+    private static StandardMaterial3D? _signalRed, _signalGreen;
+
+    /// <summary>Focos de señal con menos brillo que los pilotos: a más energía, el rojo se ve rosa y deja de leerse como rojo.</summary>
+    public static StandardMaterial3D SignalLamp(bool red)
+    {
+        if (red) return _signalRed ??= Dimmed("red");
+        return _signalGreen ??= Dimmed("green");
+        static StandardMaterial3D Dimmed(string name)
+        {
+            var m = (StandardMaterial3D)Materials.Lamp(name).Duplicate();
+            m.EmissionEnergyMultiplier = 0.9f;
+            return m;
+        }
+    }
+
     public static readonly Vector3 SignalRedLamp = new(0, 3.97f, 0);
     public static readonly Vector3 SignalGreenLamp = new(0, 3.37f, 0);
 

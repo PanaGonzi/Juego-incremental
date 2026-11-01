@@ -1212,7 +1212,7 @@ public partial class AutoTest : Node
         var exit = RailNodeAt(30, Z)!.Id;
         Check(v.SignalShownForTest(entry) == SignalLight.Clear && v.SignalShownForTest(exit) == SignalLight.Clear, "las dos en verde con la vía libre");
         var view = new Vector3(30 * 2f, 1.5f, Z * 2f);
-        await WalkTo(view + new Vector3(-12, -1.5f, -14), 6);
+        await WalkTo(view + new Vector3(12, -1.5f, 9), 6);
         v.AimAt(view);
         await Wait(0.3);
         await Shot("signals_04_verde");
@@ -1224,7 +1224,7 @@ public partial class AutoTest : Node
         await UseOn(a, () => client.Send(new Command { Type = CommandType.Insert, A = a.Id }));
         await Wait(0.5);
         Check(W.Machines[a.Id].In.Total > 0, $"carga en origen: {W.Machines[a.Id].In.Total}");
-        await WalkTo(view + new Vector3(-12, -1.5f, -14), 6);
+        await WalkTo(view + new Vector3(12, -1.5f, 9), 6);
         v.AimAt(view);
 
         client.Send(new Command { Type = CommandType.CreateTrain, A = a.Id, B = b.Id });

@@ -794,8 +794,8 @@ public partial class GameView : Node3D
             if (_signals.ContainsKey(id)) continue;
             var (position, yaw) = BesideNode(w, w.RailNodes[id], 2.3f);
             var mast = new MeshInstance3D { Mesh = Models.SignalMast(), Position = position, Rotation = new Vector3(0, yaw, 0), VisibilityRangeEnd = 160 };
-            var red = new MeshInstance3D { Mesh = Models.Lamp(), Position = Models.SignalRedLamp, Scale = Vector3.One * 1.6f, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
-            var green = new MeshInstance3D { Mesh = Models.Lamp(), Position = Models.SignalGreenLamp, Scale = Vector3.One * 1.6f, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+            var red = new MeshInstance3D { Mesh = Models.Lamp(), Position = Models.SignalRedLamp, Scale = Vector3.One * 2f, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+            var green = new MeshInstance3D { Mesh = Models.Lamp(), Position = Models.SignalGreenLamp, Scale = Vector3.One * 2f, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
             mast.AddChild(red);
             mast.AddChild(green);
             AddChild(mast);
@@ -837,8 +837,8 @@ public partial class GameView : Node3D
             var light = w.SignalLightOf(id);
             if (view.Shown == light) continue;
             view.Shown = light;
-            view.Red.MaterialOverride = light == SignalLight.Stop ? Materials.Lamp("red") : Models.Mat("dark");
-            view.Green.MaterialOverride = light == SignalLight.Clear ? Materials.Lamp("green") : Models.Mat("dark");
+            view.Red.MaterialOverride = light == SignalLight.Stop ? Models.SignalLamp(true) : Models.Mat("dark");
+            view.Green.MaterialOverride = light == SignalLight.Clear ? Models.SignalLamp(false) : Models.Mat("dark");
         }
     }
 

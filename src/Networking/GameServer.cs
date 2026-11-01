@@ -223,6 +223,8 @@ public sealed class GameServer : IDisposable
         if (World.OwnerKey.Length == 0 || key == _opt.HostKey) World.OwnerKey = _opt.HostKey ?? key;
         if (key == World.OwnerKey) player.Role = Role.Owner;
 
+        // El cliente numera sus órdenes desde 1 en cada sesión: lo guardado de la anterior contestaría a órdenes nuevas sin aplicarlas.
+        _recent.Remove(key);
         s.Player = player;
         s.LastX = player.X;
         s.LastZ = player.Z;
