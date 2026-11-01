@@ -218,7 +218,7 @@ static void Act(GameClient client, string behaviour, Random rng, float x, float 
             if (!Near(plan.Target!.Value, 6)) break;
             if (me.Bag.Get("scrap") > 0) client.Send(new Command { Type = CommandType.Insert, A = recycler.Id, Text = "scrap" });
             if (!world.Links.Values.Any(l => l.From == recycler.Id))
-                client.Send(new Command { Type = CommandType.Link, A = recycler.Id, B = Find("depot").Id });
+                client.Send(World.LinkCommand(recycler.Id, Find("depot").Id, world.RouteBelt(recycler.Id, Find("depot").Id).Cells));
             plan.Step++;
             break;
         case 2:
@@ -254,7 +254,7 @@ static void Act(GameClient client, string behaviour, Random rng, float x, float 
                 var crate = own[rng.Next(own.Count)];
                 if (!world.Links.Values.Any(l => l.To == crate.Id))
                 {
-                    client.Send(new Command { Type = CommandType.Link, A = Find("depot").Id, B = crate.Id });
+                    client.Send(World.LinkCommand(Find("depot").Id, crate.Id, world.RouteBelt(Find("depot").Id, crate.Id).Cells));
                     plan.Step++;
                     break;
                 }

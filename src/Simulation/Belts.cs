@@ -79,7 +79,7 @@ public sealed partial class World
 
     public IEnumerable<BeltPort> BeltPorts(Machine m, bool output) => BeltPorts(m.Planet, m.Def, m.X, m.Z, m.Rot, output);
 
-    private bool GroundBlocked(int planet, int x, int z, int half) =>
+    internal bool GroundBlocked(int planet, int x, int z, int half) =>
         Math.Abs(x) >= half || Math.Abs(z) >= half ||
         _occupied.ContainsKey((planet, x, z)) || _debrisCells.ContainsKey((planet, x, z)) ||
         _railCells.ContainsKey((planet, x, z)) || _nodeCells.Contains((planet, x, z));
@@ -161,7 +161,7 @@ public sealed partial class World
     }
 
     /// <summary>Un cruce solo pasa sobre un tramo recto ajeno, perpendicular y que no sea un extremo de esa cinta.</summary>
-    private bool CanCrossOver(int linkId, int x, int z, int dir)
+    internal bool CanCrossOver(int linkId, int x, int z, int dir)
     {
         if (!Links.TryGetValue(linkId, out var other) || other.Elevated) return false;
         var cells = other.Cells;
@@ -175,114 +175,6 @@ public sealed partial class World
         var alongZ = ax == x && bx == x;
         if (!alongX && !alongZ) return false;
         return alongX ? dir % 2 == 0 : dir % 2 == 1;
-    }
-
-    private const int BeltStepCost = 10;
-    private const int BeltTurnCost = 4;
-    private const int BeltCrossCost = 8;
-    private const int BeltSidePortCost = 16;
-    private const int BeltMaxExpansions = 6000; // acota el coste de una búsqueda fallida en el hilo del servidor
-
-    /// <summary>
-    /// A* determinista sobre (celda, dirección). Empates resueltos por clave total: dos ejecuciones sobre el mismo mundo
-    /// dan la misma ruta. Lo usan tanto el servidor para validar como el cliente para previsualizar.
-    /// </summary>
-    public BeltRoute RouteBelt(int fromId, int toId)
-    {
-        if (fromId == toId) return new BeltRoute(Array.Empty<(int, int)>(), "err_invalid", 0);
-        if (!Machines.TryGetValue(fromId, out var a) || !Machines.TryGetValue(toId, out var b) || a.Planet != b.Planet)
-            return new BeltRoute(Array.Empty<(int, int)>(), "err_gone", 0);
-        if (!CanSendByBelt(Content.Machines[a.Def]) || !CanReceiveByBelt(Content.Machines[b.Def]))
-            return new BeltRoute(Array.Empty<(int, int)>(), "err_link_kind", 0);
-        var cells = SearchBelt(a, b, out var error);
-        return cells == null
-            ? new BeltRoute(Array.Empty<(int, int)>(), error, 0)
-            : new BeltRoute(cells, null, cells.Count * B.BeltCreditsPerCell);
-    }
-
-    private List<(int x, int z)>? SearchBelt(Machine a, Machine b, out string? error)
-    {
-        var planet = a.Planet;
-        var half = Content.Planets.First(p => p.Id == planet).HalfSizeCells;
-        var max = B.BeltMaxCells;
-        var outputs = BeltPorts(a, true).Where(p => p.Free).ToList();
-        var inputs = BeltPorts(b, false).Where(p => p.Free).ToList();
-        if (outputs.Count == 0) { error = "err_belt_port_out"; return null; }
-        if (inputs.Count == 0) { error = "err_belt_port_in"; return null; }
-
-        var goals = new Dictionary<(int x, int z), int>();
-        foreach (var p in inputs)
-        {
-            var extra = p.Side ? BeltSidePortCost : 0;
-            if (!goals.TryGetValue((p.X, p.Z), out var known) || extra < known) goals[(p.X, p.Z)] = extra;
-        }
-        var minX = inputs.Min(p => p.X);
-        var maxX = inputs.Max(p => p.X);
-        var minZ = inputs.Min(p => p.Z);
-        var maxZ = inputs.Max(p => p.Z);
-        int Remaining(int x, int z) => (Math.Max(0, Math.Max(minX - x, x - maxX)) + Math.Max(0, Math.Max(minZ - z, z - maxZ))) * BeltStepCost;
-
-        if (outputs.Min(p => Remaining(p.X, p.Z)) / BeltStepCost + 1 > max) { error = "err_belt_long"; return null; }
-
-        var best = new Dictionary<(int x, int z, int d), (int g, int steps, (int x, int z, int d) parent)>();
-        var open = new PriorityQueue<(int x, int z, int d), (int f, int x, int z, int d)>();
-        (int x, int z, int d) none = (int.MinValue, int.MinValue, -1);
-        foreach (var p in outputs)
-        {
-            var state = (p.X, p.Z, p.Dir);
-            if (best.ContainsKey(state)) continue;
-            best[state] = (BeltStepCost, 1, none);
-            open.Enqueue(state, (BeltStepCost + Remaining(p.X, p.Z), p.X, p.Z, p.Dir));
-        }
-
-        (int x, int z, int d)? bestGoal = null;
-        var bestGoalCost = int.MaxValue;
-        var hitLength = false;
-        var expansions = 0;
-        while (open.TryDequeue(out var state, out var key))
-        {
-            if (key.f >= bestGoalCost) break;
-            if (++expansions > BeltMaxExpansions) break;
-            var (g, steps, _) = best[state];
-            if (g + Remaining(state.x, state.z) < key.f) continue; // entrada obsoleta
-            var crossing = _beltCells.ContainsKey((planet, state.x, state.z));
-            if (!crossing && goals.TryGetValue((state.x, state.z), out var goalExtra) && g + goalExtra < bestGoalCost)
-            {
-                bestGoalCost = g + goalExtra;
-                bestGoal = state;
-            }
-            if (steps >= max) { hitLength = true; continue; }
-            for (var turn = -1; turn <= 1; turn++)
-            {
-                var nd = (state.d + turn + 4) % 4;
-                if (crossing && turn != 0) continue; // dentro de un cruce no se gira
-                var nx = state.x + BeltDirs[nd].dx;
-                var nz = state.z + BeltDirs[nd].dz;
-                if (GroundBlocked(planet, nx, nz, half)) continue;
-                var cost = g + BeltStepCost + (turn != 0 ? BeltTurnCost : 0);
-                if (_beltCells.TryGetValue((planet, nx, nz), out var use))
-                {
-                    if (use.a >= 0 && use.b >= 0) continue; // como máximo dos cintas en una celda
-                    if (!CanCrossOver(use.a >= 0 ? use.a : use.b, nx, nz, nd)) continue;
-                    cost += BeltCrossCost;
-                }
-                var next = (nx, nz, nd);
-                if (best.TryGetValue(next, out var seen) && seen.g <= cost) continue;
-                best[next] = (cost, steps + 1, state);
-                open.Enqueue(next, (cost + Remaining(nx, nz), nx, nz, nd));
-            }
-        }
-
-        if (bestGoal == null)
-        {
-            error = hitLength ? "err_belt_long" : "err_belt_route";
-            return null;
-        }
-        var path = new List<(int x, int z)>();
-        for (var s = bestGoal.Value; s != none; s = best[s].parent) path.Add((s.x, s.z));
-        path.Reverse();
-        error = null;
-        return path;
     }
 
     private int SlotCount(int cells) => Math.Max(1, cells) * B.BeltSlotsPerCell;
@@ -329,19 +221,22 @@ public sealed partial class World
         return true;
     }
 
-    private CommandResult AddLink(PlayerState p, int from, int to)
+    /// <summary>
+    /// Construye exactamente la ruta recibida o la rechaza sin consumir nada. El servidor no busca ni sustituye nada aquí:
+    /// así el coste de la orden está acotado por su tamaño y lo construido coincide con lo previsualizado.
+    /// </summary>
+    private CommandResult AddLink(PlayerState p, int from, int to, IReadOnlyList<(int x, int z)>? cells)
     {
         if (from == to) return CommandResult.Fail("err_invalid");
         if (!Machines.TryGetValue(from, out var a) || !Machines.TryGetValue(to, out var b)) return CommandResult.Fail("err_gone");
         if (a.Planet != p.Planet || b.Planet != p.Planet) return CommandResult.Fail("err_gone");
-        foreach (var l in _linkList)
-            if (l.From == from && l.To == to) return CommandResult.Fail("err_link_exists");
-        var route = RouteBelt(from, to);
-        if (route.Error != null) return CommandResult.Fail(route.Error);
-        if (!Pay(p, route.Credits, new Dictionary<string, long>())) return CommandResult.Fail("err_cost");
+        var error = CheckBeltRoute(from, to, cells);
+        if (error != null) return CommandResult.Fail(error);
+        var credits = cells!.Count * B.BeltCreditsPerCell;
+        if (!Pay(p, credits, new Dictionary<string, long>())) return CommandResult.Fail("err_cost");
 
-        var link = new Link { Id = NextId++, From = from, To = to, Planet = p.Planet, Paid = route.Credits };
-        ApplyRoute(link, route.Cells);
+        var link = new Link { Id = NextId++, From = from, To = to, Planet = p.Planet, Paid = credits };
+        ApplyRoute(link, cells);
         Links[link.Id] = link;
         RegisterBelt(link);
         RefreshBelts();
@@ -349,6 +244,9 @@ public sealed partial class World
         Bump("linked");
         return CommandResult.Success;
     }
+
+    /// <summary>Celda donde se podría fijar un punto de paso.</summary>
+    public bool CellFreeForBelt(int planet, int x, int z) => BeltCellFree(planet, x, z);
 
     private CommandResult RemoveLink(PlayerState p, int id)
     {

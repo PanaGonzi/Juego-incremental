@@ -318,7 +318,7 @@ public sealed partial class World
             CommandType.Place => Place(p, c.Text, c.A, c.B, c.C),
             CommandType.Remove => Remove(p, c.A),
             CommandType.Move => Move(p, c.A, c.B, c.C, c.D),
-            CommandType.Link => AddLink(p, c.A, c.B),
+            CommandType.Link => AddLink(p, c.A, c.B, c.Cells),
             CommandType.Unlink => RemoveLink(p, c.A),
             CommandType.Insert => Insert(p, c.A, c.Text, c.Amount),
             CommandType.Extract => Extract(p, c.A, c.Text, c.Amount),

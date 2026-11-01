@@ -84,7 +84,7 @@ public class PlaythroughTests
             return W.Machines.Values.Last();
         }
 
-        public void Link(Machine a, Machine b) => Do(new Command { Type = CommandType.Link, A = a.Id, B = b.Id });
+        public void Link(Machine a, Machine b) => Do(Fixture.LinkCmd(W, a, b));
 
         public void WaitUntil(Func<bool> condition, int maxTicks, string what)
         {
@@ -503,9 +503,9 @@ public class CoopCycleTests
         Stand(pb, recycler);
         Run(b, new Command { Type = CommandType.Insert, A = recycler.Id });
         Stand(pb, recycler);
-        Run(b, new Command { Type = CommandType.Link, A = recycler.Id, B = depot.Id });
+        Run(b, Fixture.LinkCmd(world, recycler, depot));
         Stand(pb, depot);
-        Run(b, new Command { Type = CommandType.Link, A = depot.Id, B = terminal.Id });
+        Run(b, Fixture.LinkCmd(world, depot, terminal));
 
         // El servidor avanza hasta que la cadena produce y A vende lo que B fabricó.
         h.Pump(() => terminal.In.Get("recovered") >= 2, 30000);

@@ -184,6 +184,8 @@ public sealed class Command
     public int A, B, C, D;
     public long Amount;
     public string Text = "";
+    /// <summary>Solo en Link: la ruta exacta previsualizada por el cliente. El primer y último elemento fijan los conectores.</summary>
+    public List<(int x, int z)>? Cells;
 }
 
 public readonly record struct CommandResult(bool Ok, string Error)

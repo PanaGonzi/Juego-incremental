@@ -22,6 +22,10 @@ public class Fixture
         return p;
     }
 
+    /// <summary>Como hace el cliente: traza la ruta y la envía. Sin ruta, orden vacía que el servidor rechaza.</summary>
+    public static Command LinkCmd(World w, Machine a, Machine b) =>
+        World.LinkCommand(a.Id, b.Id, w.RouteBelt(a.Id, b.Id, 200000).Cells);
+
     public static Machine Find(World w, string def) => w.Machines.Values.First(m => m.Def == def);
 
     public static void StandAt(World w, PlayerState p, Machine m)
@@ -188,8 +192,8 @@ public class SimulationTests
         var recycler = Fixture.Find(w, "recycler");
         var depot = Fixture.Find(w, "depot");
         p.X = 0; p.Z = 0;
-        Assert.True(w.Apply(p, new Command { Type = CommandType.Link, A = recycler.Id, B = depot.Id }).Ok);
-        Assert.False(w.Apply(p, new Command { Type = CommandType.Link, A = recycler.Id, B = depot.Id }).Ok);
+        Assert.True(w.Apply(p, Fixture.LinkCmd(w, recycler, depot)).Ok);
+        Assert.False(w.Apply(p, Fixture.LinkCmd(w, recycler, depot)).Ok);
         recycler.Out.Add("recovered", 3);
         var length = w.Links.Values.Single().Slots.Length;
         for (var i = 0; i < (length + 3) * 3 + 1; i++) w.Step();
@@ -994,7 +998,7 @@ public class RailTests
         baseStation.StationUnload = true;
         Assert.True(w.Apply(p, new Command { Type = CommandType.Place, Text = "station", A = 55, B = -37 }).Ok);
         var mine = w.Machines.Values.Last();
-        foreach (var e in extractors) Assert.True(w.Apply(p, new Command { Type = CommandType.Link, A = e.Id, B = mine.Id }).Ok, "enlace");
+        foreach (var e in extractors) Assert.True(w.Apply(p, Fixture.LinkCmd(w, e, mine)).Ok, "enlace");
         Assert.True(w.Apply(p, new Command { Type = CommandType.PlaceRail, A = 34, B = -22, C = 47, D = -35 }).Ok);
         Assert.True(w.Apply(p, new Command { Type = CommandType.PlaceRail, A = 47, B = -35, C = 55, D = -35 }).Ok);
         Assert.True(w.Apply(p, new Command { Type = CommandType.CreateTrain, A = mine.Id, B = baseStation.Id }).Ok);
@@ -1013,8 +1017,6 @@ public class RailTests
         var rich = Fixture.Content.Planets[0].Nodes.Where(n => n.YieldPermille > 1000).ToList();
         var near = Fixture.Content.Planets[0].Nodes.Where(n => n.Item == "ore" && n.YieldPermille == 1000).ToList();
         Assert.True(rich.Count >= 3);
-        // Fuera del alcance de una cinta desde la base: el tren es necesario.
-        Assert.All(rich, n => Assert.True(Math.Abs(n.X) + Math.Abs(n.Z) > Fixture.Content.Balance.BeltMaxCells * 2));
         // Con todos los yacimientos ricos, más del doble de mineral que con los cercanos.
         var richRate = rich.Sum(n => n.YieldPermille);
         var nearRate = near.Sum(n => n.YieldPermille);

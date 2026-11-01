@@ -9,7 +9,6 @@
   "cutterCooldownTicks": 2,
   "linkIntervalTicks": 3,
   "beltSlotsPerCell": 4,
-  "beltMaxCells": 32,
   "beltCreditsPerCell": 1,
   "recipeBufferFactor": 10,
   "outputBuffer": 20,

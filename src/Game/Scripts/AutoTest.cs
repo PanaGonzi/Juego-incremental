@@ -1030,7 +1030,7 @@ public partial class AutoTest : Node
         await Wait(0.5);
         var south = W.Machines.Values.Last(m => m.Def == "storage_crate" && m.Z == cell.z - 5);
         var north = W.Machines.Values.Last(m => m.Def == "storage_crate" && m.Z == cell.z + 5);
-        client.Send(new Command { Type = CommandType.Link, A = north.Id, B = south.Id });
+        client.Send(World.LinkCommand(north.Id, south.Id, W.RouteBelt(north.Id, south.Id).Cells));
         Check(await Until(() => W.Links.Values.Any(l => l.From == north.Id), 3), "cinta que cruza");
         var crossing = W.Links.Values.Last(l => l.From == north.Id);
         Check(crossing.Cells.Intersect(toCrate.Cells).Count() == 1, "cruza por un puente en una sola celda");
@@ -1044,7 +1044,7 @@ public partial class AutoTest : Node
         Check(await Build("storage_crate", 8, -16), "almacén que se llenará");
         var full = W.Machines.Values.Last(m => m.Def == "storage_crate" && m.X == 8);
         var depot = W.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
-        client.Send(new Command { Type = CommandType.Link, A = depot.Id, B = full.Id });
+        client.Send(World.LinkCommand(depot.Id, full.Id, W.RouteBelt(depot.Id, full.Id).Cells));
         Check(await Until(() => W.Links.Values.Any(l => l.From == depot.Id && l.To == full.Id), 3), "cinta depósito → almacén");
         var line = W.Links.Values.Last(l => l.From == depot.Id);
         var lineMid = line.Cells[line.Cells.Count / 2];
