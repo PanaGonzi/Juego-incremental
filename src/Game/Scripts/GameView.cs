@@ -138,6 +138,10 @@ public partial class GameView : Node3D
     private string _ghostDef = "";
     private readonly StandardMaterial3D _ghostOk = GhostMat(new Color(0.3f, 1f, 0.55f, 0.42f));
     private readonly StandardMaterial3D _ghostBad = GhostMat(new Color(1f, 0.3f, 0.2f, 0.42f));
+    private readonly StandardMaterial3D _ghostLacking = GhostMat(new Color(1f, 0.72f, 0.2f, 0.42f));
+    private MeshInstance3D? _cellMark;
+    private string _cellMarkKey = "";
+    private bool _stowedBeforeTool;
     private int _linkFrom = -1;
     private int _objectiveSeen = -1;
     private long _lastCredits;
@@ -765,7 +769,7 @@ public partial class GameView : Node3D
         var w = Session.Client.World!;
         var model = Models.Machine(m.Def);
         var def = w.Content.Machines[m.Def];
-        var root = new Node3D { Position = CenterOf(w, m), RotationDegrees = new Vector3(0, m.Rot * 90, 0) };
+        var root = new Node3D { Position = CenterOf(w, m), RotationDegrees = new Vector3(0, ModelYawDegrees(w.Content.Machines[m.Def], m.Rot), 0) };
         root.AddChild(new MeshInstance3D { Mesh = model.Body });
         var node = new MachineNode { Root = root, Key = key, Status = MachineStatus.Idle, Phase = GD.Randf() * 6f };
 
@@ -922,7 +926,7 @@ public partial class GameView : Node3D
         else if (e.IsActionPressed("rotate"))
         {
             if (_tool == Tool.Rail) _railShape = (byte)((_railShape + 1) % 3);
-            else _buildRot = (_buildRot + 1) % 4;
+            else if (_tool == Tool.Build) _buildRot = (_buildRot + 1) % 4;
             if (_tool is Tool.Rail or Tool.Build) _rig.OnTap();
         }
         else if (e.IsActionPressed("cancel")) Cancel();
@@ -940,12 +944,21 @@ public partial class GameView : Node3D
         else if (e.IsActionPressed("secondary")) Cancel();
     }
 
-    /// <summary>Clic derecho: primero anula el paso en curso; si no lo hay, vuelve a la multiherramienta.</summary>
+    /// <summary>
+    /// Clic derecho o cancelar: primero anula el paso en curso; si no lo hay, deja las manos como estaban antes de la herramienta.
+    /// No envía nada al servidor, no gira la pieza y con la multiherramienta en la mano no hace nada.
+    /// </summary>
     private void Cancel()
     {
         if (_tool == Tool.Link && _linkFrom >= 0) _linkFrom = -1;
         else if (_tool == Tool.Rail && _railPlacing) _railPlacing = false;
-        else if (_tool != Tool.Cutter) SetTool(Tool.Cutter);
+        else if (_tool != Tool.Cutter)
+        {
+            var stowed = _stowedBeforeTool;
+            SetTool(Tool.Cutter);
+            _stowed = stowed;
+            RefreshHotbar();
+        }
     }
 
     /// <summary>E: abre o actúa sobre lo apuntado. El gesto es breve y nunca bloquea la acción.</summary>
@@ -1139,6 +1152,7 @@ public partial class GameView : Node3D
 
     public void SetTool(Tool t)
     {
+        if (_tool == Tool.Cutter && t != Tool.Cutter) _stowedBeforeTool = _stowed;
         _tool = t;
         _stowed = false;
         _linkFrom = -1;
@@ -1148,6 +1162,7 @@ public partial class GameView : Node3D
         _ground.SetShaderParameter("grid_strength", t is Tool.Build or Tool.Rail or Tool.Link ? 1f : 0f);
         if (t != Tool.Build) RemoveGhost();
         if (t != Tool.Rail) RemoveRailGhost();
+        HideCellMark();
     }
 
     public void SelectBuild(string def)
@@ -1181,11 +1196,22 @@ public partial class GameView : Node3D
                 }
                 break;
             case Tool.Build:
-                if (TryGhostCell(out var x, out var z))
+                // La pieza sigue activa tras colocar. Lo que se sabe inválido no se envía: se explica y se sigue en el modo.
+                if (!TryGhostCell(out var x, out var z))
                 {
-                    client.Send(new Command { Type = CommandType.Place, Text = _buildDef, A = x, B = z, C = _buildRot });
-                    Sfx.Play("build");
+                    Notify(Loc.T("build_aim_ground"));
+                    break;
                 }
+                var buildDef = client.World!.Content.Machines[_buildDef];
+                var buildError = client.World.PlacementSiteError(client.LocalPlayer!, _buildDef, x, z, _buildRot, out _);
+                if (buildError == null && !client.World.CanAfford(client.LocalPlayer!, buildDef.Credits, buildDef.Cost)) buildError = "err_cost";
+                if (buildError != null)
+                {
+                    Notify(Loc.T(buildError));
+                    break;
+                }
+                client.Send(new Command { Type = CommandType.Place, Text = _buildDef, A = x, B = z, C = _buildRot });
+                Sfx.Play("build");
                 break;
             case Tool.Link:
                 if (_aim.kind != "machine") break;
@@ -1198,21 +1224,16 @@ public partial class GameView : Node3D
                 }
                 break;
             case Tool.Remove:
-                if (_aim.kind == "machine")
+                var (removeKind, removeId) = RemoveTarget();
+                if (removeKind.Length == 0) break;
+                var removal = PreviewRemoval(client.World!, client.LocalPlayer!, removeKind, removeId);
+                if (removal.Error != null)
                 {
-                    client.Send(new Command { Type = CommandType.Remove, A = _aim.id });
-                    Sfx.Play("remove");
+                    Notify(Loc.T(removal.Error));
+                    break;
                 }
-                else if (_aim.kind == "belt")
-                {
-                    client.Send(new Command { Type = CommandType.Unlink, A = _aim.id });
-                    Sfx.Play("remove");
-                }
-                else if (NearestRail() is { } rail)
-                {
-                    client.Send(new Command { Type = CommandType.RemoveRail, A = rail });
-                    Sfx.Play("remove");
-                }
+                client.Send(new Command { Type = removeKind switch { "machine" => CommandType.Remove, "belt" => CommandType.Unlink, _ => CommandType.RemoveRail }, A = removeId });
+                Sfx.Play("remove");
                 break;
             case Tool.Rail:
                 if (!TryGroundPoint(out var ground)) break;
@@ -1369,17 +1390,21 @@ public partial class GameView : Node3D
             _highlighted = target;
             if (target != null) target.MaterialOverlay = HighlightMaterial;
         }
-        if (target != null) HighlightMaterial.SetShaderParameter("tint", new Vector3(color.R, color.G, color.B));
+        if (target == null) return;
+        HighlightMaterial.SetShaderParameter("tint", new Vector3(color.R, color.G, color.B));
+        // Al desmontar, el objetivo se tiñe entero: debe quedar inequívoco entre varias máquinas pegadas.
+        HighlightMaterial.SetShaderParameter("fill", _tool == Tool.Remove ? 0.2f : 0f);
     }
 
     private static readonly ShaderMaterial HighlightMaterial = new() { Shader = new Shader { Code = """
         shader_type spatial;
         render_mode unshaded, blend_add, depth_draw_never, cull_back, shadows_disabled;
         uniform vec3 tint = vec3(1.0, 0.67, 0.25);
+        uniform float fill = 0.0;
         void fragment(){
           float rim = pow(1.0 - clamp(abs(dot(NORMAL, VIEW)), 0.0, 1.0), 4.0);
           ALBEDO = tint;
-          ALPHA = rim * 0.35 + 0.004 + 0.003 * sin(TIME * 5.0);
+          ALPHA = rim * 0.35 + 0.004 + fill + 0.003 * sin(TIME * 5.0);
         }
         """ } };
 
@@ -1555,12 +1580,15 @@ public partial class GameView : Node3D
         return (x, z);
     }
 
+    private const float RailPickRadius = 1.1f;
+
+    /// <summary>Hay que apuntar a la propia vía. Los tramos de una estación se retiran con ella.</summary>
     private int? NearestRail()
     {
         if (!TryGroundPoint(out var p)) return null;
         var w = Session.Client.World!;
         int? found = null;
-        var best = 2.5f * 2.5f;
+        var best = RailPickRadius * RailPickRadius;
         foreach (var s in w.RailSegments.Values)
         {
             if (s.OwnerStation >= 0 || !w.RailNodes.TryGetValue(s.A, out var a) || !w.RailNodes.TryGetValue(s.B, out var b)) continue;
@@ -1722,16 +1750,15 @@ public partial class GameView : Node3D
                 break;
             case Tool.Build:
                 prompt = Loc.T("prompt_build");
-                status = $"{Loc.T("machine_" + _buildDef)} — {Ui.Cost(w.Content.Machines[_buildDef].Credits, w.Content.Machines[_buildDef].Cost)}";
-                statusColor = Ui.Ink;
-                UpdateGhost(w, me, ref status, ref statusColor);
+                highlight = null;
+                UpdateGhost(w, me, ref status, ref statusColor, ref prompt);
                 break;
             case Tool.Link:
                 prompt = $"{Loc.T(_linkFrom < 0 ? "prompt_link_from" : "prompt_link_to")}   {Loc.T("belt_port_hint")}";
                 UpdateBeltPreview(w, me, ref status, ref statusColor);
                 break;
             case Tool.Remove:
-                prompt = Loc.T("prompt_remove");
+                UpdateRemoval(w, me, ref status, ref statusColor, ref prompt, ref highlight, ref highlightColor);
                 break;
             case Tool.Rail:
                 prompt = Loc.T(_railPlacing ? "prompt_rail_to" : "prompt_rail_from");
@@ -1741,6 +1768,7 @@ public partial class GameView : Node3D
         _working = cutting;
         _impacts.Work(cutting ? impact : null, _aimPoint, (_camera.GlobalPosition - _aimPoint).Normalized());
         UpdateHighlight(blocked ? null : highlight, highlightColor);
+        if (_cellMark != null) _cellMark.Visible = !blocked;
         // Mientras trabaja, el cabezal ocupa esa zona: basta con el estado y la barra de vida.
         if (cutting) prompt = "";
         _targetBar.Set(blocked || _tool != Tool.Cutter ? null : progress, progressColor);
@@ -1762,8 +1790,21 @@ public partial class GameView : Node3D
     }
 
 
-    private void UpdateGhost(World w, PlayerState me, ref string status, ref Color color)
+    /// <summary>
+    /// Orientación de la malla. Las de producción se modelan con la salida en +Z, pero sus puertos de cinta salen por −Z con
+    /// Rot 0 (World.FrontDir): media vuelta las hace coincidir. Las demás reciben por cualquier cara y conservan su frente.
+    /// </summary>
+    public static int ModelYawDegrees(MachineDef def, int rot) => rot * 90 + (def.Kind == MachineKind.Production ? 180 : 0);
+
+    /// <summary>Hacia dónde queda la salida modelada (+Z local) con este giro. La escena de pruebas la compara con los puertos.</summary>
+    public static Vector3 ModelFront(MachineDef def, int rot) => Vector3.Back.Rotated(Vector3.Up, Mathf.DegToRad(ModelYawDegrees(def, rot)));
+
+    public int BuildRotation => _buildRot;
+    public string StatusText => _hud.StatusText;
+
+    private void UpdateGhost(World w, PlayerState me, ref string status, ref Color color, ref string prompt)
     {
+        var def = w.Content.Machines[_buildDef];
         if (_ghostDef != _buildDef)
         {
             RemoveGhost();
@@ -1772,26 +1813,180 @@ public partial class GameView : Node3D
             _ghost.AddChild(new MeshInstance3D { Mesh = Models.Machine(_buildDef).Body, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
             AddChild(_ghost);
         }
+        status = $"{Loc.T("machine_" + _buildDef)} — {Ui.Cost(def.Credits, def.Cost)}";
+        color = Ui.Ink;
         if (!TryGhostCell(out var x, out var z))
         {
             _ghost!.Visible = false;
+            HideCellMark();
+            status += "\n" + Loc.T("build_aim_ground");
             return;
         }
-        var def = w.Content.Machines[_buildDef];
         var (fw, fd) = _buildRot % 2 == 0 ? (def.W, def.D) : (def.D, def.W);
         _ghost!.Visible = true;
         _ghost.GlobalPosition = new Vector3((x + fw / 2f) * Cell, 0.02f, (z + fd / 2f) * Cell);
-        _ghost.RotationDegrees = new Vector3(0, _buildRot * 90, 0);
-        var error = w.CheckPlacement(me.Planet, _buildDef, x, z, _buildRot, -1, out _);
-        if (error == null && !w.CanAfford(me, def.Credits, def.Cost)) error = "err_cost";
-        var material = error == null ? _ghostOk : _ghostBad;
-        ((MeshInstance3D)_ghost.GetChild(0)).MaterialOverride = material;
-        if (error != null)
-        {
-            status = Loc.T(error);
-            color = Ui.Bad;
-        }
+        _ghost.RotationDegrees = new Vector3(0, ModelYawDegrees(def, _buildRot), 0);
+
+        var error = w.PlacementSiteError(me, _buildDef, x, z, _buildRot, out _);
+        var afford = w.CanAfford(me, def.Credits, def.Cost);
+        ((MeshInstance3D)_ghost.GetChild(0)).MaterialOverride = error != null ? _ghostBad : afford ? _ghostOk : _ghostLacking;
+        if (error != null) status += "\n" + Loc.T(error);
+        if (!afford) status += "\n" + EntryInfo.MissingText(w, me, def);
+        if (error != null || !afford) color = error != null ? Ui.Bad : Ui.Warn;
+
+        // Las celdas exactas que ocuparía y los mismos puertos que tendrá la máquina: lo que se ve es lo que queda.
+        var cellColor = error != null ? Ui.Bad : afford ? Ui.Good : Ui.Warn;
+        var ports = w.BeltPorts(me.Planet, _buildDef, x, z, _buildRot, true).Concat(w.BeltPorts(me.Planet, _buildDef, x, z, _buildRot, false));
+        ShowCellMark($"build|{_buildDef}|{x}|{z}|{_buildRot}|{cellColor.ToHtml()}|{Session.Client.StructuralDeltas}", w.Footprint(_buildDef, x, z, _buildRot), cellColor, ports);
+        if (w.CanSendByBelt(def) || w.CanReceiveByBelt(def)) prompt += "\n" + Loc.T("build_ports_legend");
     }
+
+    // ---------- Desmontar ----------
+
+    /// <summary>Solo lo que está directamente en la mira; apuntar a escombros o a nada nunca selecciona algo cercano.</summary>
+    private (string kind, int id) RemoveTarget()
+    {
+        if (_aim.kind is "machine" or "belt") return _aim;
+        return _aim.kind.Length == 0 && NearestRail() is { } rail ? ("rail", rail) : ("", -1);
+    }
+
+    private static RemovalPreview PreviewRemoval(World w, PlayerState me, string kind, int id) => kind switch
+    {
+        "machine" => w.PreviewRemoveMachine(me, id),
+        "belt" => w.PreviewRemoveBelt(me, id),
+        _ => w.PreviewRemoveRail(me, id),
+    };
+
+    private void UpdateRemoval(World w, PlayerState me, ref string status, ref Color color, ref string prompt, ref GeometryInstance3D? highlight, ref Color highlightColor)
+    {
+        var (kind, id) = RemoveTarget();
+        highlight = null;
+        if (kind.Length == 0)
+        {
+            HideCellMark();
+            status = "";
+            prompt = Loc.T("prompt_remove_aim");
+            return;
+        }
+        var preview = PreviewRemoval(w, me, kind, id);
+        var name = Loc.T("belt_title");
+        var cells = new List<(int x, int z)>();
+        if (kind == "machine" && w.Machines.TryGetValue(id, out var machine))
+        {
+            name = Loc.T("machine_" + machine.Def);
+            cells.AddRange(w.Footprint(machine.Def, machine.X, machine.Z, machine.Rot));
+            if (_machines.TryGetValue(id, out var node)) highlight = node.Root.GetChildOrNull<GeometryInstance3D>(0);
+        }
+        else if (kind == "belt" && w.Links.TryGetValue(id, out var belt))
+        {
+            cells.AddRange(belt.Cells);
+            if (cells.Count == 0 && w.Machines.TryGetValue(belt.From, out var from) && w.Machines.TryGetValue(belt.To, out var to))
+            {
+                // Cinta elevada: no ocupa celdas, se marca la recta que recorre sobre el suelo.
+                var (ax, az) = w.MachineCenterMm(from);
+                var (bx, bz) = w.MachineCenterMm(to);
+                var steps = Mathf.Max(1, Mathf.CeilToInt(new Vector2(bx - ax, bz - az).Length() / (1000f * Cell)));
+                for (var i = 0; i <= steps; i++)
+                    cells.Add((Mathf.FloorToInt(Mathf.Lerp(ax, bx, i / (float)steps) / (1000f * Cell)), Mathf.FloorToInt(Mathf.Lerp(az, bz, i / (float)steps) / (1000f * Cell))));
+            }
+        }
+        else if (kind == "rail" && w.RailSegments.TryGetValue(id, out var segment))
+        {
+            name = Loc.T("remove_rail");
+            cells.AddRange(RailMath.Cells(w.RailNodes[segment.A], w.RailNodes[segment.B], segment.Shape));
+            highlight = _rails.GetValueOrDefault(id);
+        }
+
+        highlightColor = preview.Error == null ? Ui.Bad : Ui.Dim;
+        ShowCellMark($"remove|{kind}|{id}|{preview.Error}|{Session.Client.StructuralDeltas}", cells, preview.Error == null ? Ui.Bad : Ui.Dim);
+        if (preview.Error != null)
+        {
+            status = $"{name}\n{Loc.T(preview.Error)}";
+            color = Ui.Bad;
+            prompt = Loc.T("prompt_remove_blocked");
+            return;
+        }
+        status = Loc.T("remove_target", name);
+        status += "\n" + (preview.Credits > 0 || preview.Items.Count > 0 ? Loc.T("remove_recover", Ui.Cost(preview.Credits, preview.Items)) : Loc.T("remove_nothing"));
+        if (preview.Items.Count > 0) status += "\n" + Loc.T("remove_destination", Loc.T("machine_depot"));
+        if (preview.Belts > 0) status += "\n" + Loc.T("remove_with_belts", preview.Belts.ToString());
+        color = Ui.Warn;
+        prompt = Loc.T("prompt_remove");
+    }
+
+    // ---------- Marca de celdas ----------
+
+    private void HideCellMark()
+    {
+        _cellMark?.QueueFree();
+        _cellMark = null;
+        _cellMarkKey = "";
+    }
+
+    /// <summary>
+    /// Resalta celdas exactas sobre el suelo con relleno y contorno, visibles aunque algo las tape, y las flechas de los puertos
+    /// (mismo código de colores que BeltView; la forma indica el sentido sin depender del color). Solo se rehace si cambia la clave.
+    /// </summary>
+    private void ShowCellMark(string key, IEnumerable<(int x, int z)> cells, Color color, IEnumerable<BeltPort>? ports = null)
+    {
+        if (key == _cellMarkKey) return;
+        HideCellMark();
+        _cellMarkKey = key;
+        const float Inset = 0.04f, Edge = 0.16f, Y = 0.05f;
+        var set = cells.ToHashSet();
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d)
+        {
+            foreach (var v in new[] { a, b, c, a, c, d }) st.AddVertex(v);
+        }
+        void Rect(float x0, float z0, float x1, float z1) => Quad(new Vector3(x0, Y, z0), new Vector3(x1, Y, z0), new Vector3(x1, Y, z1), new Vector3(x0, Y, z1));
+
+        st.SetColor(new Color(color.R, color.G, color.B, 0.26f));
+        foreach (var (x, z) in set) Rect(x * Cell + Inset, z * Cell + Inset, (x + 1) * Cell - Inset, (z + 1) * Cell - Inset);
+        st.SetColor(new Color(color.R, color.G, color.B, 0.95f));
+        foreach (var (x, z) in set)
+        {
+            float x0 = x * Cell, z0 = z * Cell, x1 = x0 + Cell, z1 = z0 + Cell;
+            if (!set.Contains((x, z - 1))) Rect(x0, z0, x1, z0 + Edge);
+            if (!set.Contains((x, z + 1))) Rect(x0, z1 - Edge, x1, z1);
+            if (!set.Contains((x - 1, z))) Rect(x0, z0, x0 + Edge, z1);
+            if (!set.Contains((x + 1, z))) Rect(x1 - Edge, z0, x1, z1);
+        }
+        var anyPort = false;
+        foreach (var p in ports ?? Enumerable.Empty<BeltPort>())
+        {
+            anyPort = true;
+            var (dx, dz) = World.BeltDirs[p.Dir];
+            var outward = new Vector3(dx, 0, dz);
+            var dir = p.Output ? outward : -outward;
+            var side = dir.Cross(Vector3.Up);
+            var center = new Vector3((p.X + 0.5f) * Cell, Y + 0.01f, (p.Z + 0.5f) * Cell);
+            var tail = center + dir * 0.05f;
+            var neck = tail + dir * 0.45f;
+            var tip = tail + dir * 0.9f;
+            st.SetColor(!p.Free ? new Color(0.5f, 0.5f, 0.5f, 0.6f) : p.Output ? new Color(1f, 0.66f, 0.15f, 0.95f) : new Color(0.25f, 0.7f, 1f, p.Side ? 0.6f : 0.95f));
+            Quad(tail - side * 0.16f, tail + side * 0.16f, neck + side * 0.16f, neck - side * 0.16f);
+            foreach (var v in new[] { neck - side * 0.42f, neck + side * 0.42f, tip }) st.AddVertex(v);
+            if (p.Side || !p.Free) continue;
+            // Aleta vertical: a ras de suelo la flecha casi no se ve de lejos.
+            var lift = Vector3.Up * 0.55f;
+            Quad(tail + lift - Vector3.Up * 0.12f, neck + lift - Vector3.Up * 0.12f, neck + lift + Vector3.Up * 0.12f, tail + lift + Vector3.Up * 0.12f);
+            foreach (var v in new[] { neck + lift - Vector3.Up * 0.34f, neck + lift + Vector3.Up * 0.34f, tip + lift }) st.AddVertex(v);
+        }
+        if (set.Count == 0 && !anyPort) return;
+        _cellMark = new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = CellMarkMaterial, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        AddChild(_cellMark);
+    }
+
+    private static readonly StandardMaterial3D CellMarkMaterial = new()
+    {
+        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+        VertexColorUseAsAlbedo = true,
+        CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+        NoDepthTest = true,
+    };
 
     // ---------- Apuntado por programa para pruebas ----------
 

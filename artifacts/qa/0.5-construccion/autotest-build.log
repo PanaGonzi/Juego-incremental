@@ -1,0 +1,49 @@
+﻿[    0,4] OK    entrada en el mundo
+[    0,4] Renderizador forward_plus GPU AMD Radeon RX 7800 XT ventana (1600, 900)
+[    1,9] OK    la boca de salida del modelo coincide con el puerto, giro 0
+[    1,9] OK    la boca de salida del modelo coincide con el puerto, giro 1
+[    1,9] OK    la boca de salida del modelo coincide con el puerto, giro 2
+[    1,9] OK    la boca de salida del modelo coincide con el puerto, giro 3
+[    2,7] OK    el filtro de extracción deja solo extractores: 3
+[    3,1] OK    elegir una construcción bloqueada no la equipa ni cierra el catálogo
+[    3,1] OK    elegir en el catálogo equipa la pieza
+[    8,1] OK    lugar válido sin avisos: Fundición — 60 ¤ · 12 Material recuperado
+[    8,1] OK    el fantasma muestra el coste
+[    8,4] OK    R gira la pieza un paso
+[    8,5] OK    los puertos del fantasma giran con la pieza
+[    8,7] OK    cuatro pasos vuelven al giro inicial
+[   13,1] OK    colocada la fundición en x=4
+[   13,1] OK    la pieza sigue activa tras construir
+[   13,5] OK    colocada la fundición en x=6
+[   13,5] OK    la pieza sigue activa tras construir
+[   13,9] OK    colocada la fundición en x=8
+[   13,9] OK    la pieza sigue activa tras construir
+[   14,3] OK    motivo a la vista: Fundición — 60 ¤ · 12 Material recuperado
+El espacio está ocupado.
+[   14,7] OK    colocar en lugar ocupado no construye ni sale del modo
+[   15,1] OK    el fantasma indica qué falta: Ensambladora — 150 ¤ · 15 Lingotes · 10 Material recuperado
+Faltan: 10 Lingotes
+[   15,5] OK    sin material no construye y sigue en el modo
+[   15,7] OK    Z cancela sin efectos
+[   15,9] OK    el clic derecho cancela sin efectos
+[   15,9] OK    repetir la casilla guarda la multiherramienta
+[   16,1] OK    cancelar devuelve las manos como estaban
+[   16,4] OK    sin objeto apuntado no se ofrece nada: 
+[   16,8] OK    apuntar cerca, sin dar en la máquina, no desmonta nada
+[   17,3] OK    apunta solo a la central: (machine, 222)
+[   17,3] OK    objetivo, recuperación y destino: Desmontar: Fundición
+Recuperas: 60 ¤ · 12 Material recuperado · 4 Lingotes
+Los materiales van a: Depósito central · Los ¤ al saldo común
+[   17,5] OK    se desmonta la apuntada
+[   18,3] OK    las vecinas siguen en pie
+[   18,3] OK    créditos devueltos como se mostró: 60 / 60
+[   18,3] OK    materiales devueltos como se mostró: 12 Material recuperado · 4 Lingotes
+[   18,7] OK    el depósito explica por qué no: Depósito central
+Forma parte de la base: no se puede desmontar.
+[   19,2] OK    lo instalado no se desmonta
+[   19,4] OK    cinta tendida para retirarla
+[   19,8] OK    se apunta a la cinta: (belt, 224)
+[   20,0] OK    se retira la cinta
+[   20,0] OK    su destino sigue en pie
+[   20,0] OK    sin divergencias (2 comprobaciones)
+[   20,0] RESULTADO: CORRECTO

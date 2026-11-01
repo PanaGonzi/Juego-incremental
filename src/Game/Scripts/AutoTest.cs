@@ -232,6 +232,12 @@ public partial class AutoTest : Node
             {
                 _main.StartSession(GameSession.Local(_main, BeltWorld(), "autotest-belts", null, _main.Prefs));
             }
+            else if (_args.GetValueOrDefault("scenario") == "build")
+            {
+                var world = BeltWorld();
+                world.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0).In.TryRemove("ingot", 95); // no alcanza para la ensambladora
+                _main.StartSession(GameSession.Local(_main, world, "autotest-build", null, _main.Prefs));
+            }
             else if (_args.GetValueOrDefault("scenario") == "beltsv4")
             {
                 // Guardado real de la 0.4.1 cargado por la ruta normal: migra a cintas con copia .v4.bak.
@@ -259,6 +265,7 @@ public partial class AutoTest : Node
             if (_args.ContainsKey("measure")) await MeasureScenario();
             else if (_args.GetValueOrDefault("scenario") == "rail") await RailScenario();
             else if (_args.GetValueOrDefault("scenario") == "belts") await BeltScenario();
+            else if (_args.GetValueOrDefault("scenario") == "build") await BuildScenario();
             else if (_args.GetValueOrDefault("scenario") == "beltsv4") await BeltMigrationScenario();
             else if (_args.GetValueOrDefault("scenario") == "fp") await FirstPersonScenario();
             else if (_args.GetValueOrDefault("scenario") == "travel") await TravelScenario();
@@ -1069,6 +1076,177 @@ public partial class AutoTest : Node
 
         Check(client.HashMismatches == 0, $"sin divergencias ({client.HashChecks} comprobaciones)");
         Log($"Cintas: {W.Links.Count}, objetos en cinta {W.Links.Values.Sum(l => l.Load)}, dibujados {v.Belts.DrawnItems}");
+    }
+
+    /// <summary>
+    /// Regresión de construcción con entrada inyectada (no equivale a jugar con ratón y teclado reales): catálogo, fantasma,
+    /// rotación, colocar seguidas, faltas de material, cancelar y desmontar con devolución medida.
+    /// </summary>
+    private async Task BuildScenario()
+    {
+        var v = _view!;
+        var client = v.Session.Client;
+        v.TestCapture = true;
+        v.UpdateMouseMode();
+        var smelter = W.Content.Machines["smelter"];
+
+        for (var rot = 0; rot < 4; rot++)
+        {
+            var (dx, dz) = World.BeltDirs[W.BeltPorts(0, "smelter", 0, -30, rot, true).First().Dir];
+            Check(GameView.ModelFront(smelter, rot).DistanceTo(new Vector3(dx, 0, dz)) < 0.01f, $"la boca de salida del modelo coincide con el puerto, giro {rot}");
+        }
+
+        // Catálogo.
+        Key(Godot.Key.Q);
+        await Wait(0.3);
+        v.Inventory.FocusCatalogEntry("build:smelter");
+        await Wait(0.3);
+        await Shot("build_01_catalogo");
+        v.Inventory.SetCatalogFilter(MachineCategory.Extraction);
+        await Wait(0.2);
+        Check(v.Inventory.CatalogCardCount == W.Content.Machines.Values.Count(d => d.Node != null), $"el filtro de extracción deja solo extractores: {v.Inventory.CatalogCardCount}");
+        v.Inventory.FocusCatalogEntry("build:ice_extractor");
+        await Wait(0.3);
+        await Shot("build_02_catalogo_bloqueada");
+        v.Inventory.Choose("build:ice_extractor");
+        Check(v.InventoryOpen && v.CurrentTool != Tool.Build, "elegir una construcción bloqueada no la equipa ni cierra el catálogo");
+        v.Inventory.SetCatalogFilter(null);
+        v.Inventory.Choose("build:smelter");
+        Check(!v.InventoryOpen && v.ActiveEntry == "build:smelter", "elegir en el catálogo equipa la pieza");
+        await Wait(0.2);
+
+        // Fantasma válido, rotación y colocar seguidas.
+        await WalkTo(new Vector3(14, 0, -6));
+        Vector3 At(int x, int z) => new((x + smelter.W / 2f) * 2, 0, (z + smelter.D / 2f) * 2);
+        v.AimAt(At(4, -12));
+        await Wait(0.3);
+        Check(!v.StatusText.Contains('\n'), $"lugar válido sin avisos: {v.StatusText}");
+        Check(v.StatusText.Contains(Ui.Cost(smelter.Credits, smelter.Cost)), "el fantasma muestra el coste");
+        await Shot("build_03_fantasma_valido");
+        Key(Godot.Key.R);
+        await Wait(0.3);
+        Check(v.BuildRotation == 1, "R gira la pieza un paso");
+        await Shot("build_04_fantasma_girado");
+        Check(W.BeltPorts(0, "smelter", 4, -12, 1, true).All(p => p.Dir == World.FrontDir(1)), "los puertos del fantasma giran con la pieza");
+        for (var i = 0; i < 3; i++) Key(Godot.Key.R);
+        await Wait(0.2);
+        Check(v.BuildRotation == 0, "cuatro pasos vuelven al giro inicial");
+        // De cerca y de costado: se comparan las flechas con la boca del modelo. La salida con giro 0 va hacia −Z.
+        await WalkTo(At(4, -12) + new Vector3(9, 0, 0));
+        v.AimAt(At(4, -12));
+        await Wait(0.4);
+        await Shot("build_04b_puertos_de_costado");
+        await WalkTo(new Vector3(14, 0, -6));
+
+        var built = new List<Machine>();
+        var machinesBefore = W.Stats.GetValueOrDefault("built.smelter");
+        foreach (var x in new[] { 4, 6, 8 })
+        {
+            v.AimAt(At(x, -12));
+            await Wait(0.3);
+            v.Primary();
+            var count = machinesBefore + built.Count + 1;
+            Check(await Until(() => W.Stats.GetValueOrDefault("built.smelter") >= count, 3), $"colocada la fundición en x={x}");
+            Check(v.ActiveEntry == "build:smelter", "la pieza sigue activa tras construir");
+            built.Add(W.Machines.Values.Last(m => m.Def == "smelter"));
+        }
+
+        // Inválido con motivo, sin salir del modo.
+        v.AimAt(At(4, -12));
+        await Wait(0.4);
+        Check(v.StatusText.Contains(Loc.T("err_blocked")), $"motivo a la vista: {v.StatusText}");
+        await Shot("build_05_fantasma_invalido");
+        v.Primary();
+        await Wait(0.4);
+        Check(W.Stats.GetValueOrDefault("built.smelter") == machinesBefore + 3 && v.ActiveEntry == "build:smelter", "colocar en lugar ocupado no construye ni sale del modo");
+
+        // Faltan materiales, también desde la barra rápida.
+        v.ActivateEntry("build:assembler");
+        var assemblerBuilt = W.Stats.GetValueOrDefault("built.assembler");
+        v.AimAt(At(12, -12));
+        await Wait(0.4);
+        Check(v.StatusText.Contains(Loc.T("item_ingot")) && v.StatusText.Contains(Loc.T("cost_lacking", "")), $"el fantasma indica qué falta: {v.StatusText}");
+        await Shot("build_06_faltan_materiales");
+        v.Primary();
+        await Wait(0.4);
+        Check(W.Stats.GetValueOrDefault("built.assembler") == assemblerBuilt && v.ActiveEntry == "build:assembler", "sin material no construye y sigue en el modo");
+
+        // Cancelar.
+        var credits = W.Credits;
+        Key(Godot.Key.Z);
+        await Wait(0.2);
+        Check(v.CurrentTool == Tool.Cutter && v.ActiveEntry == HotbarLayout.Cutter && W.Credits == credits, "Z cancela sin efectos");
+        v.SelectBuild("smelter");
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Pressed = true });
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Pressed = false });
+        await Wait(0.2);
+        Check(v.CurrentTool == Tool.Cutter && W.Stats.GetValueOrDefault("built.smelter") == machinesBefore + 3, "el clic derecho cancela sin efectos");
+        v.ActivateEntry(HotbarLayout.Cutter);
+        Check(v.ActiveEntry == "", "repetir la casilla guarda la multiherramienta");
+        v.SelectBuild("smelter");
+        Key(Godot.Key.Z);
+        await Wait(0.2);
+        Check(v.ActiveEntry == "", "cancelar devuelve las manos como estaban");
+        v.ActivateEntry(HotbarLayout.Cutter);
+
+        // Desmontar: sin apuntar a nada no hay objetivo.
+        var server = v.Session.Runner!.Server.World;
+        v.SetTool(Tool.Remove);
+        v.AimAt(At(12, -12));
+        await Wait(0.3);
+        var machineCount = W.Machines.Count;
+        Check(v.StatusText.Length == 0, $"sin objeto apuntado no se ofrece nada: {v.StatusText}");
+        v.Primary();
+        await Wait(0.4);
+        Check(W.Machines.Count == machineCount, "apuntar cerca, sin dar en la máquina, no desmonta nada");
+
+        // La máquina central de tres pegadas, con contenido.
+        var target = built[1];
+        server.Machines[target.Id].Out.Add("ingot", 4);
+        server.DirtyMachines.Add(target.Id);
+        await Until(() => W.Machines[target.Id].Out.Get("ingot") == 4, 2);
+        v.AimAt(CenterOf(target) + Vector3.Up);
+        await Wait(0.4);
+        Check(v.AimTarget == ("machine", target.Id), $"apunta solo a la central: {v.AimTarget}");
+        Check(v.StatusText.Contains(Loc.T("remove_target", Loc.T("machine_smelter"))) && v.StatusText.Contains(Loc.T("machine_depot")), $"objetivo, recuperación y destino: {v.StatusText}");
+        await Shot("build_07_desmontar");
+        var preview = W.PreviewRemoveMachine(Me, target.Id);
+        var stock = W.DepotOf(0)!.In.Items.ToDictionary(kv => kv.Key, kv => kv.Value);
+        credits = W.Credits;
+        v.Primary();
+        Check(await Until(() => !W.Machines.ContainsKey(target.Id), 3), "se desmonta la apuntada");
+        await Wait(0.8);
+        Check(W.Machines.ContainsKey(built[0].Id) && W.Machines.ContainsKey(built[2].Id), "las vecinas siguen en pie");
+        Check(W.Credits - credits == preview.Credits, $"créditos devueltos como se mostró: {W.Credits - credits} / {preview.Credits}");
+        Check(preview.Items.All(kv => W.DepotOf(0)!.In.Get(kv.Key) - stock.GetValueOrDefault(kv.Key) == kv.Value), $"materiales devueltos como se mostró: {Ui.Cost(0, preview.Items)}");
+
+        // Lo instalado en la base lo explica y no se toca.
+        var baseDepot = W.DepotOf(0)!;
+        v.AimAt(CenterOf(baseDepot) + Vector3.Up);
+        await Wait(0.4);
+        Check(v.AimTarget == ("machine", baseDepot.Id) && v.StatusText.Contains(Loc.T("err_builtin")), $"el depósito explica por qué no: {v.StatusText}");
+        await Shot("build_08_desmontar_base");
+        v.Primary();
+        await Wait(0.4);
+        Check(W.Machines.ContainsKey(baseDepot.Id), "lo instalado no se desmonta");
+
+        // Una cinta: se retira ella y no sus extremos.
+        client.Send(new Command { Type = CommandType.Link, A = baseDepot.Id, B = built[2].Id });
+        Check(await Until(() => W.Links.Values.Any(l => l.From == baseDepot.Id && l.To == built[2].Id), 3), "cinta tendida para retirarla");
+        var belt = W.Links.Values.Last(l => l.From == baseDepot.Id);
+        var cell = belt.Cells[belt.Cells.Count / 2];
+        v.AimAt(new Vector3((cell.x + 0.5f) * 2, 0.5f, (cell.z + 0.5f) * 2));
+        await Wait(0.4);
+        Check(v.AimTarget == ("belt", belt.Id) && v.StatusText.Contains(Loc.T("belt_title")), $"se apunta a la cinta: {v.AimTarget}");
+        await Shot("build_09_desmontar_cinta");
+        v.Primary();
+        Check(await Until(() => !W.Links.ContainsKey(belt.Id), 3), "se retira la cinta");
+        Check(W.Machines.ContainsKey(built[2].Id), "su destino sigue en pie");
+
+        v.SetTool(Tool.Cutter);
+        v.TestCapture = false;
+        v.UpdateMouseMode();
+        Check(client.HashMismatches == 0, $"sin divergencias ({client.HashChecks} comprobaciones)");
     }
 
     /// <summary>Partida 0.4.1 migrada: comprueba las cintas enrutadas, la elevada y que siguen transportando.</summary>

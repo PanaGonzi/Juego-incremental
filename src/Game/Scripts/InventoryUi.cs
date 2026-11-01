@@ -247,6 +247,9 @@ public partial class InventoryUi : Control
     private readonly List<EntryCard> _catalogCards = new();
     private readonly List<EntryCard> _equipCards = new();
     private Label _catalogTitle = null!, _catalogDetail = null!;
+    private TextureRect _catalogPreview = null!;
+    private MachineCategory? _catalogFilter;
+    private readonly List<(MachineCategory? category, Button button)> _catalogFilters = new();
     private VBoxContainer _costList = null!;
     private string _catalogSignature = "";
     private EntryCard? _hoverEntry;
@@ -427,11 +430,25 @@ public partial class InventoryUi : Control
         var list = Column(Loc.T("inv_catalog"), out var listBody, new DropColumnFactory(null));
         list.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         page.AddChild(list);
+        var filters = new HBoxContainer();
+        filters.AddThemeConstantOverride("separation", 6);
+        listBody.AddChild(filters);
+        AddCatalogFilter(filters, null);
+        foreach (var category in Enum.GetValues<MachineCategory>()) AddCatalogFilter(filters, category);
         _catalogGrid = ScrollGrid(listBody, 3);
 
         var side = Column("", out var sideBody, new DropColumnFactory(null));
         side.CustomMinimumSize = new Vector2(430, 0);
         page.AddChild(side);
+        _catalogPreview = new TextureRect
+        {
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            CustomMinimumSize = new Vector2(0, 170),
+            MouseFilter = MouseFilterEnum.Ignore,
+            Visible = false,
+        };
+        sideBody.AddChild(_catalogPreview);
         _catalogTitle = Ui.Text(Loc.T("inv_catalog_hint"), 20, Ui.Amber);
         _catalogTitle.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         sideBody.AddChild(_catalogTitle);
@@ -443,6 +460,29 @@ public partial class InventoryUi : Control
         sideBody.AddChild(_costList);
         return page;
     }
+
+    private void AddCatalogFilter(HBoxContainer row, MachineCategory? category)
+    {
+        var button = Ui.Btn(CategoryName(category), () => SetCatalogFilter(category));
+        button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        row.AddChild(button);
+        _catalogFilters.Add((category, button));
+    }
+
+    private static string CategoryName(MachineCategory? category) => Loc.T(category == null ? "cat_all" : "cat_" + category.Value.ToString().ToLowerInvariant());
+
+    public void SetCatalogFilter(MachineCategory? category)
+    {
+        _catalogFilter = category;
+        _catalogSignature = "";
+        _refresh = 0;
+        Refresh();
+    }
+
+    public int CatalogCardCount => _catalogCards.Count;
+
+    /// <summary>Lleva el foco a una construcción del catálogo, igual que al recorrerlo con el teclado.</summary>
+    public void FocusCatalogEntry(string entry) => _catalogCards.FirstOrDefault(c => c.Entry == entry)?.GrabFocus();
 
     // ---------- Abrir y cerrar ----------
 
@@ -772,8 +812,18 @@ public partial class InventoryUi : Control
 
     private void RefreshCatalog(World w, PlayerState me)
     {
-        var defs = w.Content.Machines.Values
-            .Where(d => !(d.Builtin && d.Credits == 0 && d.Cost.Count == 0) && (d.Unlock == null || w.Upgrades.Contains(d.Unlock)))
+        // También se listan las bloqueadas, con lo que piden: el catálogo enseña qué se puede llegar a construir.
+        var all = w.Content.Machines.Values.Where(d => !(d.Builtin && d.Credits == 0 && d.Cost.Count == 0)).ToList();
+        foreach (var (category, button) in _catalogFilters)
+        {
+            var count = all.Count(d => category == null || World.CategoryOf(d) == category);
+            var label = $"{CategoryName(category)} ({count})";
+            if (button.Text != label) button.Text = label;
+            button.Modulate = category == _catalogFilter ? new Color(1.3f, 1.1f, 0.7f) : Colors.White;
+        }
+        var defs = all
+            .Where(d => _catalogFilter == null || World.CategoryOf(d) == _catalogFilter)
+            .OrderBy(World.CategoryOf)
             .ToList();
         var signature = string.Join(",", defs.Select(d => d.Id));
         if (signature != _catalogSignature)
@@ -796,8 +846,10 @@ public partial class InventoryUi : Control
         foreach (var card in _catalogCards)
         {
             var def = w.Content.Machines[EntryInfo.DefOf(card.Entry)];
-            var afford = w.CanAfford(me, def.Credits, def.Cost);
-            card.SetCost(Ui.Cost(def.Credits, def.Cost), afford ? Ui.Good : Ui.Bad);
+            var locked = def.Unlock != null && !w.Upgrades.Contains(def.Unlock);
+            card.Modulate = locked ? new Color(1f, 1f, 1f, 0.62f) : Colors.White;
+            if (locked) card.SetCost($"{Loc.T("tech_requires")}: {Loc.T("upgrade_" + def.Unlock)}", Ui.Warn);
+            else card.SetCost(Ui.Cost(def.Credits, def.Cost), w.CanAfford(me, def.Credits, def.Cost) ? Ui.Good : Ui.Bad);
         }
         var focus = _hoverEntry;
         if (focus != null && EntryInfo.DefOf(focus.Entry).Length > 0 && w.Content.Machines.TryGetValue(EntryInfo.DefOf(focus.Entry), out var shown))
@@ -807,12 +859,17 @@ public partial class InventoryUi : Control
     private void ShowCost(World w, PlayerState me, MachineDef def)
     {
         _catalogTitle.Text = Loc.T("machine_" + def.Id);
-        var lines = new List<string> { $"{Loc.T("cat_size")}: {def.W * 2} × {def.D * 2} m" };
+        _catalogPreview.Texture = MachineThumbnails.Get(def.Id);
+        _catalogPreview.Visible = true;
+        var lines = new List<string> { $"{CategoryName(World.CategoryOf(def))} · {Loc.T("cat_size")}: {def.W * 2} × {def.D * 2} m" };
+        if (def.Recipe != null && w.Content.Recipes.TryGetValue(def.Recipe, out var r))
+            lines.Add($"{Loc.T("panel_recipe")}: {Ui.Amounts(r.Inputs)} → {Ui.Amounts(r.Outputs)} · {r.Ticks / (double)w.Content.Balance.TicksPerSecond:0.#} s");
+        if (def.Unlock != null)
+            lines.Add($"{Loc.T("tech_requires")}: {Loc.T("upgrade_" + def.Unlock)}{(w.Upgrades.Contains(def.Unlock) ? "" : " · " + Loc.T("tech_locked"))}");
+        if (def.Node != null) lines.Add(Loc.T("cat_needs_node", Loc.T("item_" + def.Node)));
         if (def.Power > 0) lines.Add($"{Loc.T("panel_power_use")}: {def.Power}");
         if (def.PowerGen > 0) lines.Add($"{Loc.T("panel_power_gen")}: {def.PowerGen}");
         if (def.Capacity > 0) lines.Add(Loc.T("panel_capacity", def.Capacity.ToString()));
-        if (def.Recipe != null && w.Content.Recipes.TryGetValue(def.Recipe, out var r))
-            lines.Add($"{Loc.T("panel_recipe")}: {Ui.Amounts(r.Inputs)} → {Ui.Amounts(r.Outputs)}");
         _catalogDetail.Text = string.Join("\n", lines);
 
         foreach (var c in _costList.GetChildren()) { _costList.RemoveChild(c); c.QueueFree(); }
@@ -860,6 +917,9 @@ public partial class InventoryUi : Control
     public void Choose(string entry)
     {
         _view.ActivateEntry(entry);
+        // Bloqueada: el aviso lo da la activación y el jugador sigue eligiendo.
+        var world = _view.Session.Client.World;
+        if (world != null && world.Content.Machines.TryGetValue(EntryInfo.DefOf(entry), out var def) && def.Unlock != null && !world.Upgrades.Contains(def.Unlock)) return;
         Close();
     }
 

@@ -314,6 +314,8 @@ public partial class Hud : Control
         _view.UpdateMouseMode();
     }
 
+    public string StatusText => _status.Text;
+
     public void SetPrompt(string status, Color statusColor, string prompt)
     {
         _status.Text = status;
