@@ -21,6 +21,8 @@ La última sesión con entradas reales fue la de `0.5.0-qa2`.
 - [ ] Fantasma de pieza grande en movimiento, de cerca y de lejos: las marcas cambian de tamaño sin molestar (INC-20).
 - [ ] Tender cintas hacia y desde un divisor y un unificador.
 - [ ] Colocación consecutiva y desmontaje con ratón.
+- [ ] Insertar un divisor y un unificador sobre una cinta tendida, apuntando con el ratón.
+- [ ] Botón «Mover» del panel: fantasma, rotar, confirmar y cancelar.
 
 ## Inventario y barra rápida
 

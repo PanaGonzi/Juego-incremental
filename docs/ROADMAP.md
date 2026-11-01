@@ -75,7 +75,7 @@ Cómo leer las columnas: **Implementado** es que el código existe. **Comprobado
 | E-7 | A | Dos clientes viendo el mismo transporte; 12 clientes | sí | T-018, T-019, un solo PC y comandos de la interfaz | Dos personas o dos PC: NO VERIFICADO |
 | E-8 | A | Revisión independiente de calidad y rendimiento con cintas cargadas | no | medidas parciales en PERFORMANCE y T-019 | La revisión independiente no se ha hecho |
 | E-9 | M | Divisores y combinadores | sustituida por C-3 | — | — |
-| E-10 | M | Acabado de Marte y del resto de máquinas | en parte: terreno y cielo de Marte, plataforma de carga | `artifacts/qa/0.5-marte/` | El resto de máquinas |
+| E-10 | M | Acabado de Marte y del resto de máquinas | terreno y cielo de Marte, plataforma de carga; enfriador, refinería de obleas, radiadores, divisor y unificador rehechos; piloto y animación por estado (2865495) | `artifacts/qa/0.5-marte/`, `artifacts/qa/0.5-maquinas/` con antes y después; auto `gallery` | Valoración de una persona; rendimiento en equipo modesto |
 | E-11 | M | BUG-005: picos de respuesta | causa medida y mitigada: reenvío 1,3×RTT y lectura cada 5 ms | T-021, T-023, relé en un PC | Picos con pérdidas seguidas; canales separados sin probar; redes reales |
 
 ## A0.6 — Construcción, gestión y primeros 30 minutos
@@ -86,7 +86,7 @@ Encargo: [PROMPT_CLAUDE_CONSTRUCCION_PRIMEROS_30_MIN.md](../PROMPT_CLAUDE_CONSTR
 | --- | --- | --- | --- | --- | --- |
 | C-1 | A | Cintas sin límite arbitrario, trazado automático, puntos intermedios, rutas alternativas, confirmación exacta, validación en servidor | sí: b0ff255, 50de932, 3229fa5, a657005, d8353f9 | xUnit; auto `beltslong`; real en qa2: R, M, clic de punto, Z | Pendientes reales: cuestas (el terreno es llano: solo simuladas); Retroceso y N con entradas reales |
 | C-2 | A | Colocación consecutiva, previsualización con coste y motivo, desmontaje con lo que se recupera | sí: ed60e1e | auto `artifacts/qa/0.5-construccion`; real en parte, qa2 | Repetir con entradas reales |
-| C-3 | A | Divisores y unificadores | sí como máquina: 1d1b828, 137d2b6 | xUnit; auto `manage`; unificador en el cliente, solo pruebas unitarias | Insertarlos en una cinta ya tendida: no existía, ver tarea 3 del encargo vigente |
+| C-3 | A | Divisores y unificadores | sí como máquina (1d1b828, 137d2b6) e insertados en una cinta tendida, con la carga conservada (db39124) | xUnit `BeltEditTests`; auto `manage`; `artifacts/qa/0.5-gestion/gestion_08..10` | Insertar y mover con teclado y ratón reales |
 | C-4 | A | Lectura de un vistazo, capacidad y producción real, seguir cadena | sí | `artifacts/qa/0.5-gestion`, real con H, C y Esc | Botón «Seguir cadena» con ratón real |
 | C-5 | A | Progresión de los primeros 30 min | sí | `docs/TIEMPOS_30_MIN.md`, recorridos con guion, no con personas | 36 acarreos manuales todavía; duración con personas |
 | C-6 | A | Zona inicial, respuesta sonora y visual, ajustes para reducir movimiento y efectos | sí | `artifacts/qa/0.5-zona` | El sonido no lo ha oído nadie |

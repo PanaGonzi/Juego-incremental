@@ -2,7 +2,7 @@
 
 **Última build estable:** `builds/alpha-0.4.1` (commit babc91c, etiqueta `alpha-0.4.1`, protocolo 4, guardado 4). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`.
 
-**Última build de prueba:** `builds/alpha-0.5.0-qa4` (protocolo 7, guardado 5; commit en su `VERSION.txt`). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`. Sin QA con entradas reales de Windows: la última es la de `0.5.0-qa2`.
+**Última build de prueba:** `builds/alpha-0.5.0-qa5` (protocolo 8, guardado 5; commit en su `VERSION.txt`). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`. Sin QA con entradas reales de Windows: la última es la de `0.5.0-qa2`.
 
 **Hitos:** M0, A0.1, A0.2, A0.4 y evento/offline de A0.5 implementados, con verificación en una sola máquina. A0.3 completo salvo Steam en el menú.
 
