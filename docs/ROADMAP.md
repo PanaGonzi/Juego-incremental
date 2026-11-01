@@ -76,6 +76,20 @@ Encargo: [PROMPT_CLAUDE_CONTINUAR_QA_CINTAS_GRAFICOS.md](../PROMPT_CLAUDE_CONTIN
 | E-10 | M | Extender el acabado a Marte y al resto de máquinas | pendiente | — |
 | E-11 | M | BUG-005: dónde se producen los picos de RTT | pendiente | — |
 
+## A0.6 — Construcción, gestión y primeros 30 minutos (en cola tras integrar E-1 a E-5)
+
+Encargo: [PROMPT_CLAUDE_CONSTRUCCION_PRIMEROS_30_MIN.md](../PROMPT_CLAUDE_CONSTRUCCION_PRIMEROS_30_MIN.md). Máximo dos subagentes a la vez, sin delegación en cascada.
+
+| ID | P | Tarea | Estado | Evidencia |
+| --- | --- | --- | --- | --- |
+| C-1 | A | Cintas sin límite arbitrario, trazado automático comprensible, puntos intermedios, rutas alternativas, confirmación exacta y validación en servidor | pendiente, primera de este bloque | — |
+| C-2 | A | Colocación consecutiva, previsualización con coste y motivo, desmontaje preciso con lo que se recupera | pendiente | — |
+| C-3 | A | Divisores y unificadores | pendiente (sustituye a E-9) | — |
+| C-4 | A | Lectura de un vistazo: receta, progreso, estado, capacidad frente a producción real, seguir cadena hasta el cuello de botella | pendiente | — |
+| C-5 | A | Progresión de los primeros 30 min con tiempos de recorridos reproducibles | pendiente | — |
+| C-6 | A | Zona inicial terminada, respuesta sonora y visual, ajustes para reducir movimiento y efectos | pendiente | — |
+| C-7 | A | Pruebas con controles normales: dos jugadores sobre la misma construcción, rendimiento antes y después, regresión de 12 jugadores | pendiente | — |
+
 ## Beta
 
 | ID | P | Tarea | Estado |
