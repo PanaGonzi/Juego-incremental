@@ -435,6 +435,9 @@ public class FactoryManagementTests
     public void Cadena_consumidor_lento_es_la_menor_capacidad()
     {
         var (w, p, _) = Stage();
+        // Con todas las mejoras, fundición y ensambladora quedan empatadas a 30/min: un empate no es un cuello de botella.
+        w.Upgrades.Remove("smelt_speed");
+        w.Reindex();
         var smelter = Place(w, p, "smelter", Bx, Bz); // produce lingotes
         var assembler = Place(w, p, "assembler", Bx, Bz - 8); // los consume
         var crate = Place(w, p, "storage_crate", Bx, Bz - 15);
@@ -459,6 +462,9 @@ public class FactoryManagementTests
     public void Cadena_todo_en_marcha_compara_capacidades()
     {
         var (w, p, _) = Stage();
+        // Con todas las mejoras, fundición y ensambladora quedan empatadas a 30/min: un empate no es un cuello de botella.
+        w.Upgrades.Remove("smelt_speed");
+        w.Reindex();
         var smelter = Place(w, p, "smelter", Bx, Bz);
         var assembler = Place(w, p, "assembler", Bx, Bz - 8);
         Connect(w, p, smelter, assembler);

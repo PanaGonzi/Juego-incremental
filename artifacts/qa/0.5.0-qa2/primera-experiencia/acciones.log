@@ -1,0 +1,84 @@
+11:18:11.172 start C:\Users\gonza\Desktop\Juego incremental\builds\alpha-0.5.0-qa2\client\Pluton.exe perfil=test-qa2 1600x900 pantalla=\\.\DISPLAY1
+11:18:11.704 info
+11:18:16.040 wait 2000
+11:18:18.162 shot artifacts\qa\0.5.0-qa2\primera-experiencia\01_menu.png 1280
+11:18:24.174 click 255 450
+11:18:24.418 wait 1500
+11:18:26.035 shot artifacts\qa\0.5.0-qa2\primera-experiencia\02.png 1280
+11:18:31.835 look -500 120
+11:18:32.274 wait 400
+11:18:32.804 shot artifacts\qa\0.5.0-qa2\primera-experiencia\03.png 1280
+11:18:37.853 look 170 0
+11:18:38.291 key W 1500
+11:18:39.933 wait 200
+11:18:40.274 shot artifacts\qa\0.5.0-qa2\primera-experiencia\04.png 1280
+11:18:45.371 look 0 150
+11:18:45.810 press left 1000
+11:18:46.961 shot artifacts\qa\0.5.0-qa2\primera-experiencia\05.png 1280
+11:18:52.489 press left 500
+11:18:53.125 look -220 -40
+11:18:53.574 wait 200
+11:18:53.909 shot artifacts\qa\0.5.0-qa2\primera-experiencia\06.png 1280
+11:18:59.523 look -30 -50
+11:18:59.957 key W 500
+11:19:00.587 press left 1800
+11:19:02.522 shot artifacts\qa\0.5.0-qa2\primera-experiencia\07.png 1280
+11:19:10.214 look 255 60
+11:19:10.651 key W 1100
+11:19:11.887 wait 100
+11:19:12.122 shot artifacts\qa\0.5.0-qa2\primera-experiencia\08.png 1280
+11:19:18.151 key E
+11:19:18.350 wait 400
+11:19:18.877 shot artifacts\qa\0.5.0-qa2\primera-experiencia\09a.png 640
+11:19:19.109 press left 1800
+11:19:21.045 wait 300
+11:19:21.468 shot artifacts\qa\0.5.0-qa2\primera-experiencia\09.png 1280
+11:19:29.548 look 0 -60
+11:19:29.978 wait 150
+11:19:30.246 shot artifacts\qa\0.5.0-qa2\primera-experiencia\10.png 640
+11:19:30.474 look 400 0
+11:19:30.904 wait 150
+11:19:31.182 shot artifacts\qa\0.5.0-qa2\primera-experiencia\11.png 640
+11:19:31.418 look 400 0
+11:19:31.847 wait 150
+11:19:32.118 shot artifacts\qa\0.5.0-qa2\primera-experiencia\12.png 640
+11:19:38.390 look 400 0
+11:19:38.837 wait 150
+11:19:39.113 shot artifacts\qa\0.5.0-qa2\primera-experiencia\13.png 800
+11:19:39.360 look 400 0
+11:19:39.800 wait 150
+11:19:40.094 shot artifacts\qa\0.5.0-qa2\primera-experiencia\14.png 800
+11:19:48.003 look -1000 -30
+11:19:48.445 wait 150
+11:19:48.728 shot artifacts\qa\0.5.0-qa2\primera-experiencia\15.png 1280
+11:19:55.984 look 225 0
+11:19:56.421 key Shift+W 1800
+11:19:58.362 wait 150
+11:19:58.642 shot artifacts\qa\0.5.0-qa2\primera-experiencia\16.png 1280
+11:20:03.399 look -60 -40
+11:20:03.835 wait 200
+11:20:04.162 shot artifacts\qa\0.5.0-qa2\primera-experiencia\17.png 1280
+11:20:09.275 key E
+11:20:09.469 wait 500
+11:20:10.087 shot artifacts\qa\0.5.0-qa2\primera-experiencia\18_panel.png 1280
+11:20:15.856 click 425 150 right
+11:20:16.107 wait 400
+11:20:16.632 shot artifacts\qa\0.5.0-qa2\primera-experiencia\19.png 1280
+11:20:21.591 click 1419 699
+11:20:21.847 move 1000 500
+11:20:21.979 wait 500
+11:20:22.618 shot artifacts\qa\0.5.0-qa2\primera-experiencia\20.png 1280
+11:20:28.215 click 1383 95
+11:20:28.467 wait 700
+11:20:29.296 shot artifacts\qa\0.5.0-qa2\primera-experiencia\21_panelmaq.png 1280
+11:20:35.633 click 817 578
+11:20:35.875 wait 500
+11:20:36.502 shot artifacts\qa\0.5.0-qa2\primera-experiencia\22.png 1000
+11:20:36.755 wait 15000
+11:20:51.916 shot artifacts\qa\0.5.0-qa2\primera-experiencia\23.png 1000
+11:20:59.034 click 606 578
+11:20:59.288 wait 300
+11:20:59.709 click 640 617
+11:20:59.959 wait 300
+11:21:00.381 look 300 0
+11:21:00.828 wait 200
