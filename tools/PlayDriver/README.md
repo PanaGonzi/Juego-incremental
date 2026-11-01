@@ -30,6 +30,7 @@ dotnet build tools/PlayDriver -c Release -o logs/playdriver-bin -v q
 | `D move x y` · `D click x y [left\|right] [ms]` · `D drag x1 y1 x2 y2` · `D scroll n` | Ratón absoluto para menús |
 | `D press [left\|right] [ms]` | Pulsa sin mover (primera persona: mantener para trabajar) |
 | `D look dx dy [ms]` | Ratón **relativo** real (primera persona) |
+| `D keydown Shift` … `D click x y` … `D keyup Shift` | Clic con modificador (Mayús, Ctrl) |
 | `D wait ms` | Espera |
 | `D stop` | Cierra el juego |
 

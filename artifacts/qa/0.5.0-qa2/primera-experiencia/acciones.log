@@ -82,3 +82,415 @@
 11:20:59.959 wait 300
 11:21:00.381 look 300 0
 11:21:00.828 wait 200
+11:21:01.184 shot artifacts\qa\0.5.0-qa2\primera-experiencia\24.png 1000
+11:21:01.452 key Q
+11:21:01.664 wait 500
+11:21:02.291 shot artifacts\qa\0.5.0-qa2\primera-experiencia\25_catalogo.png 1280
+11:21:10.720 key Escape
+11:21:10.916 wait 400
+11:21:11.433 look 300 0
+11:21:11.876 wait 200
+11:21:12.205 shot artifacts\qa\0.5.0-qa2\primera-experiencia\26.png 1000
+11:21:19.312 key Q
+11:21:19.514 wait 500
+11:21:20.141 shot artifacts\qa\0.5.0-qa2\primera-experiencia\27_catalogo.png 1280
+11:21:26.241 move 880 335
+11:21:26.358 wait 400
+11:21:26.874 shot artifacts\qa\0.5.0-qa2\primera-experiencia\28.png 1280
+11:21:34.267 key Tab
+11:21:34.458 wait 300
+11:21:34.883 look -340 -30
+11:21:35.321 wait 200
+11:21:35.649 shot artifacts\qa\0.5.0-qa2\primera-experiencia\29.png 1000
+11:21:44.531 click 764 170
+11:21:44.776 wait 400
+11:21:45.306 move 700 500
+11:21:45.426 wait 200
+11:21:45.741 shot artifacts\qa\0.5.0-qa2\primera-experiencia\30.png 800
+11:21:45.960 key Tab
+11:21:46.149 wait 300
+11:21:46.571 shot artifacts\qa\0.5.0-qa2\primera-experiencia\31.png 800
+11:21:53.452 look -340 -40
+11:21:53.879 wait 200
+11:21:54.213 shot artifacts\qa\0.5.0-qa2\primera-experiencia\32.png 1000
+11:22:02.171 key G
+11:22:02.354 wait 200
+11:22:02.681 key D 1400
+11:22:04.215 key Shift+W 2200
+11:22:06.547 wait 200
+11:22:06.877 shot artifacts\qa\0.5.0-qa2\primera-experiencia\33.png 1000
+11:22:14.129 look 66 80
+11:22:14.559 key Shift+W 1050
+11:22:15.732 wait 200
+11:22:16.060 shot artifacts\qa\0.5.0-qa2\primera-experiencia\34.png 1000
+11:22:22.960 key W 350
+11:22:23.432 look 0 30
+11:22:23.875 wait 150
+11:22:24.150 shot artifacts\qa\0.5.0-qa2\primera-experiencia\35.png 800
+11:22:24.381 press left 2500
+11:22:27.019 shot artifacts\qa\0.5.0-qa2\primera-experiencia\36.png 1000
+11:22:33.994 press left 2000
+11:22:36.122 shot artifacts\qa\0.5.0-qa2\primera-experiencia\37.png 800
+11:22:43.771 look -5 -30
+11:22:44.203 key W 250
+11:22:44.579 press left 4500
+11:22:49.207 shot artifacts\qa\0.5.0-qa2\primera-experiencia\38.png 800
+11:22:55.902 look 180 60
+11:22:56.336 wait 150
+11:22:56.603 shot artifacts\qa\0.5.0-qa2\primera-experiencia\39.png 600
+11:22:56.829 press left 4500
+11:23:01.464 shot artifacts\qa\0.5.0-qa2\primera-experiencia\40.png 1000
+11:23:07.556 key 6
+11:23:07.749 wait 500
+11:23:08.371 shot artifacts\qa\0.5.0-qa2\primera-experiencia\41_fantasma.png 1280
+11:23:14.886 key S 800
+11:23:15.816 wait 300
+11:23:16.236 shot artifacts\qa\0.5.0-qa2\primera-experiencia\42.png 1280
+11:23:23.528 key R
+11:23:23.725 wait 300
+11:23:24.157 shot artifacts\qa\0.5.0-qa2\primera-experiencia\43.png 800
+11:23:24.396 press left 100
+11:23:24.631 wait 500
+11:23:25.255 shot artifacts\qa\0.5.0-qa2\primera-experiencia\44.png 1000
+11:23:33.358 press right 100
+11:23:33.589 wait 300
+11:23:34.007 key 1
+11:23:34.197 wait 300
+11:23:34.623 look 0 -20
+11:23:35.064 wait 300
+11:23:35.491 shot artifacts\qa\0.5.0-qa2\primera-experiencia\45.png 1000
+11:23:43.863 key 1
+11:23:44.052 wait 400
+11:23:44.566 look 0 -60
+11:23:44.992 key W 800
+11:23:45.918 look 0 60
+11:23:46.358 wait 300
+11:23:46.775 shot artifacts\qa\0.5.0-qa2\primera-experiencia\46.png 1000
+11:23:53.900 key H
+11:23:54.097 wait 400
+11:23:54.635 shot artifacts\qa\0.5.0-qa2\primera-experiencia\47.png 1000
+11:24:02.871 key G
+11:24:03.063 wait 200
+11:24:03.391 look -1000 0
+11:24:03.825 wait 300
+11:24:04.253 shot artifacts\qa\0.5.0-qa2\primera-experiencia\48.png 1000
+11:24:16.607 look -400 -30
+11:24:17.035 wait 300
+11:24:17.459 shot artifacts\qa\0.5.0-qa2\primera-experiencia\49.png 1000
+11:24:24.925 look -125 40
+11:24:25.369 key Shift+W 3000
+11:24:28.508 wait 300
+11:24:28.943 shot artifacts\qa\0.5.0-qa2\primera-experiencia\50.png 1000
+11:24:36.502 look 420 50
+11:24:36.935 wait 200
+11:24:37.266 shot artifacts\qa\0.5.0-qa2\primera-experiencia\51.png 700
+11:24:37.490 press left 1800
+11:24:39.427 wait 100
+11:24:39.644 shot artifacts\qa\0.5.0-qa2\primera-experiencia\52.png 700
+11:24:47.108 look -330 -90
+11:24:47.547 key W 900
+11:24:48.577 wait 150
+11:24:48.854 press left 1800
+11:24:50.789 wait 100
+11:24:51.004 shot artifacts\qa\0.5.0-qa2\primera-experiencia\53.png 800
+11:24:58.640 look 500 -60
+11:24:59.070 wait 250
+11:24:59.448 shot artifacts\qa\0.5.0-qa2\primera-experiencia\54.png 1000
+11:25:07.168 look 208 0
+11:25:07.596 key Shift+W 2400
+11:25:10.121 wait 250
+11:25:10.504 shot artifacts\qa\0.5.0-qa2\primera-experiencia\55.png 1000
+11:25:17.181 key F
+11:25:17.370 wait 300
+11:25:17.793 key Escape
+11:25:17.983 wait 500
+11:25:18.601 shot artifacts\qa\0.5.0-qa2\primera-experiencia\56_pausa.png 1000
+11:25:24.433 click 800 490
+11:25:24.685 wait 500
+11:25:25.312 shot artifacts\qa\0.5.0-qa2\primera-experiencia\57_ajustes.png 1280
+11:25:32.431 click 680 286
+11:25:32.676 wait 400
+11:25:33.193 shot artifacts\qa\0.5.0-qa2\primera-experiencia\58_interfaz.png 1000
+11:25:33.429 click 840 286
+11:25:33.680 wait 400
+11:25:34.210 shot artifacts\qa\0.5.0-qa2\primera-experiencia\59_controles.png 1280
+11:25:40.337 click 800 470
+11:25:40.594 wait 500
+11:25:41.213 shot artifacts\qa\0.5.0-qa2\primera-experiencia\60_mapa_controles.png 1280
+11:25:49.336 key Escape
+11:25:49.532 wait 400
+11:25:50.063 shot artifacts\qa\0.5.0-qa2\primera-experiencia\61.png 500
+11:25:50.276 key Escape
+11:25:50.456 wait 400
+11:25:50.977 shot artifacts\qa\0.5.0-qa2\primera-experiencia\62.png 500
+11:25:51.189 key Escape
+11:25:51.382 wait 400
+11:25:51.900 look 0 -20
+11:25:52.342 wait 200
+11:25:52.666 shot artifacts\qa\0.5.0-qa2\primera-experiencia\63.png 800
+11:26:00.153 key G
+11:26:00.553 wait 200
+11:26:00.871 key F
+11:26:01.062 wait 300
+11:26:01.497 shot artifacts\qa\0.5.0-qa2\primera-experiencia\64.png 800
+11:26:14.539 key 1
+11:26:14.729 wait 400
+11:26:15.261 shot artifacts\qa\0.5.0-qa2\primera-experiencia\65.png 500
+11:26:15.492 key F
+11:26:15.680 wait 400
+11:26:16.206 shot artifacts\qa\0.5.0-qa2\primera-experiencia\66.png 800
+11:26:26.761 look -150 220
+11:26:27.200 wait 300
+11:26:27.622 shot artifacts\qa\0.5.0-qa2\primera-experiencia\67.png 800
+11:26:37.205 look 700 30
+11:26:37.632 wait 300
+11:26:38.067 shot artifacts\qa\0.5.0-qa2\primera-experiencia\68.png 800
+11:26:46.003 key G
+11:26:46.194 wait 400
+11:26:46.709 shot artifacts\qa\0.5.0-qa2\primera-experiencia\69.png 800
+11:26:55.849 key S 700
+11:26:56.678 look 150 -20
+11:26:57.100 wait 300
+11:26:57.533 shot artifacts\qa\0.5.0-qa2\primera-experiencia\70.png 800
+11:27:06.155 look 500 -20
+11:27:06.587 wait 250
+11:27:06.957 shot artifacts\qa\0.5.0-qa2\primera-experiencia\71.png 700
+11:27:07.183 look 500 0
+11:27:07.612 wait 250
+11:27:07.990 shot artifacts\qa\0.5.0-qa2\primera-experiencia\72.png 700
+11:27:15.555 look -505 60
+11:27:15.992 key Shift+W 2100
+11:27:18.214 wait 200
+11:27:18.544 key 7
+11:27:18.731 wait 400
+11:27:19.265 shot artifacts\qa\0.5.0-qa2\primera-experiencia\73.png 1000
+11:27:27.660 look -80 40
+11:27:28.097 wait 300
+11:27:28.529 shot artifacts\qa\0.5.0-qa2\primera-experiencia\74.png 1000
+11:27:35.453 press left 100
+11:27:35.694 wait 500
+11:27:36.314 press right 100
+11:27:36.536 wait 400
+11:27:37.072 key S 900
+11:27:38.101 look 60 -10
+11:27:38.534 wait 300
+11:27:38.954 shot artifacts\qa\0.5.0-qa2\primera-experiencia\75.png 1000
+11:27:46.388 key H
+11:27:46.589 wait 100
+11:27:46.816 key L
+11:27:47.004 wait 500
+11:27:47.632 shot artifacts\qa\0.5.0-qa2\primera-experiencia\76_cinta.png 1280
+11:27:55.295 look 40 0
+11:27:55.727 key Shift+W 650
+11:27:56.512 wait 300
+11:27:56.930 shot artifacts\qa\0.5.0-qa2\primera-experiencia\77.png 1280
+11:28:03.755 look -35 -30
+11:28:04.192 wait 300
+11:28:04.624 shot artifacts\qa\0.5.0-qa2\primera-experiencia\78.png 1280
+11:28:12.414 key M
+11:28:12.604 wait 300
+11:28:13.021 shot artifacts\qa\0.5.0-qa2\primera-experiencia\79.png 800
+11:28:13.249 press left 100
+11:28:13.473 wait 300
+11:28:13.897 look -500 40
+11:28:14.336 wait 300
+11:28:14.763 shot artifacts\qa\0.5.0-qa2\primera-experiencia\80.png 1280
+11:28:22.681 look 320 30
+11:28:23.109 wait 300
+11:28:23.530 shot artifacts\qa\0.5.0-qa2\primera-experiencia\81.png 1280
+11:28:30.986 key R
+11:28:31.173 wait 300
+11:28:31.596 shot artifacts\qa\0.5.0-qa2\primera-experiencia\82.png 800
+11:28:31.847 key M
+11:28:32.038 wait 300
+11:28:32.458 shot artifacts\qa\0.5.0-qa2\primera-experiencia\83.png 800
+11:28:42.299 key M
+11:28:42.488 wait 200
+11:28:42.806 key M
+11:28:43.000 wait 300
+11:28:43.427 shot artifacts\qa\0.5.0-qa2\primera-experiencia\84.png 700
+11:28:43.659 press left 100
+11:28:43.893 wait 700
+11:28:44.720 shot artifacts\qa\0.5.0-qa2\primera-experiencia\85.png 1000
+11:28:52.636 key 8
+11:28:52.837 wait 300
+11:28:53.257 look -420 10
+11:28:53.690 wait 300
+11:28:54.111 shot artifacts\qa\0.5.0-qa2\primera-experiencia\86.png 1000
+11:29:01.665 look -60 -35
+11:29:02.096 wait 300
+11:29:02.516 press left 100
+11:29:02.755 wait 500
+11:29:03.380 press right 100
+11:29:03.613 wait 300
+11:29:04.039 key L
+11:29:04.225 wait 300
+11:29:04.645 shot artifacts\qa\0.5.0-qa2\primera-experiencia\87.png 1000
+11:29:11.995 look 350 0
+11:29:12.429 wait 300
+11:29:12.850 press left 100
+11:29:13.085 wait 300
+11:29:13.509 look -350 0
+11:29:13.940 wait 300
+11:29:14.366 shot artifacts\qa\0.5.0-qa2\primera-experiencia\88.png 1000
+11:29:21.044 press left 100
+11:29:21.272 wait 700
+11:29:22.111 key 1
+11:29:22.309 wait 400
+11:29:22.835 shot artifacts\qa\0.5.0-qa2\primera-experiencia\89.png 1000
+11:29:29.065 wait 12000
+11:29:41.192 shot artifacts\qa\0.5.0-qa2\primera-experiencia\90.png 1000
+11:29:49.849 key E
+11:29:50.039 wait 500
+11:29:50.655 shot artifacts\qa\0.5.0-qa2\primera-experiencia\91_contenedor.png 1000
+11:29:58.246 click 978 192 right
+11:29:58.510 wait 300
+11:29:58.949 click 1419 699
+11:29:59.200 wait 300
+11:29:59.617 drag 515 160 978 450
+11:30:00.135 wait 400
+11:30:00.676 move 700 500
+11:30:00.796 wait 300
+11:30:01.226 shot artifacts\qa\0.5.0-qa2\primera-experiencia\92_transfer.png 1000
+11:30:13.319 click 978 192
+11:30:13.573 wait 300
+11:30:13.997 move 700 500
+11:30:14.114 wait 200
+11:30:14.432 key Tab
+11:30:14.624 wait 400
+11:30:15.152 look -100 -30
+11:30:15.583 wait 200
+11:30:15.915 shot artifacts\qa\0.5.0-qa2\primera-experiencia\93.png 800
+11:30:16.142 look -600 0
+11:30:16.571 wait 200
+11:30:16.899 shot artifacts\qa\0.5.0-qa2\primera-experiencia\94.png 800
+11:30:24.791 look 400 20
+11:30:25.229 key Shift+W 2900
+11:30:28.262 wait 300
+11:30:28.687 shot artifacts\qa\0.5.0-qa2\primera-experiencia\95.png 1000
+11:30:36.534 look -165 0
+11:30:36.975 key Shift+W 1000
+11:30:38.103 wait 200
+11:30:38.428 look -60 0
+11:30:38.869 wait 200
+11:30:39.200 shot artifacts\qa\0.5.0-qa2\primera-experiencia\96.png 1000
+11:30:45.857 look 0 -5
+11:30:46.288 key W 800
+11:30:47.212 wait 250
+11:30:47.591 shot artifacts\qa\0.5.0-qa2\primera-experiencia\97.png 800
+11:30:47.822 key F
+11:30:48.016 wait 500
+11:30:48.637 shot artifacts\qa\0.5.0-qa2\primera-experiencia\98_venta.png 1000
+11:30:55.032 key C
+11:30:55.224 wait 3000
+11:30:58.355 shot artifacts\qa\0.5.0-qa2\primera-experiencia\99_terminal.png 1000
+11:31:05.093 click 595 408
+11:31:05.349 wait 700
+11:31:06.171 shot artifacts\qa\0.5.0-qa2\primera-experiencia\100_ingreso.png 1000
+11:31:14.816 key Escape
+11:31:15.011 wait 300
+11:31:15.427 key J
+11:31:15.620 wait 500
+11:31:16.248 shot artifacts\qa\0.5.0-qa2\primera-experiencia\101_contratos.png 1280
+11:31:27.875 click 552 199
+11:31:28.127 wait 700
+11:31:28.961 move 300 600
+11:31:29.090 wait 300
+11:31:29.523 shot artifacts\qa\0.5.0-qa2\primera-experiencia\102_contratos2.png 1000
+11:31:38.604 wait 15000
+11:31:53.726 shot artifacts\qa\0.5.0-qa2\primera-experiencia\103.png 800
+11:32:04.220 key J
+11:32:04.410 wait 400
+11:32:04.937 look 900 40
+11:32:05.359 wait 300
+11:32:05.789 shot artifacts\qa\0.5.0-qa2\primera-experiencia\104.png 800
+11:32:11.808 look -500 -20
+11:32:12.230 wait 300
+11:32:12.661 shot artifacts\qa\0.5.0-qa2\primera-experiencia\105.png 800
+11:32:19.145 look -650 0
+11:32:19.574 wait 300
+11:32:19.994 shot artifacts\qa\0.5.0-qa2\primera-experiencia\106.png 800
+11:32:30.012 look -525 0
+11:32:30.452 wait 300
+11:32:30.876 shot artifacts\qa\0.5.0-qa2\primera-experiencia\107.png 800
+11:32:40.406 key Shift+W 3000
+11:32:43.543 wait 200
+11:32:43.874 look 0 -10
+11:32:44.301 wait 200
+11:32:44.624 shot artifacts\qa\0.5.0-qa2\primera-experiencia\108.png 800
+11:32:53.760 key H
+11:32:53.958 wait 200
+11:32:54.281 look 700 0
+11:32:54.719 wait 300
+11:32:55.146 shot artifacts\qa\0.5.0-qa2\primera-experiencia\109.png 800
+11:33:05.350 key Escape
+11:33:05.536 wait 400
+11:33:06.070 click 800 530
+11:33:06.309 wait 3000
+11:33:09.429 shot artifacts\qa\0.5.0-qa2\primera-experiencia\110_titulo.png 1000
+11:33:14.790 click 255 404
+11:33:15.049 wait 2500
+11:33:17.672 look 400 0
+11:33:18.108 wait 300
+11:33:18.530 shot artifacts\qa\0.5.0-qa2\primera-experiencia\111_continuar.png 1000
+11:33:25.122 look 350 -20
+11:33:25.556 wait 300
+11:33:25.977 shot artifacts\qa\0.5.0-qa2\primera-experiencia\112.png 800
+11:33:32.144 look 390 10
+11:33:32.578 key Shift+W 2800
+11:33:35.513 wait 300
+11:33:35.939 shot artifacts\qa\0.5.0-qa2\primera-experiencia\113.png 800
+11:33:43.523 key A 1300
+11:33:44.952 wait 150
+11:33:45.228 look -260 10
+11:33:45.664 wait 300
+11:33:46.100 shot artifacts\qa\0.5.0-qa2\primera-experiencia\114.png 800
+11:33:51.841 look -550 0
+11:33:52.282 wait 300
+11:33:52.706 shot artifacts\qa\0.5.0-qa2\primera-experiencia\115.png 800
+11:33:58.553 look -420 30
+11:33:58.993 wait 300
+11:33:59.422 shot artifacts\qa\0.5.0-qa2\primera-experiencia\116.png 800
+11:34:05.117 key G
+11:34:05.303 wait 400
+11:34:05.833 key J
+11:34:06.021 wait 500
+11:34:06.645 shot artifacts\qa\0.5.0-qa2\primera-experiencia\117_mejora.png 800
+11:34:14.899 click 1043 394
+11:34:15.157 wait 500
+11:34:15.801 key J
+11:34:15.993 wait 400
+11:34:16.524 key L
+11:34:16.722 wait 300
+11:34:17.153 press left 100
+11:34:17.391 wait 300
+11:34:17.821 look 300 40
+11:34:18.258 wait 300
+11:34:18.683 shot artifacts\qa\0.5.0-qa2\primera-experiencia\118_tras_mejora.png 1000
+11:34:26.696 press left 100
+11:34:26.928 wait 300
+11:34:27.345 look -100 0
+11:34:27.785 wait 300
+11:34:28.211 shot artifacts\qa\0.5.0-qa2\primera-experiencia\119_punto.png 800
+11:34:28.453 key Backspace
+11:34:28.650 wait 300
+11:34:29.072 shot artifacts\qa\0.5.0-qa2\primera-experiencia\120_quitar.png 800
+11:34:29.326 key Z
+11:34:29.522 wait 400
+11:34:30.054 shot artifacts\qa\0.5.0-qa2\primera-experiencia\121_cancel.png 800
+11:34:39.378 key 3
+11:34:39.576 wait 300
+11:34:40.001 look -280 -10
+11:34:40.425 wait 300
+11:34:40.865 shot artifacts\qa\0.5.0-qa2\primera-experiencia\122_desmontar.png 800
+11:34:41.112 press left 100
+11:34:41.348 wait 700
+11:34:42.177 shot artifacts\qa\0.5.0-qa2\primera-experiencia\123_desmontado.png 800
+11:34:52.493 press right 100
+11:34:52.728 wait 300
+11:34:53.154 key Tab
+11:34:53.352 wait 500
+11:34:53.995 shot artifacts\qa\0.5.0-qa2\primera-experiencia\124_inventario.png 1000
+11:34:54.233 key Tab
+11:34:54.439 wait 300
+11:34:54.866 stop
