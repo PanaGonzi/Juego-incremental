@@ -1,0 +1,27 @@
+﻿[    0,3] OK    entrada en el mundo
+[    0,3] Renderizador forward_plus GPU AMD Radeon RX 7800 XT ventana (1600, 900)
+[    2,1] OK    L activa la herramienta de cinta
+[    4,8] OK    origen con conector elegido: (5, 9)
+[    5,5] OK    clic en el suelo fija un punto: 1
+[    5,9] OK    Z cancela el trazado
+[    5,9] OK    cancelar no cuesta nada
+[    5,9] OK    tras cancelar sigue la herramienta
+[   17,4] OK    destino y ruta listos: Ready 
+[   17,4] OK    ruta larga, sin límite: 76 celdas
+[   17,4] OK    la ruta respeta el punto fijado
+[   18,7] OK    R ofrece otra ruta válida (2/2)
+[   18,9] OK    Retroceso retira el último punto
+[   18,9] OK    recalcula al retirar el punto
+[   18,9] OK    la ruta ya no depende del punto
+[   19,8] OK    la cinta se construye
+[   19,8] OK    lo construido coincide celda a celda con lo previsualizado
+[   19,8] OK    el conector de destino no cambió al hacer clic
+[   20,1] OK    coste cobrado: 5000 → 4930
+[   20,1] OK    la herramienta sigue activa para otra cinta
+[  104,3] OK    los objetos recorren las 70 celdas en unos 84 s
+[  105,8] OK    carga a lo largo de la cinta: 280
+[  109,1] OK    reanudar la partida
+[  110,1] OK    el trazado se conserva al guardar y cargar
+[  110,1] OK    la carga se conserva
+[  110,1] OK    sin divergencias
+[  110,1] RESULTADO: CORRECTO
