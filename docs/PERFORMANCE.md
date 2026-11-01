@@ -29,7 +29,7 @@ Rama `agente/arte`, preset medio, un solo cliente. Otros agentes usaban el equip
 | Vías | 3,79 ms | 6,16 | 12,05 | 0 | 4073 | 3545 | 620 MB | 362 MB |
 | Panorámica | 2,52 ms | 5,19 | 14,48 | 0 | 3048 | 1203 | 620 MB | 362 MB |
 
-**Cumple el objetivo en este equipo.** Dibujos a menos de la mitad que antes: una superficie opaca compartida por malla. Una tirada anterior de la misma rama dio 7,80 ms de media y un pico aislado de 112 ms en vías, con el escritorio ocupado; no se reprodujo en las dos siguientes. Equipos de gama menor, presets bajo y alto, y anfitrión con 11 clientes: **NO VERIFICADO**.
+**Cumple el objetivo en este equipo.** Dibujos frente a la tabla anterior: densa 838 → 362, vías 6626 → 3545, panorámica 1990 → 1203, con una superficie opaca compartida por malla. La vista densa sube de 1,45 a 1,96 ms; vías baja de 5,69 a 3,79 ms. Una tirada anterior de la misma rama dio 7,80 ms de media y un pico aislado de 112 ms en vías, con el escritorio ocupado; no se reprodujo en las dos siguientes. Equipos de gama menor, presets bajo y alto, y anfitrión con 11 clientes: **NO VERIFICADO**.
 
 ## Servidor dedicado + 12 clientes
 
