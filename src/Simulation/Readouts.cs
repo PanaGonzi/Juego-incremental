@@ -161,16 +161,6 @@ public sealed partial class World
         return count;
     }
 
-    /// <summary>Lo disponible para un contrato: mochila más terminales, almacenes, estaciones y plataformas del planeta.</summary>
-    public long ContractStock(PlayerState p, string item)
-    {
-        var have = p.Bag.Get(item);
-        foreach (var m in Machines.Values)
-            if (m.Planet == p.Planet && Content.Machines[m.Def].Kind is MachineKind.Terminal or MachineKind.Storage or MachineKind.Station or MachineKind.CargoPad)
-                have += m.In.Get(item);
-        return have;
-    }
-
     public MachineReadout ReadMachine(Machine m)
     {
         var def = Content.Machines[m.Def];

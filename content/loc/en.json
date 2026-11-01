@@ -237,7 +237,7 @@
   "objective_o_recycle": "Deposit the scrap in the Recycler ({interact_insert}) and collect 8 recovered material ({interact_take}): machines are built with it.",
   "objective_o_extractor": "Cut the ice crust from an ore deposit and place an Extractor ({tool_build}): it mines ore on its own.",
   "objective_o_smelter": "Place a Smelter near the Extractor ({tool_build}): it turns ore into ingots, which are worth far more.",
-  "objective_o_link": "With the Belt ({tool_link}), join the connectors extractor → smelter → terminal: output at the front, input at the back, and the line runs itself.",
+  "objective_o_link": "With the Belt ({tool_link}), join extractor → smelter → terminal: the orange arrow is the output and the blue ones are inputs. The line will then run on its own.",
   "objective_o_ingots": "Let the line produce 10 ingots: meanwhile, you can open another deposit or keep recycling.",
   "objective_o_sell": "Sell ingots in the Export terminal panel ({interact_panel}) until you earn 50 credits: auto-sell does it for you.",
   "objective_o_contract": "Hand in 10 ingots for the “First ingot shipment” contract ({tech}): it pays far more than selling them.",

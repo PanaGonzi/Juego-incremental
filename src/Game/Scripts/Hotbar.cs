@@ -188,14 +188,8 @@ public static class EntryInfo
         return parts.Count == 0 ? Loc.T("cost_ready") : Loc.T("cost_lacking", string.Join(", ", parts));
     }
 
-    /// <summary>Lo disponible para construir según las mismas reservas que usa el servidor: mochila más depósito del planeta.</summary>
-    public static long HaveOf(World w, PlayerState me, string item)
-    {
-        var have = me.Bag.Get(item);
-        foreach (var m in w.Machines.Values)
-            if (m.Planet == me.Planet && m.Def == "depot") have += m.In.Get(item);
-        return have;
-    }
+    /// <summary>Lo disponible para construir: exactamente lo que el servidor puede cobrar.</summary>
+    public static long HaveOf(World w, PlayerState me, string item) => w.PlanetStock(me, item);
 
     public static Control Icon(string entry, float size)
     {

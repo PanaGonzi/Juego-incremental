@@ -253,7 +253,6 @@ public sealed class Settings
 public static class Loc
 {
     private static Dictionary<string, string> _table = new();
-    private static readonly System.Text.RegularExpressions.Regex KeyToken = new(@"\{([a-z_]+)\}", System.Text.RegularExpressions.RegexOptions.Compiled);
     public static readonly string[] Languages = { "es", "en" };
 
     public static void Load(string language)
@@ -269,7 +268,7 @@ public static class Loc
     public static string T(string key)
     {
         if (!_table.TryGetValue(key, out var v)) return key;
-        return v.Contains('{') ? KeyToken.Replace(v, m => Controls.KeyName(m.Groups[1].Value)) : v;
+        return v.Contains('{') ? LocTokens.Action.Replace(v, m => Controls.KeyName(m.Groups[1].Value)) : v;
     }
 
     public static string T(string key, string arg) => T(key).Replace("{0}", arg);

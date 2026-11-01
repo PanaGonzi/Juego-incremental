@@ -77,7 +77,10 @@ public static class HotbarLayout
         return -1;
     }
 
-    /// <summary>Siguiente casilla con contenido en la dirección de la ruedecilla; da la vuelta.</summary>
+    /// <summary>
+    /// Siguiente casilla con contenido en la dirección de la ruedecilla; da la vuelta. Desmontar se salta: es la única herramienta
+    /// destructiva y un roce de la rueda no debe activarla (INC-07). Se elige con su número o su tecla.
+    /// </summary>
     public static int Step(IList<string> slots, int from, int direction)
     {
         var count = slots.Count;
@@ -85,7 +88,7 @@ public static class HotbarLayout
         for (var i = 0; i < count; i++)
         {
             at = ((at + direction) % count + count) % count;
-            if (slots[at].Length > 0) return at;
+            if (slots[at].Length > 0 && slots[at] != "tool:remove") return at;
         }
         return from;
     }

@@ -486,33 +486,21 @@ public sealed partial class World
         return null;
     }
 
-    /// <summary>Paga de la mochila y luego del depósito del planeta. Todo o nada.</summary>
+    /// <summary>Paga de la mochila y luego de los contenedores del planeta (PlanetStock). Todo o nada.</summary>
     public bool CanAfford(PlayerState p, long credits, Dictionary<string, long> cost)
     {
         if (Credits < credits) return false;
-        var depot = DepotOf(p.Planet);
         foreach (var (item, qty) in cost)
-            if (p.Bag.Get(item) + (depot?.In.Get(item) ?? 0) < qty) return false;
+            if (PlanetStock(p, item) < qty) return false;
         return true;
     }
 
     private bool Pay(PlayerState p, long credits, Dictionary<string, long> cost)
     {
         if (!CanAfford(p, credits, cost)) return false;
-        var depot = DepotOf(p.Planet);
         Credits -= credits;
         DirtyGlobal = true;
-        foreach (var (item, qty) in cost)
-        {
-            var fromBag = Math.Min(qty, p.Bag.Get(item));
-            p.Bag.TryRemove(item, fromBag);
-            if (qty > fromBag)
-            {
-                depot!.In.TryRemove(item, qty - fromBag);
-                DirtyMachines.Add(depot.Id);
-            }
-        }
-        DirtyPlayers.Add(p.Key);
+        TakeFromPlanet(p, cost);
         return true;
     }
 
@@ -726,33 +714,8 @@ public sealed partial class World
         foreach (var (stat, qty) in c.NeedStats)
             if (Stats.GetValueOrDefault(stat) < qty) return CommandResult.Fail("err_need_stats");
 
-        // Reúne de terminales y depósito del planeta y de la mochila, sin tocar nada hasta confirmar.
-        var sources = _machineList
-            .Where(m => m.Planet == p.Planet && Content.Machines[m.Def].Kind is MachineKind.Terminal or MachineKind.Storage or MachineKind.Station or MachineKind.CargoPad)
-            .ToList();
-        foreach (var (item, qty) in c.Items)
-        {
-            var have = p.Bag.Get(item);
-            foreach (var s in sources) have += s.In.Get(item);
-            if (have < qty) return CommandResult.Fail("err_cost");
-        }
-        foreach (var (item, qty) in c.Items)
-        {
-            var left = qty;
-            var fromBag = Math.Min(left, p.Bag.Get(item));
-            p.Bag.TryRemove(item, fromBag);
-            left -= fromBag;
-            foreach (var s in sources)
-            {
-                if (left == 0) break;
-                var take = Math.Min(left, s.In.Get(item));
-                if (take == 0) continue;
-                s.In.TryRemove(item, take);
-                DirtyMachines.Add(s.Id);
-                left -= take;
-            }
-        }
-        DirtyPlayers.Add(p.Key);
+        // Misma regla que cualquier otro pago, sin tocar nada hasta confirmar.
+        if (!Pay(p, 0, c.Items)) return CommandResult.Fail("err_cost");
         ContractsDone.Add(id);
         AddCredits(c.Credits);
         if (c.Cosmetic != null)

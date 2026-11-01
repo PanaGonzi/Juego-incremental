@@ -41,6 +41,8 @@ public sealed class BeltPlanner
     public IReadOnlyList<(int x, int z)>? Route => _routes.Count > _selected ? _routes[_selected] : null;
     public bool HasOrigin => From >= 0;
     public bool CanConfirm => State == BeltPlanState.Ready && To >= 0 && Route != null;
+    /// <summary>Conector por el que entrará la ruta mostrada: el fijado a mano o, sin él, el que eligió la búsqueda por ser el más directo.</summary>
+    public (int x, int z)? EntryPort => ToPort ?? (To >= 0 && Route is { Count: > 0 } r ? r[^1] : null);
 
     public BeltPlanner(World world) { _w = world; }
 

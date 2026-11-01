@@ -8,6 +8,7 @@
   <ItemGroup>
     <None Include="fixtures\**" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="..\..\src\Game\Scripts\ControlsMigration.cs" Link="ControlsMigration.cs" />
+    <Compile Include="..\..\src\Game\Scripts\LocTokens.cs" Link="LocTokens.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />

@@ -848,7 +848,7 @@ public partial class Hud : Control
             // Progreso real: lo que ya hay disponible para entregar, objeto a objeto.
             foreach (var (item, qty) in c.Items)
             {
-                var have = done ? qty : Math.Min(qty, w.ContractStock(me, item));
+                var have = done ? qty : Math.Min(qty, w.PlanetStock(me, item));
                 if (have < qty) ready = false;
                 var line = Ui.Row(UiTheme.M, Ui.Icon(ItemVisuals.IconOf(item), 24), Ui.Text(Loc.T("item_" + item), UiTheme.Small, Ui.Dim), Ui.Bar(have, qty, have >= qty ? Ui.Good : Ui.Amber, 8), Ui.Text($"{have}/{qty}", UiTheme.Small, have >= qty ? Ui.Good : Ui.Ink));
                 card.AddChild(line);

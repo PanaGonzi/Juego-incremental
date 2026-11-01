@@ -230,7 +230,7 @@
   "objective_o_recycle": "Deposita la chatarra en la Recicladora ({interact_insert}) y recoge 8 de material recuperado ({interact_take}): con él se construyen las máquinas.",
   "objective_o_extractor": "Corta la costra de hielo de un yacimiento de mineral y coloca un Extractor ({tool_build}): sacará mineral sin que hagas nada.",
   "objective_o_smelter": "Coloca una Fundición cerca del Extractor ({tool_build}): convierte el mineral en lingotes, que valen mucho más.",
-  "objective_o_link": "Con la Cinta ({tool_link}), une los conectores extractor → fundición → terminal: se sale por el frente y se entra por detrás, y la línea trabaja sola.",
+  "objective_o_link": "Con la Cinta ({tool_link}), une extractor → fundición → terminal: la flecha naranja es la salida y las azules, las entradas. La línea trabajará sola.",
   "objective_o_ingots": "Deja que la línea produzca 10 lingotes: mientras, puedes abrir otro yacimiento o seguir reciclando.",
   "objective_o_sell": "Vende lingotes en el panel de la Terminal de exportación ({interact_panel}) hasta ganar 50 créditos: la venta automática lo hace por ti.",
   "objective_o_contract": "Entrega 10 lingotes en el contrato «Primer envío de lingotes» ({tech}): paga mucho más que venderlos.",
