@@ -34,6 +34,7 @@ public sealed class GameClient : IDisposable
     public event Action<string, string>? NoticeReceived;
     public event Action<float, float, float>? PositionCorrected;
     public event Action<int, float, float, float, float>? RemoteMoved;
+    public event Action<int, byte>? RemoteAction;
     public event Action? WorldReady;
     public event Action? DeltaApplied;
 
@@ -94,11 +95,11 @@ public sealed class GameClient : IDisposable
         _pw.Send(_transport, _serverPeer, Channel.Reliable);
     }
 
-    public void SendMove(float x, float y, float z, float yaw)
+    public void SendMove(float x, float y, float z, float yaw, byte action = 0)
     {
         if (_serverPeer < 0 || State != ClientState.InGame) return;
         var w = _pw.Begin(MsgType.Move);
-        w.Write(x); w.Write(y); w.Write(z); w.Write(yaw);
+        w.Write(x); w.Write(y); w.Write(z); w.Write(yaw); w.Write(action);
         _pw.Send(_transport, _serverPeer, Channel.Unreliable);
     }
 
@@ -309,7 +310,11 @@ public sealed class GameClient : IDisposable
         for (var i = 0; i < count; i++)
         {
             int num = r.ReadUInt16();
-            RemoteMoved?.Invoke(num, r.ReadSingle(), r.ReadSingle(), r.ReadSingle(), r.ReadSingle());
+            // Se leen antes de invocar: con ?.Invoke sin suscriptores los argumentos no se evalúan y se perdería el hilo del mensaje.
+            float x = r.ReadSingle(), y = r.ReadSingle(), z = r.ReadSingle(), yaw = r.ReadSingle();
+            var action = r.ReadByte();
+            RemoteMoved?.Invoke(num, x, y, z, yaw);
+            RemoteAction?.Invoke(num, action);
         }
     }
 

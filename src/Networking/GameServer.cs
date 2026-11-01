@@ -35,6 +35,7 @@ public sealed class GameServer : IDisposable
         public long LastMoveMs;
         public float LastX, LastZ;
         public int LastPlanet;
+        public byte Action; // solo representación: herramienta visible y si trabaja. No se guarda ni acredita nada.
     }
 
     private sealed class RecentResults
@@ -300,6 +301,7 @@ public sealed class GameServer : IDisposable
         var y = r.ReadSingle();
         var z = r.ReadSingle();
         var yaw = r.ReadSingle();
+        s.Action = PlayerAction.Sanitize(r.ReadByte());
         var p = s.Player!;
         if (p.TransitTo >= 0) return; // la lanzadera manda: se ignora hasta llegar
         if (p.Planet != s.LastPlanet)
@@ -519,6 +521,7 @@ public sealed class GameServer : IDisposable
                 w.Write(s.Player.Y);
                 w.Write(s.Player.Z);
                 w.Write(s.Player.Yaw);
+                w.Write(s.Action);
                 count++;
             }
             if (count == 0) continue;

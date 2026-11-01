@@ -15,6 +15,20 @@ public static class Protocol
     public const float MaxMoveSpeed = 14f;
 }
 
+/// <summary>Estado de acción de un jugador, solo para representarlo ante los demás. Viaja con la posición y no se guarda.</summary>
+public static class PlayerAction
+{
+    public const byte Stowed = 0, Cutter = 1, Device = 2;
+    private const byte WorkingBit = 0x80;
+
+    public static byte Pack(byte equipped, bool working) => Sanitize((byte)(equipped | (working ? WorkingBit : 0)));
+    public static byte Equipped(byte action) => (byte)(action & 3);
+    public static bool IsWorking(byte action) => (action & WorkingBit) != 0;
+
+    /// <summary>El valor lo envía el cliente: se normaliza para no reenviar a los demás nada que no signifique algo.</summary>
+    public static byte Sanitize(byte raw) => (byte)(Math.Min(raw & 3, (int)Device) | (raw & WorkingBit));
+}
+
 public enum MsgType : byte
 {
     // Cliente a servidor

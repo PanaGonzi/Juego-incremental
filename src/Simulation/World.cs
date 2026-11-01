@@ -317,8 +317,8 @@ public sealed partial class World
             CommandType.Move => Move(p, c.A, c.B, c.C, c.D),
             CommandType.Link => AddLink(p, c.A, c.B),
             CommandType.Unlink => RemoveLink(p, c.A),
-            CommandType.Insert => Insert(p, c.A, c.Text),
-            CommandType.Extract => Extract(p, c.A, c.Text),
+            CommandType.Insert => Insert(p, c.A, c.Text, c.Amount),
+            CommandType.Extract => Extract(p, c.A, c.Text, c.Amount),
             CommandType.Sell => Sell(p, c.A, c.Text, c.Amount),
             CommandType.SetAutoSell => SetAutoSell(p, c.A, c.B != 0, c.Text, c.Amount),
             CommandType.FulfillContract => Fulfill(p, c.Text),
@@ -681,9 +681,13 @@ public sealed partial class World
         }
     }
 
-    /// <summary>Con un objeto indicado transfiere solo ese; sin él, todo lo que quepa.</summary>
-    private CommandResult Insert(PlayerState p, int id, string only = "")
+    /// <summary>
+    /// Con un objeto indicado transfiere solo ese; sin él, todo lo que quepa. Una cantidad positiva, que exige indicar
+    /// el objeto, es el máximo a mover: se recorta a lo que haya y a lo que quepa, nunca se crea ni se pierde nada.
+    /// </summary>
+    private CommandResult Insert(PlayerState p, int id, string only = "", long amount = 0)
     {
+        if (amount < 0 || amount > 0 && only.Length == 0) return CommandResult.Fail("err_invalid");
         if (!Machines.TryGetValue(id, out var m) || m.Planet != p.Planet) return CommandResult.Fail("err_gone");
         var (cx, cz) = MachineCenterMm(m);
         if (!InRange(p, cx, cz, B.InteractRangeMm)) return CommandResult.Fail("err_range");
@@ -692,6 +696,7 @@ public sealed partial class World
         {
             if (only.Length > 0 && kv.Key != only) continue;
             var qty = Math.Min(kv.Value, InputRoom(m, kv.Key));
+            if (amount > 0) qty = Math.Min(qty, amount);
             if (qty <= 0) continue;
             p.Bag.TryRemove(kv.Key, qty);
             m.In.Add(kv.Key, qty);
@@ -703,8 +708,9 @@ public sealed partial class World
         return CommandResult.Success;
     }
 
-    private CommandResult Extract(PlayerState p, int id, string only = "")
+    private CommandResult Extract(PlayerState p, int id, string only = "", long amount = 0)
     {
+        if (amount < 0 || amount > 0 && only.Length == 0) return CommandResult.Fail("err_invalid");
         if (!Machines.TryGetValue(id, out var m) || m.Planet != p.Planet) return CommandResult.Fail("err_gone");
         var (cx, cz) = MachineCenterMm(m);
         if (!InRange(p, cx, cz, B.InteractRangeMm)) return CommandResult.Fail("err_range");
@@ -716,6 +722,7 @@ public sealed partial class World
             if (only.Length > 0 && kv.Key != only) continue;
             var room = B.PersonalStackLimit - p.Bag.Get(kv.Key);
             var qty = Math.Min(kv.Value, room);
+            if (amount > 0) qty = Math.Min(qty, amount);
             if (qty <= 0) continue;
             source.TryRemove(kv.Key, qty);
             p.Bag.Add(kv.Key, qty);
