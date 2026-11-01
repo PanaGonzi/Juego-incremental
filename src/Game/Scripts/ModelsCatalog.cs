@@ -434,6 +434,26 @@ public static partial class Models
         return m;
     }
 
+    /// <summary>Mástil de señalización en celosía, con franja de aviso y baliza con capota.</summary>
+    private static void PadMast(Builder b, float x, float z)
+    {
+        const float Half = 0.17f, Base = 0.3f, Top = 1.62f;
+        b.Cyl("steel_dark", x, Base + 0.05f, z, 0.3f, 0.1f, sides: 8);
+        var corners = new[] { (-Half, -Half), (Half, -Half), (Half, Half), (-Half, Half) };
+        foreach (var (dx, dz) in corners) b.Box("steel_dark", x + dx, (Base + Top) / 2, z + dz, 0.06f, Top - Base, 0.06f, bevel: 0);
+        for (var i = 0; i < corners.Length; i++)
+        {
+            var (ax, az) = corners[i];
+            var (cx, cz) = corners[(i + 1) % corners.Length];
+            b.Beam("steel_dark", new Vector3(x + ax, 0.42f, z + az), new Vector3(x + cx, 0.86f, z + cz), 0.03f, 0.03f);
+            b.Beam("steel_dark", new Vector3(x + cx, 0.86f, z + cz), new Vector3(x + ax, 1.3f, z + az), 0.03f, 0.03f);
+        }
+        b.Box("signal", x, 1.42f, z, Half * 2 + 0.1f, 0.2f, Half * 2 + 0.1f, bevel: 0.015f);
+        b.Cyl("steel_dark", x, Top + 0.03f, z, 0.14f, 0.06f, sides: 8);
+        b.Ball("amber", x, Top + 0.13f, z, 0.075f, 8, 4);
+        b.Cyl("steel_dark", x, Top + 0.24f, z, 0.13f, 0.03f, sides: 8);
+    }
+
     private static void Crate(Builder b, float x, float y, float z, float w, float h, float d, string mat)
     {
         b.Box(mat, x, y, z, w, h, d);
@@ -678,14 +698,15 @@ public static partial class Models
                 b.Lathe("stripe", 0, 0.53f, 0, new[] { (2.75f, 0f), (3.2f, 0f) }, 32);
                 b.Lathe("tread", 0, 0.52f, 0, new[] { (0f, 0f), (2.7f, 0f) }, 28);
                 foreach (var (x, z) in new[] { (-3.4f, -3.4f), (3.4f, -3.4f), (-3.4f, 3.4f), (3.4f, 3.4f) })
-                {
-                    b.Box("signal", x, 1f, z, 0.56f, 1.4f, 0.56f);
-                    b.Ball("amber", x, 1.85f, z, 0.14f, 8, 4);
-                }
+                    PadMast(b, x, z);
+                // Compuerta central y anclajes: se lee como plataforma de aterrizaje, no como una losa.
+                b.Lathe("steel_dark", 0, 0.52f, 0, new[] { (1.25f, 0f), (1.3f, 0.05f), (1.2f, 0.07f), (0f, 0.07f) }, 24);
+                b.Box("dark", 0, 0.6f, 0, 2.3f, 0.015f, 0.05f, bevel: 0);
+                BoltRing(b, 0, 0.6f, 0, 1.08f, 12);
                 b.Port(0, 3.9f, true);
                 b.Port(0, -3.9f, false);
                 m.Height = 2f;
-                m.LampPos = new Vector3(3.4f, 1.3f, 3.1f);
+                m.LampPos = new Vector3(3.4f, 1.72f, 3.4f);
                 break;
             }
             case "shuttle_terminal":

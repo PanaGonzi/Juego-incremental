@@ -73,7 +73,7 @@ Encargo: [PROMPT_CLAUDE_CONTINUAR_QA_CINTAS_GRAFICOS.md](../PROMPT_CLAUDE_CONTIN
 | E-7 | A | QA de sistemas y dos clientes viendo el mismo transporte; después 12 clientes | verificada en un solo PC con comandos de la interfaz; con personas o varios PC, NO VERIFICADO | T-018, T-019, `artifacts/qa/0.5-coop/` |
 | E-8 | A | Revisión independiente de calidad y rendimiento con cintas cargadas | pendiente de build integrada | — |
 | E-9 | M | Divisores y combinadores de cintas | pendiente | — |
-| E-10 | M | Extender el acabado a Marte y al resto de máquinas | pendiente | — |
+| E-10 | M | Extender el acabado a Marte y al resto de máquinas | en curso: terreno y cielo de Marte revisados, plataforma de carga rehecha | `artifacts/qa/0.5-marte/` |
 | E-11 | M | BUG-005: dónde se producen los picos de RTT | lectura explicada y reducida; pico real con pérdida abierto | T-021 |
 
 ## A0.6 — Construcción, gestión y primeros 30 minutos (en cola tras integrar E-1 a E-5)

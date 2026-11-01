@@ -27,6 +27,8 @@
 | INC-17 | Baja | 0.5.0-qa2 | Corregido en `agente/correcciones` | No se veía a dónde iba lo desmontado ni si servía. | `17_desmontar`, `17_inventario_stock`, `17_material_usado` |
 | INC-18 | Baja | 0.5.0-qa2 | Corregido en `agente/correcciones` | Foco en «Guardar» y Esc saliendo de golpe. | `18_pausa_foco`, `18_esc_retrocede` |
 | INC-19 | Baja | 0.5.0-qa2 | Corregido en `agente/correcciones` | «Ingresos/min» se disparaba con ventas sueltas y contratos: media de 5 min, solo ventas. | `16_vendido_lingote` (50 ¤ → 10/min) |
+| INC-20 | Baja | 0.5.0-qa4 | Abierto | Las piezas grandes muestran tantas flechas de puertos, y tan grandes, que tapan el suelo donde se va a colocar. | Fantasma de la Plataforma de carga: `artifacts/qa/0.5-marte/despues_fantasma.png` |
+
 ## Limitaciones de las alfas
 
 Sin tutorial aparte de los objetivos. Sin desvíos ni señales ferroviarias. Sin LOD. Invitar por Steam sin integrar en el menú. Prestigio sin implementar (opcional y posterior).
