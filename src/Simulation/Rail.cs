@@ -427,6 +427,67 @@ public sealed partial class World
         return Machines.TryGetValue(id, out var m) ? m : null;
     }
 
+    /// <summary>
+    /// Puesto en la cola de la parada: 0 el primero. Se deriva solo de estado replicado, así que todos los clientes colocan igual.
+    /// No afecta a reservas ni a carga: la vía solo la retienen los trenes en marcha.
+    /// </summary>
+    public int PlatformSlot(Train t)
+    {
+        var slot = 0;
+        foreach (var other in Trains.Values)
+        {
+            if (other.Id >= t.Id) break;
+            if (other.CurrentNode == t.CurrentNode && other.State != TrainState.Moving) slot++;
+        }
+        return slot;
+    }
+
+    /// <summary>Trenes parados en un nodo: los que llegan se quedan detrás de ellos.</summary>
+    public int StoppedAt(int node)
+    {
+        var count = 0;
+        foreach (var t in Trains.Values)
+            if (t.CurrentNode == node && t.State != TrainState.Moving) count++;
+        return count;
+    }
+
+    /// <summary>
+    /// Punto a `backMm` por detrás del nodo donde está parado: primero por donde vino, y después por el tramo de menor id.
+    /// Devuelve el tramo, si hay que recorrerlo de A a B para avanzar hacia el nodo, y la distancia desde el inicio de ese recorrido.
+    /// Si la vía se acaba, se queda en su extremo.
+    /// </summary>
+    public (RailSegment segment, bool forward, long along)? RestPoint(Train t, long backMm)
+    {
+        var node = t.CurrentNode;
+        var visited = new HashSet<int>();
+        var reached = Math.Min(t.PathIndex, t.Path.Count) - 1;
+        RailSegment? last = null;
+        while (true)
+        {
+            RailSegment? s = null;
+            if (reached >= 0)
+            {
+                if (RailSegments.TryGetValue(t.Path[reached], out var fromPath) && (fromPath.A == node || fromPath.B == node)) s = fromPath;
+                reached = s == null ? -1 : reached - 1;
+            }
+            if (s == null && _adjacency.TryGetValue(node, out var list))
+                foreach (var candidate in list)
+                    if (!visited.Contains(candidate.Id) && (s == null || candidate.Id < s.Id)) s = candidate;
+            if (s == null)
+            {
+                if (last == null) return null;
+                // Sin más vía: el extremo del último tramo recorrido.
+                return (last, last.B != node, 0);
+            }
+            visited.Add(s.Id);
+            var forward = s.B == node;
+            if (backMm <= s.LengthMm) return (s, forward, s.LengthMm - backMm);
+            backMm -= s.LengthMm;
+            node = forward ? s.A : s.B;
+            last = s;
+        }
+    }
+
     private void StepTrains()
     {
         foreach (var t in _trainList)

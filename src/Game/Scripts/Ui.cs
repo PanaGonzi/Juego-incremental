@@ -447,7 +447,9 @@ public partial class Hud : Control
     }
 
     /// <summary>Hueco entre el panel del objetivo y la barra rápida: lo que abre un panel central no los tapa ni queda debajo.</summary>
-    private Rect2 SafeArea()
+    public Rect2 ObjectiveRect => _objectivePanel.GetGlobalRect();
+
+    public Rect2 SafeArea()
     {
         var view = GetRect().Size;
         var top = _objectivePanel.GetGlobalRect().End.Y + UiTheme.S;

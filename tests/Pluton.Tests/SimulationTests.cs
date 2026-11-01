@@ -779,6 +779,66 @@ public class RailTests
         return (w, p, a, b);
     }
 
+    [Fact]
+    public void Trains_stopped_at_the_same_station_queue_without_overlapping_and_replicas_agree()
+    {
+        var (w, p, a, b) = TwoStations();
+        Connect(w, p);
+        for (var i = 0; i < 3; i++) Assert.True(w.Apply(p, new Command { Type = CommandType.CreateTrain, A = a.Id, B = b.Id }).Ok);
+        var trains = w.Trains.Values.ToList();
+        Assert.Equal(new[] { 0, 1, 2 }, trains.Select(w.PlatformSlot));
+        Assert.Equal(3, w.StoppedAt(a.RailA));
+
+        var spacing = w.Content.Balance.Rail.TrainSpacingMm;
+        var points = trains.Select(t =>
+        {
+            var rest = w.RestPoint(t, w.PlatformSlot(t) * spacing)!.Value;
+            return (rest.segment.Id, rest.along);
+        }).ToList();
+        Assert.Equal(3, points.Distinct().Count());
+
+        // Un cliente reconstruye lo mismo a partir del guardado, sin estado propio.
+        var mirror = WorldCodec.Deserialize(Fixture.Content, WorldCodec.Serialize(w));
+        mirror.ReindexRail();
+        foreach (var t in trains)
+        {
+            var other = mirror.Trains[t.Id];
+            Assert.Equal(w.PlatformSlot(t), mirror.PlatformSlot(other));
+            var mine = w.RestPoint(t, w.PlatformSlot(t) * spacing)!.Value;
+            var theirs = mirror.RestPoint(other, mirror.PlatformSlot(other) * spacing)!.Value;
+            Assert.Equal((mine.segment.Id, mine.forward, mine.along), (theirs.segment.Id, theirs.forward, theirs.along));
+        }
+    }
+
+    [Fact]
+    public void Queueing_for_a_platform_changes_neither_reservations_nor_cargo()
+    {
+        var (w, p, a, b) = TwoStations();
+        Connect(w, p);
+        Assert.True(w.Apply(p, new Command { Type = CommandType.CreateTrain, A = a.Id, B = b.Id }).Ok);
+        Assert.True(w.Apply(p, new Command { Type = CommandType.CreateTrain, A = a.Id, B = b.Id }).Ok);
+        var first = w.Trains.Values.First();
+        var second = w.Trains.Values.Last();
+        for (var i = 0; i < 120; i++) w.Step();
+        var slotBefore = w.PlatformSlot(second);
+        var signature = WorldCodec.Hash(w);
+        w.PlatformSlot(first);
+        w.RestPoint(first, 100000);
+        Assert.Equal(signature, WorldCodec.Hash(w));
+        Assert.InRange(slotBefore, 0, 1);
+    }
+
+    [Fact]
+    public void A_rest_point_past_the_end_of_the_track_stays_on_the_track()
+    {
+        var (w, p, a, b) = TwoStations();
+        Connect(w, p);
+        Assert.True(w.Apply(p, new Command { Type = CommandType.CreateTrain, A = a.Id, B = b.Id }).Ok);
+        var t = w.Trains.Values.Single();
+        var rest = w.RestPoint(t, 10_000_000)!.Value;
+        Assert.InRange(rest.along, 0, rest.segment.LengthMm);
+    }
+
     private static void Connect(World w, PlayerState p) =>
         Assert.True(w.Apply(p, new Command { Type = CommandType.PlaceRail, A = 14, B = -32, C = 30, D = -32 }).Ok);
 

@@ -57,8 +57,9 @@ public partial class GameView : Node3D
         public Node3D Wagon = null!;
         public MeshInstance3D Cargo = null!;
         public Label3D Label = null!;
-        public long Distance;
-        public int LastSegment = -1;
+        public Vector3 LocoShown;
+        public Vector3 WagonShown;
+        public bool Placed;
     }
 
     private readonly Dictionary<int, TrainNode> _trains = new();
@@ -197,6 +198,8 @@ public partial class GameView : Node3D
         var layer = new CanvasLayer();
         _uiLayer = layer;
         AddChild(layer);
+        ChainTagForTest = new ChainTag(this);
+        layer.AddChild(ChainTagForTest);
         _feedback = new ActionFeedback(_impacts, layer);
         AddChild(_feedback);
         Belts.BeltAdded += _feedback.BeltLinked;
@@ -762,13 +765,19 @@ public partial class GameView : Node3D
             // Entre actualizaciones del servidor se extrapola; la siguiente corrige.
             if (t.State == TrainState.Moving) t.PosMm += (long)(speed * delta);
             if (!TryTrainPose(w, t, 0, out var pos, out var dir)) continue;
-            node.Loco.GlobalPosition = pos;
-            node.Loco.LookAt(pos - dir, Vector3.Up);
-            if (TryTrainPose(w, t, -7400, out var wagonPos, out var wagonDir))
+            // Al cambiar de puesto en la cola, o al salir, avanza por la vía en vez de saltar.
+            var catchUp = (float)(speed / 1000 * 2 * delta);
+            var snap = !node.Placed;
+            node.LocoShown = Follow(node.LocoShown, pos, catchUp, snap);
+            node.Loco.GlobalPosition = node.LocoShown;
+            node.Loco.LookAt(node.LocoShown - dir, Vector3.Up);
+            if (TryTrainPose(w, t, WagonOffsetMm, out var wagonPos, out var wagonDir))
             {
-                node.Wagon.GlobalPosition = wagonPos;
-                node.Wagon.LookAt(wagonPos - wagonDir, Vector3.Up);
+                node.WagonShown = Follow(node.WagonShown, wagonPos, catchUp, snap);
+                node.Wagon.GlobalPosition = node.WagonShown;
+                node.Wagon.LookAt(node.WagonShown - wagonDir, Vector3.Up);
             }
+            node.Placed = true;
             var fill = Mathf.Clamp(t.Cargo.Total / (float)w.Content.Balance.Rail.TrainCapacity, 0, 1);
             node.Cargo.Visible = fill > 0;
             node.Cargo.Scale = new Vector3(1, Mathf.Max(0.05f, fill) * 1.2f, 1);
@@ -777,25 +786,33 @@ public partial class GameView : Node3D
         }
     }
 
+    private static Vector3 Follow(Vector3 shown, Vector3 target, float step, bool snap)
+    {
+        const float SnapDistance = 60;
+        return snap || shown.DistanceTo(target) > SnapDistance ? target : shown.MoveToward(target, step);
+    }
+
+    private const long WagonOffsetMm = -7400;
+
+    /// <summary>Posición en la vía. Los trenes parados en un mismo nodo hacen cola, y el que llega se detiene detrás de ellos (BUG-006).</summary>
     private static bool TryTrainPose(World w, Train t, long offsetMm, out Vector3 pos, out Vector3 dir)
     {
         pos = Vector3.Zero;
         dir = Vector3.Forward;
-        var index = Math.Min(t.PathIndex, t.Path.Count - 1);
-        var along = t.PosMm + offsetMm;
+        var spacing = (long)w.Content.Balance.Rail.TrainSpacingMm;
         if (t.State != TrainState.Moving || t.Path.Count == 0)
         {
-            // Parado: se apoya en el último tramo recorrido, o en cualquiera del nodo.
-            if (t.Path.Count == 0 || t.PathIndex == 0 && t.State == TrainState.Waiting)
-            {
-                var near = w.RailSegments.Values.FirstOrDefault(s => s.A == t.CurrentNode || s.B == t.CurrentNode);
-                if (near == null) return false;
-                var forward = near.A == t.CurrentNode;
-                return Pose(w, near, forward, Math.Min(near.LengthMm, 7400 + Math.Abs(offsetMm)) - Math.Abs(offsetMm), out pos, out dir);
-            }
-            index = t.Path.Count - 1;
-            if (!w.RailSegments.TryGetValue(t.Path[index], out var last)) return false;
-            along = last.LengthMm + offsetMm;
+            if (w.RestPoint(t, w.PlatformSlot(t) * spacing - offsetMm) is not { } rest) return false;
+            return Pose(w, rest.segment, rest.forward, rest.along, out pos, out dir);
+        }
+
+        var index = Math.Min(t.PathIndex, t.Path.Count - 1);
+        var along = t.PosMm + offsetMm;
+        if (index == t.Path.Count - 1 && w.RailSegments.TryGetValue(t.Path[index], out var final))
+        {
+            // En el último tramo se frena detrás de los que ya están parados en el destino.
+            var end = t.Forward ? final.B : final.A;
+            along = Math.Min(t.PosMm, final.LengthMm - w.StoppedAt(end) * spacing) + offsetMm;
         }
 
         if (!w.RailSegments.TryGetValue(t.Path[index], out var seg)) return false;
@@ -1050,6 +1067,10 @@ public partial class GameView : Node3D
 
     public int ChainSeed => _chain.Seed;
     public ChainOverlay ChainForTest => _chain;
+    public Vector3 TrainShownForTest(int id) => _trains.TryGetValue(id, out var node) ? node.LocoShown : Vector3.Zero;
+    public ChainTag ChainTagForTest { get; private set; } = null!;
+    public Rect2 HudSafeArea => _hud.SafeArea();
+    public Rect2 ObjectiveRect => _hud.ObjectiveRect;
     public LookReadout LookForTest => _hud.Look;
     public void OpenMachineForTest(int id) => _hud.OpenMachine(id);
 
@@ -1966,6 +1987,9 @@ public partial class GameView : Node3D
     /// <summary>0 lejos, 1 pegado a la pieza: a esa distancia las flechas de los puertos también se atenúan.</summary>
     private float NearCellMarkFade { set { if (_cellMark != null) _cellMark.Transparency = value * 0.7f; _cellMarkFade = value; } }
     private float _cellMarkFade;
+    private float _cellMarkScale = 1f;
+    /// <summary>Flechas de puertos del último fantasma: la escena de pruebas comprueba que no se desbordan.</summary>
+    public int PlacementMarkCount { get; private set; }
     public string StatusText => _hud.StatusText;
 
     private void UpdateGhost(World w, PlayerState me, ref string status, ref Color color, ref string prompt)
@@ -2014,8 +2038,12 @@ public partial class GameView : Node3D
 
         // Las celdas exactas que ocuparía y los mismos puertos que tendrá la máquina: lo que se ve es lo que queda.
         var cellColor = error != null ? Ui.Bad : afford ? Ui.Good : Ui.Warn;
-        var ports = w.BeltPorts(me.Planet, _buildDef, x, z, _buildRot, true).Concat(w.BeltPorts(me.Planet, _buildDef, x, z, _buildRot, false));
-        ShowCellMark($"build|{_buildDef}|{x}|{z}|{_buildRot}|{cellColor.ToHtml()}|{Session.Client.StructuralDeltas}", w.Footprint(_buildDef, x, z, _buildRot), cellColor, ports);
+        var ports = PortIndicators.ForPlacement(w.BeltPorts(me.Planet, _buildDef, x, z, _buildRot, true).Concat(w.BeltPorts(me.Planet, _buildDef, x, z, _buildRot, false)));
+        // Las marcas se reducen al acercarse: de cerca, una flecha de tamaño fijo ocupa media pantalla.
+        var sizeStep = Mathf.Clamp((int)(Mathf.Max(0f, away) / 3f), 0, 3);
+        _cellMarkScale = 0.55f + sizeStep * 0.15f;
+        ShowCellMark($"build|{_buildDef}|{x}|{z}|{_buildRot}|{cellColor.ToHtml()}|{sizeStep}|{Session.Client.StructuralDeltas}", w.Footprint(_buildDef, x, z, _buildRot), cellColor, ports);
+        PlacementMarkCount = ports.Count;
         if (w.CanSendByBelt(def) || w.CanReceiveByBelt(def)) prompt += "\n" + Loc.T("build_ports_legend");
     }
 
@@ -2132,7 +2160,9 @@ public partial class GameView : Node3D
             if (!set.Contains((x + 1, z))) Rect(x1 - Edge, z0, x1, z1);
         }
         var anyPort = false;
-        foreach (var p in ports ?? Enumerable.Empty<BeltPort>())
+        var portList = ports?.ToList() ?? new List<BeltPort>();
+        var scale = _tool == Tool.Build ? _cellMarkScale : 1f;
+        foreach (var p in portList)
         {
             anyPort = true;
             var (dx, dz) = World.BeltDirs[p.Dir];
@@ -2140,17 +2170,23 @@ public partial class GameView : Node3D
             var dir = p.Output ? outward : -outward;
             var side = dir.Cross(Vector3.Up);
             var center = new Vector3((p.X + 0.5f) * Cell, Y + 0.01f, (p.Z + 0.5f) * Cell);
-            var tail = center + dir * 0.05f;
-            var neck = tail + dir * 0.45f;
-            var tip = tail + dir * 0.9f;
+            // Entrada y salida en la misma celda: una a cada lado para que no se pisen.
+            if (portList.Any(o => o.X == p.X && o.Z == p.Z && o.Output != p.Output)) center += outward.Cross(Vector3.Up) * (p.Output ? 0.3f : -0.3f) * scale;
+            var tail = center + dir * 0.05f * scale;
+            var neck = tail + dir * 0.34f * scale;
+            var tip = tail + dir * 0.68f * scale;
             st.SetColor(!p.Free ? new Color(0.5f, 0.5f, 0.5f, 0.6f) : p.Output ? new Color(1f, 0.66f, 0.15f, 0.95f) : new Color(0.25f, 0.7f, 1f, p.Side ? 0.6f : 0.95f));
-            Quad(tail - side * 0.16f, tail + side * 0.16f, neck + side * 0.16f, neck - side * 0.16f);
-            foreach (var v in new[] { neck - side * 0.42f, neck + side * 0.42f, tip }) st.AddVertex(v);
+            var shaft = side * 0.11f * scale;
+            var head = side * 0.28f * scale;
+            Quad(tail - shaft, tail + shaft, neck + shaft, neck - shaft);
+            foreach (var v in new[] { neck - head, neck + head, tip }) st.AddVertex(v);
             if (p.Side || !p.Free) continue;
             // Aleta vertical: a ras de suelo la flecha casi no se ve de lejos.
-            var lift = Vector3.Up * 0.55f;
-            Quad(tail + lift - Vector3.Up * 0.12f, neck + lift - Vector3.Up * 0.12f, neck + lift + Vector3.Up * 0.12f, tail + lift + Vector3.Up * 0.12f);
-            foreach (var v in new[] { neck + lift - Vector3.Up * 0.34f, neck + lift + Vector3.Up * 0.34f, tip + lift }) st.AddVertex(v);
+            var lift = Vector3.Up * 0.42f * scale;
+            var fin = Vector3.Up * 0.08f * scale;
+            var finHead = Vector3.Up * 0.22f * scale;
+            Quad(tail + lift - fin, neck + lift - fin, neck + lift + fin, tail + lift + fin);
+            foreach (var v in new[] { neck + lift - finHead, neck + lift + finHead, tip + lift }) st.AddVertex(v);
         }
         if (set.Count == 0 && !anyPort) return;
         _cellMark = new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = CellMarkMaterial, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Transparency = _tool == Tool.Build ? _cellMarkFade * 0.7f : 0f };

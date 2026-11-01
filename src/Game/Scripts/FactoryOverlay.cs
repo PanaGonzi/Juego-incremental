@@ -95,26 +95,6 @@ public partial class ChainOverlay : Node3D
     private static Shader? _shader;
     private readonly MultiMeshInstance3D _chevrons = new() { CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
     private readonly MultiMeshInstance3D _frames = new() { CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
-    private readonly Label3D _label = new()
-    {
-        Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-        NoDepthTest = true,
-        FixedSize = true,
-        PixelSize = 0.00085f,
-        FontSize = 34,
-        OutlineSize = 10,
-        Modulate = new Color(1f, 0.82f, 0.74f),
-        OutlineModulate = new Color(0, 0, 0, 0.9f),
-        Visible = false,
-    };
-    private readonly Sprite3D _icon = new()
-    {
-        Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-        NoDepthTest = true,
-        FixedSize = true,
-        PixelSize = 0.0007f,
-        Visible = false,
-    };
     private double _wait;
     private string _signature = "";
 
@@ -124,14 +104,17 @@ public partial class ChainOverlay : Node3D
     /// <summary>Texto de lo señalado, también para el aviso al activar.</summary>
     public string Summary { get; private set; } = "";
     public int ChevronCount => _chevrons.Multimesh?.InstanceCount ?? 0;
+    /// <summary>Lo que dibuja ChainTag en 2D: ahí el HUD puede reservarle sitio, cosa que un rótulo 3D no permite (INC-14).</summary>
+    public bool TagShown { get; private set; }
+    public Vector3 TagAnchor { get; private set; }
+    public string TagText { get; private set; } = "";
+    public string TagGlyph { get; private set; } = "st_wait";
     public event Action<string>? LimitChanged;
 
     public override void _Ready()
     {
         AddChild(_chevrons);
         AddChild(_frames);
-        AddChild(_label);
-        AddChild(_icon);
         _shader ??= new Shader
         {
             Code = """
@@ -163,8 +146,7 @@ public partial class ChainOverlay : Node3D
         _signature = "";
         _chevrons.Multimesh = null;
         _frames.Multimesh = null;
-        _label.Visible = false;
-        _icon.Visible = false;
+        TagShown = false;
     }
 
     public void Refresh(World w, double delta)
@@ -244,8 +226,7 @@ public partial class ChainOverlay : Node3D
         if (limit.Cause == ChainCause.None)
         {
             Summary = Loc.T("chain_none");
-            _label.Visible = false;
-            _icon.Visible = false;
+            TagShown = false;
             return;
         }
         var position = Vector3.Zero;
@@ -253,31 +234,29 @@ public partial class ChainOverlay : Node3D
         if (w.Machines.TryGetValue(limit.Machine, out var m))
         {
             var (x, z) = w.MachineCenterMm(m);
-            position = new Vector3(x / 1000f, Models.Machine(m.Def).Height + 2.6f, z / 1000f);
+            position = new Vector3(x / 1000f, Models.Machine(m.Def).Height + 0.6f, z / 1000f);
             name = Loc.T("machine_" + m.Def);
         }
         if (limit.Link >= 0 && w.Links.TryGetValue(limit.Link, out var l) && l.Cells.Count > 0)
         {
             var (cx, cz) = l.Cells[l.Cells.Count / 2];
-            position = new Vector3((cx + 0.5f) * Cell, 2.2f, (cz + 0.5f) * Cell);
+            position = new Vector3((cx + 0.5f) * Cell, 1.4f, (cz + 0.5f) * Cell);
             name = Loc.T("tool_link");
         }
         var cause = Loc.T("chain_cause_" + limit.Cause);
         if (limit.Item.Length > 0) cause += $" · {Loc.T("item_" + limit.Item)}";
         Summary = $"{Loc.T("chain_limit")}: {name} — {cause}";
-        _label.Text = $"{Loc.T("chain_limit")}\n{name}\n{cause}";
-        _label.Position = position;
-        _label.Visible = true;
-        _icon.Texture = Ui.Glyph(limit.Cause switch
+        TagText = $"{Loc.T("chain_limit")}\n{name}\n{cause}";
+        TagAnchor = position;
+        TagGlyph = limit.Cause switch
         {
             ChainCause.NoPower or ChainCause.LowPower => "st_power",
             ChainCause.Overheated => "st_heat",
             ChainCause.OutputFull => "st_full",
             ChainCause.BeltSaturated => "belt",
             _ => "st_wait",
-        });
-        _icon.Position = position + Vector3.Up * 1.1f;
-        _icon.Visible = true;
+        };
+        TagShown = true;
     }
 
     private static MultiMesh Multi(Mesh mesh, List<(Transform3D at, Color color)> items)
@@ -326,5 +305,105 @@ public partial class ChainOverlay : Node3D
             Vertex(a); Vertex(c); Vertex(d);
         }
         return st.Commit();
+    }
+}
+
+/// <summary>
+/// Rótulo del eslabón limitante, en 2D y siempre dentro del hueco libre del HUD: entre el panel del objetivo y la barra rápida.
+/// Si el eslabón queda fuera de ese hueco o a la espalda, el rótulo se queda en el borde con una punta hacia él.
+/// </summary>
+public partial class ChainTag : Control
+{
+    private const float Gap = 10;
+    private const float PointerSize = 9;
+    private readonly GameView _view;
+    private readonly PanelContainer _box;
+    private readonly TextureRect _glyph;
+    private readonly Label _text;
+    private string _glyphName = "";
+    private Vector2 _pointerFrom;
+    private Vector2 _pointerDir;
+
+    public Rect2 TagRect => _box.Visible ? _box.GetGlobalRect() : new Rect2();
+    public bool Showing => _box.Visible;
+    public string Text => _text.Text;
+    /// <summary>La punta solo se dibuja si el rótulo no puede estar junto al eslabón.</summary>
+    public bool PointerShown { get; private set; }
+
+    public ChainTag(GameView view)
+    {
+        _view = view;
+        MouseFilter = MouseFilterEnum.Ignore;
+        _box = new PanelContainer { MouseFilter = MouseFilterEnum.Ignore, Visible = false };
+        _box.AddThemeStyleboxOverride("panel", UiTheme.Box(new Color(0.09f, 0.03f, 0.025f, 0.9f), new Color(1f, 0.26f, 0.2f, 0.95f), 1, 6, 10, 3));
+        _glyph = Ui.Icon(Ui.Glyph("st_wait"), 28);
+        _text = Ui.Text("", UiTheme.Small, new Color(1f, 0.86f, 0.78f));
+        var row = Ui.Row(UiTheme.S, _glyph, _text);
+        row.MouseFilter = MouseFilterEnum.Ignore;
+        _box.AddChild(row);
+        AddChild(_box);
+    }
+
+    public override void _Ready() => SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+
+    public override void _Process(double delta)
+    {
+        var chain = _view.ChainForTest;
+        if (!chain.TagShown)
+        {
+            if (_box.Visible)
+            {
+                _box.Visible = false;
+                PointerShown = false;
+                QueueRedraw();
+            }
+            return;
+        }
+        if (_text.Text != chain.TagText) _text.Text = chain.TagText;
+        if (_glyphName != chain.TagGlyph)
+        {
+            _glyphName = chain.TagGlyph;
+            _glyph.Texture = Ui.Glyph(_glyphName);
+        }
+        _box.Visible = true;
+        _box.ResetSize();
+
+        var size = _box.Size;
+        var safe = _view.HudSafeArea;
+        var view = GetViewportRect().Size;
+        var camera = _view.Camera;
+        // La cámara devuelve píxeles de ventana; la interfaz puede estar escalada.
+        var scale = view / ((Vector2)GetWindow().Size).Max(Vector2.One);
+        var target = camera.UnprojectPosition(chain.TagAnchor) * scale;
+        if (camera.IsPositionBehind(chain.TagAnchor))
+        {
+            // A la espalda la proyección no sirve: se señala hacia el lado por el que hay que girar.
+            var side = camera.ToLocal(chain.TagAnchor).X >= 0 ? 1 : -1;
+            target = view / 2 + new Vector2(side, 0.35f).Normalized() * view.Length();
+        }
+        var wanted = target - new Vector2(size.X / 2, size.Y + Gap);
+        var at = new Vector2(
+            Mathf.Clamp(wanted.X, safe.Position.X, Mathf.Max(safe.Position.X, safe.End.X - size.X)),
+            Mathf.Clamp(wanted.Y, safe.Position.Y, Mathf.Max(safe.Position.Y, safe.End.Y - size.Y)));
+        _box.Position = at;
+
+        var box = new Rect2(at, size);
+        var pushed = (at - wanted).Length() > 1;
+        var inner = new Vector2(Mathf.Clamp(target.X, box.Position.X, box.End.X), Mathf.Clamp(target.Y, box.Position.Y, box.End.Y));
+        var dir = (target - inner).LengthSquared() > 1 ? (target - inner).Normalized() : Vector2.Down;
+        if (pushed != PointerShown || inner != _pointerFrom || dir != _pointerDir)
+        {
+            PointerShown = pushed;
+            _pointerFrom = inner;
+            _pointerDir = dir;
+            QueueRedraw();
+        }
+    }
+
+    public override void _Draw()
+    {
+        if (!PointerShown || !_box.Visible) return;
+        var side = new Vector2(-_pointerDir.Y, _pointerDir.X);
+        DrawColoredPolygon(new[] { _pointerFrom + _pointerDir * PointerSize * 1.5f, _pointerFrom + side * PointerSize, _pointerFrom - side * PointerSize }, new Color(1f, 0.26f, 0.2f, 0.95f));
     }
 }

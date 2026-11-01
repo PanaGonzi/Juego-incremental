@@ -173,6 +173,8 @@ public sealed class RailDef
     public Dictionary<string, long> TrainCost { get; set; } = new();
     public int TrainSpeedMmPerTick { get; set; }
     public long TrainCapacity { get; set; }
+    /// <summary>Distancia entre trenes parados en la misma parada, de morro a morro.</summary>
+    public int TrainSpacingMm { get; set; }
     public long TransferUnitsPerTick { get; set; }
     public int MaxLoadWaitTicks { get; set; }
 }

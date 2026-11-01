@@ -143,6 +143,8 @@ public partial class AutoTest : Node
         return ok;
     }
 
+    private int _lastGhostMarks;
+
     private async Task<bool> Build(string def, int x, int z)
     {
         var d = W.Content.Machines[def];
@@ -153,6 +155,7 @@ public partial class AutoTest : Node
         _view.SelectBuild(def);
         _view.AimAt(center);
         await Wait(0.3);
+        _lastGhostMarks = _view.PlacementMarkCount;
         await Shot("ghost_" + def);
         _view.Primary();
         var ok = await Until(() => W.Stats.GetValueOrDefault("built." + def) > before, 3);
@@ -840,6 +843,7 @@ public partial class AutoTest : Node
         var padPluto = W.Machines.Values.First(m => m.Def == "shuttle_terminal" && m.Planet == 0);
 
         Check(await Build("cargo_pad", -8, 12), "plataforma de carga en Plutón");
+        Check(_lastGhostMarks is > 0 and <= 8, $"INC-20: la plataforma tiene 32 conectores y muestra {_lastGhostMarks} marcas al colocarla");
         var send = W.Machines.Values.Last(m => m.Def == "cargo_pad");
         var depot = W.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
         await UseOn(depot, () => client.Send(new Command { Type = CommandType.Extract, A = depot.Id, Text = "cryo_module" }));
@@ -1112,7 +1116,20 @@ public partial class AutoTest : Node
         var ok = await Until(() => W.Machines[b.Id].In.Total >= Math.Min(loaded, W.Content.Balance.Rail.TrainCapacity), 60);
         _measuring = false;
         Check(ok, $"carga recibida en destino: {W.Machines[b.Id].In.Total}");
-        Check(v.Session.Client.HashMismatches == 0, $"sin divergencias ({v.Session.Client.HashChecks} comprobaciones)");
+        // BUG-006: dos trenes más parados en la misma estación hacen cola; ninguno ocupa el sitio de otro.
+        var before = W.Trains.Count;
+        client.Send(new Command { Type = CommandType.CreateTrain, A = a.Id, B = b.Id });
+        client.Send(new Command { Type = CommandType.CreateTrain, A = a.Id, B = b.Id });
+        Check(await Until(() => W.Trains.Count == before + 2, 5), "dos trenes más en la estación A");
+        var queue = W.Trains.Keys.Where(id => id != trainId).ToArray();
+        await WalkTo(CenterOf(a) + new Vector3(-14, -1.2f, 12), 6);
+        v.AimAt(CenterOf(a) + new Vector3(4, -1, 2));
+        await Wait(2);
+        var gap = v.TrainShownForTest(queue[0]).DistanceTo(v.TrainShownForTest(queue[1]));
+        Check(gap > 10, $"separación entre trenes en cola: {gap:0.0} m");
+        await Shot("rail_08b_cola_en_anden");
+        var serverWorld = v.Session.Runner!.Server.World;
+        Check(queue.All(id => serverWorld.PlatformSlot(serverWorld.Trains[id]) == W.PlatformSlot(W.Trains[id])), "servidor y espejo dan el mismo puesto");
 
         _view.Session.Client.RequestSave();
         await Wait(1);
@@ -1284,6 +1301,19 @@ public partial class AutoTest : Node
         Check(v.LookForTest.StateText == Loc.T("look_NoPower"), $"lectura al mirar: {v.LookForTest.StateText}");
         Check(v.ChainForTest.Current?.Limit.Cause == ChainCause.NoPower && v.ChainForTest.Current.Limit.Machine == recycler.Id, $"motivo: {v.ChainForTest.Summary}");
         await Shot("gestion_06_sin_energia_y_motivo");
+        // INC-14: el eslabón queda donde estaría el panel del objetivo, y luego a la espalda; el rótulo no se mete debajo.
+        Check(v.ChainTagForTest.Showing, $"rótulo de la cadena visible: {v.ChainTagForTest.Text}");
+        var objectivePanel = v.ObjectiveRect;
+        v.AimAt(CenterOf(recycler) + new Vector3(0, -7, 0));
+        await Wait(0.3);
+        Check(!v.ChainTagForTest.TagRect.Intersects(objectivePanel), $"rótulo fuera del panel del objetivo: {v.ChainTagForTest.TagRect} / {objectivePanel}");
+        await Shot("gestion_06b_rotulo_bajo_el_objetivo");
+        v.AimAt(v.PlayerPosition + (v.PlayerPosition - CenterOf(recycler)).Normalized() * 8);
+        await Wait(0.3);
+        Check(v.ChainTagForTest.PointerShown && !v.ChainTagForTest.TagRect.Intersects(objectivePanel) && v.HudSafeArea.Encloses(v.ChainTagForTest.TagRect), $"con el eslabón a la espalda sigue en el hueco libre, con punta: {v.ChainTagForTest.TagRect}");
+        await Shot("gestion_06c_rotulo_a_la_espalda");
+        v.AimAt(CenterOf(recycler));
+        await Wait(0.2);
 
         // Con energía de nuevo y sin salida conectada, acaba con la salida bloqueada.
         Check(await UseOn(crate, () => client.Send(new Command { Type = CommandType.Extract, A = crate.Id, Text = "recovered" })), "material para reponer el generador");

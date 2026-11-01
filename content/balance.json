@@ -28,6 +28,7 @@
     "trainCost": { "ingot": 15, "parts": 5 },
     "trainSpeedMmPerTick": 1400,
     "trainCapacity": 200,
+    "trainSpacingMm": 16500,
     "transferUnitsPerTick": 4,
     "maxLoadWaitTicks": 150
   },

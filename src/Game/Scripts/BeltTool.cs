@@ -392,12 +392,14 @@ public partial class BeltView
         if (m == null) return;
         var g = new Geometry();
         var isDestination = _plan is { HasOrigin: true } && m.Id == _plan.To;
+        var isOrigin = _plan is { HasOrigin: true } && m.Id == _plan.From;
         foreach (var output in new[] { true, false })
         {
             if (_plan is { HasOrigin: false } && !output) continue; // eligiendo origen, solo importan las salidas
             if (isDestination && output) continue;                  // eligiendo destino, solo las entradas
-            foreach (var p in w.BeltPorts(m, output))
-                PortArrow(g, p, selected == (p.X, p.Z));
+            if (isOrigin && !output) continue;                      // con el origen elegido, sus entradas no vienen al caso
+            foreach (var p in PortIndicators.ForTool(w.BeltPorts(m, output), selected))
+                if (!isOrigin || selected == (p.X, p.Z)) PortArrow(g, p, selected == (p.X, p.Z));
         }
         if (other != null)
             foreach (var p in w.BeltPorts(other, true))
@@ -420,7 +422,8 @@ public partial class BeltView
         var center = cell - outward * (p.Output ? 0.45f : 0.2f);
         var color = p.Output ? new Color(1f, 0.66f, 0.15f, 0.9f) : new Color(0.25f, 0.7f, 1f, p.Side ? 0.55f : 0.9f);
         if (!p.Free) color = new Color(0.45f, 0.45f, 0.45f, 0.45f);
-        var scale = selected ? 1.35f : 1f;
+        // La elegida destaca por su marco y por su tamaño, no por llenar la celda: el resto queda por debajo.
+        var scale = selected ? 1.15f : 0.72f;
         var tip = center + dir * 0.45f * scale;
         var tail = center - dir * 0.3f * scale;
         g.Quad(tail - side * 0.16f * scale, tail + side * 0.16f * scale, center + side * 0.16f * scale, center - side * 0.16f * scale, Vector3.Up, color);
