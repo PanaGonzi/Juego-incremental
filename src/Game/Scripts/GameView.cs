@@ -1377,7 +1377,7 @@ public partial class GameView : Node3D
         }
         // Las cintas no tienen cuerpo físico: se apuntan por geometría si nada más próximo tapa el rayo.
         var belt = Belts.Pick(Session.Client.World!, from, (to - from).Normalized(), 34f, out var beltDistance);
-        if (belt >= 0 && beltDistance < from.DistanceTo(_aimPoint))
+        if (belt >= 0 && _aim.kind != "debris" && beltDistance < from.DistanceTo(_aimPoint))
         {
             _aim = ("belt", belt);
             _aimPoint = from + (to - from).Normalized() * beltDistance;

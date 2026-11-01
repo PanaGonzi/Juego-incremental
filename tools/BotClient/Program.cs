@@ -241,6 +241,24 @@ static void Act(GameClient client, string behaviour, Random rng, float x, float 
         default:
             // Construye y desmonta en una zona disputada por varios bots.
             var own = world.Machines.Values.Where(m => m.Def == "storage_crate").ToList();
+            // Tiende y retira cintas con carga real desde el depósito: varios bots compiten por las mismas.
+            var fed = world.Links.Values.Where(l => own.Any(m => m.Id == l.To)).ToList();
+            if (fed.Count > 3 && rng.Next(3) == 0)
+            {
+                client.Send(new Command { Type = CommandType.Unlink, A = fed[rng.Next(fed.Count)].Id });
+                plan.Step++;
+                break;
+            }
+            if (own.Count > 0 && rng.Next(2) == 0)
+            {
+                var crate = own[rng.Next(own.Count)];
+                if (!world.Links.Values.Any(l => l.To == crate.Id))
+                {
+                    client.Send(new Command { Type = CommandType.Link, A = Find("depot").Id, B = crate.Id });
+                    plan.Step++;
+                    break;
+                }
+            }
             if (own.Count > 4)
             {
                 var old = own[rng.Next(own.Count)];

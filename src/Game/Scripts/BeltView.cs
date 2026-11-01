@@ -28,15 +28,15 @@ public partial class BeltView : Node3D
         void fragment(){
           float x = abs(UV.x - 0.5) * 2.0;
           float along = UV.y - offset;
-          float c = fract(along + x * 0.32);
-          float chevron = smoothstep(0.0, 0.03, c) * (1.0 - smoothstep(0.17, 0.2, c)) * (1.0 - smoothstep(0.66, 0.74, x));
+          float c = fract(along * 0.5 + x * 0.16);
+          float chevron = smoothstep(0.0, 0.012, c) * (1.0 - smoothstep(0.06, 0.072, c)) * (1.0 - smoothstep(0.5, 0.58, x));
           float ribs = step(0.5, fract(along * 7.0)) * 0.012;
           vec3 rubber = vec3(0.05, 0.05, 0.055) + ribs;
-          vec3 mark = mix(vec3(0.95, 0.62, 0.14), vec3(0.95, 0.14, 0.08), jam);
-          ALBEDO = mix(rubber, mark, chevron * 0.9);
+          vec3 mark = mix(vec3(0.85, 0.56, 0.14), vec3(0.95, 0.14, 0.08), jam);
+          ALBEDO = mix(rubber, mark, chevron * 0.75);
           ROUGHNESS = 0.82;
           METALLIC = 0.0;
-          EMISSION = mark * chevron * (0.18 + jam * 0.3);
+          EMISSION = mark * chevron * (0.06 + jam * 0.45);
         }
         """ } };
 
@@ -193,7 +193,9 @@ public partial class BeltView : Node3D
         var entry = PortSide(w.BeltPorts(a, true), cells[0], cells.Count > 1 ? cells[1] : null);
         var exit = PortSide(w.BeltPorts(b, false), cells[^1], cells.Count > 1 ? cells[^2] : null);
 
-        float Height(int i) => i < 0 || i >= cells.Count ? BandY : bridge(i) ? BridgeY : BandY;
+        // Puente plano sobre la celda cruzada, con rampa en toda la celda vecina.
+        bool High(int i) => i >= 0 && i < cells.Count && bridge(i);
+        float EdgeHeight(int edge) => High(edge - 1) || High(edge) ? BridgeY : BandY;
         for (var k = 0; k < cells.Count; k++)
         {
             var center = new Vector2((cells[k].x + 0.5f) * Cell, (cells[k].z + 0.5f) * Cell);
@@ -203,16 +205,15 @@ public partial class BeltView : Node3D
             var outEdge = k == cells.Count - 1
                 ? center + new Vector2(exit.dx, exit.dz) * Cell / 2
                 : (center + new Vector2((cells[k + 1].x + 0.5f) * Cell, (cells[k + 1].z + 0.5f) * Cell)) / 2;
-            var h = Height(k);
-            var hIn = (Height(k - 1) + h) / 2;
-            var hOut = (Height(k + 1) + h) / 2;
+            var hIn = EdgeHeight(k);
+            var hOut = EdgeHeight(k + 1);
             for (var s = 0; s <= slotsPerCell; s++)
             {
                 if (s == 0 && k > 0) continue;
                 var t = s / (float)slotsPerCell;
                 var u = 1 - t;
                 var xz = inEdge * u * u + center * 2 * u * t + outEdge * t * t;
-                var y = t < 0.5f ? Mathf.Lerp(hIn, h, Mathf.SmoothStep(0, 1, t * 2)) : Mathf.Lerp(h, hOut, Mathf.SmoothStep(0, 1, (t - 0.5f) * 2));
+                var y = Mathf.Lerp(hIn, hOut, Mathf.SmoothStep(0, 1, t));
                 points[k * slotsPerCell + s] = new Vector3(xz.X, y, xz.Y);
             }
         }

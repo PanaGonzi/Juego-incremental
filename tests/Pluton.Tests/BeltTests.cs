@@ -694,6 +694,31 @@ public class BeltTests
     }
 
     [Fact]
+    public void Failed_route_search_is_bounded()
+    {
+        // Peor caso razonable: destino dentro de un recinto cerrado, con todo el radio de búsqueda libre fuera.
+        var (w, p) = Open();
+        var a = Place(w, p, "storage_crate", -20, -40);
+        var b = Place(w, p, "storage_crate", 0, -40);
+        for (var x = -3; x <= 4; x += 1)
+            foreach (var z in new[] { -43, -36 })
+                w.Machines[w.NextId] = new Machine { Id = w.NextId++, Def = "storage_crate", Planet = 0, X = x, Z = z };
+        foreach (var z in Enumerable.Range(-43, 8))
+            foreach (var x in new[] { -3, 4 })
+                w.Machines[w.NextId] = new Machine { Id = w.NextId++, Def = "storage_crate", Planet = 0, X = x, Z = z };
+        w.Reindex();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var route = w.RouteBelt(a.Id, b.Id);
+        var first = clock.Elapsed.TotalMilliseconds;
+        clock.Restart();
+        for (var i = 0; i < 20; i++) w.RouteBelt(a.Id, b.Id);
+        var average = clock.Elapsed.TotalMilliseconds / 20;
+        Assert.NotNull(route.Error);
+        Assert.True(average < 100, $"búsqueda fallida: primera {first:F2} ms, media {average:F2} ms");
+        Console.WriteLine($"Búsqueda fallida: primera {first:F2} ms, media {average:F2} ms");
+    }
+
+    [Fact]
     public void Texts_for_every_belt_error_and_state_exist_in_both_languages()
     {
         var dir = Path.Combine(ContentDb.LocateDirectory(), "loc");

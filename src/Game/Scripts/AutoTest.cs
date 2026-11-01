@@ -232,6 +232,12 @@ public partial class AutoTest : Node
             {
                 _main.StartSession(GameSession.Local(_main, BeltWorld(), "autotest-belts", null, _main.Prefs));
             }
+            else if (_args.GetValueOrDefault("scenario") == "beltsv4")
+            {
+                // Guardado real de la 0.4.1 cargado por la ruta normal: migra a cintas con copia .v4.bak.
+                System.IO.File.Copy(_args["fixture"], _main.Store.PathOf("autotest-v4"), true);
+                _main.StartSolo("autotest-v4", false);
+            }
             else
             {
                 _main.StartSolo("autotest-" + DateTime.Now.ToString("HHmmss"), true);
@@ -253,6 +259,7 @@ public partial class AutoTest : Node
             if (_args.ContainsKey("measure")) await MeasureScenario();
             else if (_args.GetValueOrDefault("scenario") == "rail") await RailScenario();
             else if (_args.GetValueOrDefault("scenario") == "belts") await BeltScenario();
+            else if (_args.GetValueOrDefault("scenario") == "beltsv4") await BeltMigrationScenario();
             else if (_args.GetValueOrDefault("scenario") == "travel") await TravelScenario();
             else if (_args.GetValueOrDefault("scenario") == "halloween") await HalloweenScenario();
             else if (_args.GetValueOrDefault("scenario") == "mars") await MarsScenario();
@@ -951,8 +958,64 @@ public partial class AutoTest : Node
         await Shot("belt_04_cruce");
         _ = server;
 
+        // Carga densa y atasco reales: depósito → cinta larga → almacén hasta llenarlo (200 por tipo).
+        Check(await Build("storage_crate", 8, -16), "almacén que se llenará");
+        var full = W.Machines.Values.Last(m => m.Def == "storage_crate" && m.X == 8);
+        var depot = W.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
+        client.Send(new Command { Type = CommandType.Link, A = depot.Id, B = full.Id });
+        Check(await Until(() => W.Links.Values.Any(l => l.From == depot.Id && l.To == full.Id), 3), "cinta depósito → almacén");
+        var line = W.Links.Values.Last(l => l.From == depot.Id);
+        var lineMid = line.Cells[line.Cells.Count / 2];
+        var lineAim = new Vector3((lineMid.x + 0.5f) * 2, 0.5f, (lineMid.z + 0.5f) * 2);
+        await WalkTo(lineAim + new Vector3(5, -0.5f, 3));
+        v.AimAt(lineAim);
+        Check(await Until(() => W.Links[line.Id].Load >= W.Links[line.Id].Slots.Length - 1, 25), "cinta casi saturada");
+        await Wait(1.2);
+        await Shot("belt_05_carga_densa");
+        Check(await Until(() => W.BeltStatusOf(W.Links[line.Id]) == BeltStatus.BlockedFull, 110), $"la cinta se atasca con el destino lleno: {W.Machines[full.Id].In.Get("recovered")}");
+        await Wait(1.5);
+        v.AimAt(lineAim);
+        await Wait(0.3);
+        await Shot("belt_06_atasco");
+        var ids = W.Links[line.Id].Load;
+        Check(ids == W.Links[line.Id].Slots.Length, $"cinta llena: {ids}");
+        var totalBefore = W.CountEverywhere("recovered");
+        client.Send(new Command { Type = CommandType.Unlink, A = line.Id });
+        Check(await Until(() => !W.Links.ContainsKey(line.Id), 3), "retirar devuelve la carga");
+        await Wait(1.2);
+        Check(W.CountEverywhere("recovered") == totalBefore, $"sin pérdida al retirar: {totalBefore} → {W.CountEverywhere("recovered")}");
+
         Check(client.HashMismatches == 0, $"sin divergencias ({client.HashChecks} comprobaciones)");
         Log($"Cintas: {W.Links.Count}, objetos en cinta {W.Links.Values.Sum(l => l.Load)}, dibujados {v.Belts.DrawnItems}");
+    }
+
+    /// <summary>Partida 0.4.1 migrada: comprueba las cintas enrutadas, la elevada y que siguen transportando.</summary>
+    private async Task BeltMigrationScenario()
+    {
+        var v = _view!;
+        Check(System.IO.File.Exists(_main.Store.PathOf("autotest-v4") + ".v4.bak"), "copia .v4.bak creada");
+        Check(W.Links.Count == 6, $"seis conexiones conservadas: {W.Links.Count}");
+        var elevated = W.Links.Values.FirstOrDefault(l => l.Elevated);
+        Check(elevated != null, "enlace sin ruta posible queda elevado");
+        var smelter = W.Machines.Values.First(m => m.Def == "smelter");
+        var c = CenterOf(smelter);
+        await WalkTo(new Vector3(c.X - 3, 0, c.Z + 13));
+        v.AimAt(c);
+        Check(await Until(() => W.Links.Values.Sum(l => l.Load) > 0, 20), "las cintas migradas transportan carga");
+        await Wait(1);
+        await Shot("beltv4_01_fabrica");
+        if (elevated != null)
+        {
+            var a = CenterOf(W.Machines[elevated.From]);
+            var b = CenterOf(W.Machines[elevated.To]);
+            var mid = (a + b) / 2 + new Vector3(0, 2.5f, 0);
+            await WalkTo(new Vector3(mid.X + 6, 0, mid.Z + 6));
+            v.AimAt(mid);
+            await Wait(0.5);
+            Check(v.AimTarget == ("belt", elevated.Id), $"la elevada se puede apuntar: {v.AimTarget}");
+            await Shot("beltv4_02_elevada");
+        }
+        Check(v.Session.Client.HashMismatches == 0, $"sin divergencias ({v.Session.Client.HashChecks} comprobaciones)");
     }
 
     private async Task<bool> LinkMachines(Machine a, Machine b)

@@ -15,7 +15,7 @@ public sealed record BeltInfo(
     IReadOnlyList<KeyValuePair<string, int>> Items, bool Elevated, int CellCount);
 
 /// <summary>
-/// Cintas abiertas: un Link con ruta en la cuadrícula y carga por huecos. Reglas en docs/DECISIONS.md (D-022).
+/// Cintas abiertas: un Link con ruta en la cuadrícula y carga por huecos. Reglas en docs/DECISIONS.md (D-030).
 /// Todo lo que se valida aquí se usa igual en el servidor y en la previsualización del cliente.
 /// </summary>
 public sealed partial class World
@@ -45,7 +45,7 @@ public sealed partial class World
 
     /// <summary>
     /// Puertos de una colocación. Producción: salida al frente; entrada detrás y, con menos prioridad, por los lados
-    /// (una fundición de dos celdas de ancho no recibiría cuatro cintas solo por detrás). Ver D-022.
+    /// (una fundición de dos celdas de ancho no recibiría cuatro cintas solo por detrás). Ver D-031.
     /// </summary>
     public IEnumerable<BeltPort> BeltPorts(int planet, string defId, int x, int z, int rot, bool output)
     {
@@ -178,7 +178,7 @@ public sealed partial class World
     private const int BeltTurnCost = 4;
     private const int BeltCrossCost = 8;
     private const int BeltSidePortCost = 16;
-    private const int BeltMaxExpansions = 14000;
+    private const int BeltMaxExpansions = 6000; // acota el coste de una búsqueda fallida en el hilo del servidor
 
     /// <summary>
     /// A* determinista sobre (celda, dirección). Empates resueltos por clave total: dos ejecuciones sobre el mismo mundo
