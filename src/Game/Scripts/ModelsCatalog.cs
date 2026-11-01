@@ -533,6 +533,37 @@ public static partial class Models
         return m;
     }
 
+    /// <summary>
+    /// Divisor y unificador: caja de una celda con bocas en las caras que usa cada uno. Se distinguen por la forma de la tapa
+    /// (aleta o cúpula) y por las flechas, sin depender del color. El frente de la simulación es −Z.
+    /// </summary>
+    private static void Junction(Builder b, bool splitter)
+    {
+        b.Plinth(2, 2);
+        b.Box("hull", 0, 0.68f, 0, 1.2f, 0.92f, 1.2f);
+        b.Seams(0, 0.68f, 0, 1.2f, 0.92f, 1.2f);
+        var faces = new (Vector3 dir, bool output)[]
+        {
+            (Vector3.Forward, true),
+            (Vector3.Back, false),
+            (Vector3.Right, splitter),
+            (Vector3.Left, splitter),
+        };
+        foreach (var (dir, output) in faces)
+        {
+            var side = new Vector3(dir.Z, 0, -dir.X);
+            b.Box("steel_dark", dir.X * 0.74f, 0.62f, dir.Z * 0.74f, Mathf.Abs(dir.X) * 0.28f + Mathf.Abs(dir.Z) * 0.82f, 0.62f, Mathf.Abs(dir.Z) * 0.28f + Mathf.Abs(dir.X) * 0.82f);
+            b.Box(output ? "signal" : "cream", dir.X * 0.74f, 1.0f, dir.Z * 0.74f, Mathf.Abs(dir.X) * 0.32f + Mathf.Abs(dir.Z) * 0.9f, 0.1f, Mathf.Abs(dir.Z) * 0.32f + Mathf.Abs(dir.X) * 0.9f);
+            // Punta de flecha sobre la tapa: hacia fuera si es salida, hacia el centro si es entrada.
+            var flow = output ? dir : -dir;
+            var tip = new Vector3(dir.X * 0.46f, 1.2f, dir.Z * 0.46f) + flow * 0.14f;
+            b.Beam("amber", tip - flow * 0.22f + side * 0.22f, tip, 0.08f, 0.04f);
+            b.Beam("amber", tip - flow * 0.22f - side * 0.22f, tip, 0.08f, 0.04f);
+        }
+        if (splitter) b.Box("steel", 0, 1.26f, 0, 0.1f, 0.22f, 0.44f);
+        else b.Cyl("chrome", 0, 1.22f, 0, 0.2f, 0.12f, sides: 12, topRadius: 0.08f);
+    }
+
     private static MachineModel BuildMachine(string def)
     {
         switch (def)
@@ -686,6 +717,12 @@ public static partial class Models
                 m.GlowPos = new Vector3(0, 4, 3.4f);
                 break;
             }
+            case "splitter":
+            case "merger":
+                Junction(b, def == "splitter");
+                m.Height = 1.5f;
+                m.LampPos = new Vector3(0.62f, 1.05f, 0.62f);
+                break;
             case "storage_crate":
             {
                 b.Plinth(4, 4);
@@ -1061,7 +1098,7 @@ public static partial class Models
     /// <summary>Material del piloto según estado: verde en marcha, ámbar a la espera, rojo parada.</summary>
     public static StandardMaterial3D LampState(Pluton.Simulation.MachineStatus status) => status switch
     {
-        Pluton.Simulation.MachineStatus.Working or Pluton.Simulation.MachineStatus.Generating or Pluton.Simulation.MachineStatus.Cooling or Pluton.Simulation.MachineStatus.Storing or Pluton.Simulation.MachineStatus.Ready => Materials.Lamp("green"),
+        Pluton.Simulation.MachineStatus.Working or Pluton.Simulation.MachineStatus.Generating or Pluton.Simulation.MachineStatus.Cooling or Pluton.Simulation.MachineStatus.Storing or Pluton.Simulation.MachineStatus.Passing or Pluton.Simulation.MachineStatus.Ready => Materials.Lamp("green"),
         Pluton.Simulation.MachineStatus.NoPower or Pluton.Simulation.MachineStatus.Overheated or Pluton.Simulation.MachineStatus.LowPower => Materials.Lamp("red"),
         _ => Materials.Lamp("amber"),
     };

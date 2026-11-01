@@ -1,6 +1,7 @@
 {
   "upgrades": [
     { "id": "cutter_1",       "credits": 60,   "cost": { "recovered": 10 }, "mods": { "cutter_damage": 1 } },
+    { "id": "tech_logistics", "credits": 40,   "cost": { "recovered": 8 } },
     { "id": "tech_assembly",  "credits": 200,  "cost": { "ingot": 10 } },
     { "id": "extract_speed",  "credits": 250,  "cost": { "ingot": 20 }, "mods": { "speed.extract_ore": 250, "speed.extract_ice": 250 } },
     { "id": "smelt_speed",    "credits": 300,  "cost": { "ingot": 25 }, "mods": { "speed.smelt_ingot": 250 } },

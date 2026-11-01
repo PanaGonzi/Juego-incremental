@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 
 namespace Pluton.Simulation;
 
-public enum MachineKind { Production, Generator, Storage, Terminal, Station, Shuttle, Radiator, CargoPad }
+public enum MachineKind { Production, Generator, Storage, Terminal, Station, Shuttle, Radiator, CargoPad, Splitter, Merger }
 
 public sealed class ItemDef
 {

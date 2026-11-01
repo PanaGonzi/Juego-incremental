@@ -119,7 +119,6 @@ public partial class Hud : Control
     private readonly List<PanelContainer> _toolSlots = new();
     private readonly List<(Label label, string key)> _toolNames = new();
     private ProgressBar _powerBar = null!, _objectiveBar = null!;
-    private readonly Dictionary<string, Queue<(double time, long total)>> _produced = new();
     private int _meterId = -1;
     private long _meterProgress;
     private double _meterTime;
@@ -133,6 +132,7 @@ public partial class Hud : Control
     private double _nextEarning;
     private double _panelRefresh;
     private Action? _panelBuilder;
+    public LookReadout Look { get; private set; } = null!;
     public bool PanelOpen => _center.Visible;
     public bool ChatOpen => _chatInput.Visible;
 
@@ -238,6 +238,8 @@ public partial class Hud : Control
         _prompt.AddThemeConstantOverride("outline_size", 4);
         _prompt.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.8f));
         promptBox.AddChild(_prompt);
+        Look = new LookReadout();
+        promptBox.AddChild(Look);
 
         _toast = Ui.Text("", 20, Ui.Bad);
         _toast.SetAnchorsAndOffsetsPreset(LayoutPreset.CenterBottom);
@@ -358,7 +360,6 @@ public partial class Hud : Control
         var (oldTime, oldTotal) = _earnings.Count > 0 ? _earnings.Peek() : (_elapsed, total);
         var span = Math.Max(10, _elapsed - oldTime);
         _income.Text = $"{Loc.T("hud_income")}: {(total - oldTotal) * 60 / span:F0} ¤";
-        SampleProduction(w);
 
         var (supply, demand) = EstimatePower(w, me.Planet);
         _power.Text = $"{Loc.T("hud_power")}: {demand} / {supply}";
@@ -424,29 +425,6 @@ public partial class Hud : Control
         _objectiveBar.Value = have;
         var distance = _view.ObjectiveDistance > 7 ? $"   ·   {_view.ObjectiveDistance:0} m" : "";
         _objectiveCount.Text = $"{have}/{o.Qty}{distance}";
-    }
-
-    /// <summary>Producción acumulada del mundo cada segundo: de aquí sale la cifra real del panel de máquina.</summary>
-    private void SampleProduction(World w)
-    {
-        if (_elapsed < _nextEarning - 1 + 0.02)
-        {
-            foreach (var item in w.Content.Items.Keys)
-            {
-                if (!_produced.TryGetValue(item, out var q)) _produced[item] = q = new Queue<(double, long)>();
-                q.Enqueue((_elapsed, w.ProducedTotal(item)));
-                while (q.Count > 1 && q.Peek().time < _elapsed - 60) q.Dequeue();
-            }
-        }
-    }
-
-    private double? MeasuredPerMinute(string item)
-    {
-        if (!_produced.TryGetValue(item, out var q) || q.Count < 2) return null;
-        var first = q.Peek();
-        var last = q.Last();
-        var seconds = last.time - first.time;
-        return seconds < 5 ? null : (last.total - first.total) * 60.0 / seconds;
     }
 
     private static (long heat, long cooling) EstimateHeat(World w, int planet)
@@ -611,20 +589,15 @@ public partial class Hud : Control
             buffers.AddChild(outBox);
             Add(buffers);
 
-            // Rendimiento: teórica de esta máquina frente a la real medida en el mundo.
+            // Rendimiento: teórica de esta máquina frente a la real medida por el servidor en los últimos 60 s.
             Add(new HSeparator());
             Add(Ui.Text(Loc.T("panel_rate_title"), UiTheme.Small, Ui.Dim));
             foreach (var (item, perMinute) in readout.Theoretical)
             {
-                var producers = Math.Max(1, w.ProducersOf(item));
-                var measured = MeasuredPerMinute(item);
-                var real = measured == null ? Loc.T("panel_rate_measuring") : $"{measured / producers:0.#}";
-                var note = producers > 1 ? Loc.T("panel_rate_shared", producers.ToString()) : "";
-                var perMachine = measured / producers;
-                var rateColor = perMachine == null ? Ui.Dim : perMachine >= perMinute * 0.9 ? Ui.Good : Ui.Warn;
-                var row = Ui.Row(UiTheme.M, Ui.Icon(ItemVisuals.IconOf(item), 24), Ui.Text($"{Loc.T("panel_rate_real")}: {real}/min", UiTheme.Body, rateColor), Ui.Text($"{Loc.T("panel_rate_theory")}: {perMinute:0.#}/min", UiTheme.Small, Ui.Dim));
-                if (note.Length > 0) row.AddChild(Ui.Text(note, UiTheme.Caption, Ui.Dim));
-                Add(row);
+                var measured = w.MeasuredPerMinute(m, item);
+                var real = measured == null ? Loc.T("panel_rate_measuring") : $"{measured:0.#}";
+                var rateColor = measured == null ? Ui.Dim : measured >= perMinute * 0.9 ? Ui.Good : Ui.Warn;
+                Add(Ui.Row(UiTheme.M, Ui.Icon(ItemVisuals.IconOf(item), 24), Ui.Text($"{Loc.T("panel_rate_real")}: {real}/min", UiTheme.Body, rateColor), Ui.Text($"{Loc.T("panel_rate_theory")}: {perMinute:0.#}/min", UiTheme.Small, Ui.Dim)));
             }
         }
         else if (def.Kind is not (MachineKind.Generator or MachineKind.Shuttle))
@@ -734,6 +707,13 @@ public partial class Hud : Control
             }
             if (transfer.GetChildCount() > 0) Add(transfer);
         }
+
+        if (readout.LinksIn + readout.LinksOut > 0)
+            Add(Ui.Btn($"{Loc.T(_view.ChainSeed == id ? "panel_chain_off" : "panel_chain_on")} [{Controls.KeyName("chain_trace")}]", () =>
+            {
+                _view.ToggleChain(id);
+                ClosePanel();
+            }));
 
         foreach (var link in w.Links.Values.Where(l => l.From == id || l.To == id).ToList())
         {

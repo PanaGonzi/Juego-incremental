@@ -162,6 +162,16 @@ public sealed class GameClient : IDisposable
                     DeltaApplied?.Invoke();
                 }
                 break;
+            case MsgType.Rates:
+                if (World == null) break;
+                var rates = r.Read7BitEncodedInt();
+                for (var i = 0; i < rates; i++)
+                {
+                    var machine = r.Read7BitEncodedInt();
+                    var cycles = r.Read7BitEncodedInt();
+                    World.MeasuredRates[machine] = (cycles, r.ReadByte());
+                }
+                break;
             case MsgType.Result:
                 var id = r.ReadUInt32();
                 var ok = r.ReadBoolean();
@@ -230,7 +240,12 @@ public sealed class GameClient : IDisposable
         for (var i = 0; i < n; i++) structural |= world.ApplyReplicatedMachine(WorldCodec.ReadMachine(r));
         n = r.Read7BitEncodedInt();
         structural |= n > 0;
-        for (var i = 0; i < n; i++) world.Machines.Remove(r.ReadInt32());
+        for (var i = 0; i < n; i++)
+        {
+            var gone = r.ReadInt32();
+            world.Machines.Remove(gone);
+            world.MeasuredRates.Remove(gone);
+        }
         n = r.Read7BitEncodedInt();
         structural |= n > 0;
         for (var i = 0; i < n; i++)

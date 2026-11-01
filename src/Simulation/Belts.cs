@@ -26,6 +26,10 @@ public sealed partial class World
     private readonly Dictionary<(int planet, int x, int z), (int a, int b)> _beltCells = new();
     private readonly HashSet<(int planet, int x, int z)> _nodeCells = new();
     private readonly Dictionary<int, Link[]> _beltsOut = new();
+    private readonly Dictionary<int, Link[]> _beltsIn = new();
+    /// <summary>Qué puede salir de cada divisor o unificador; null si acepta cualquier objeto. Se rehace al cambiar las cintas.</summary>
+    private readonly Dictionary<int, HashSet<string>?> _junctionAccepts = new();
+    private long _deliveryTurn;
 
     /// <summary>Huecos cambiados por la simulación: se replican en el ciclo lento.</summary>
     public readonly HashSet<int> DirtySimSlots = new();
@@ -37,15 +41,19 @@ public sealed partial class World
     /// <summary>Solo los almacenes y estaciones sacan y reciben por cualquier cara.</summary>
     private static bool AnySide(MachineKind kind) => kind is MachineKind.Storage or MachineKind.Terminal or MachineKind.Station or MachineKind.CargoPad;
 
+    /// <summary>Divisor o unificador: pasan objetos entre cintas, sin energía y con un búfer mínimo por tipo.</summary>
+    public static bool IsJunction(MachineKind kind) => kind is MachineKind.Splitter or MachineKind.Merger;
+
     public bool CanSendByBelt(MachineDef def) =>
-        AnySide(def.Kind) || def.Kind == MachineKind.Production && Content.Recipes[def.Recipe!].Outputs.Count > 0;
+        AnySide(def.Kind) || IsJunction(def.Kind) || def.Kind == MachineKind.Production && Content.Recipes[def.Recipe!].Outputs.Count > 0;
 
     public bool CanReceiveByBelt(MachineDef def) =>
-        AnySide(def.Kind) || def.Kind == MachineKind.Production && Content.Recipes[def.Recipe!].Inputs.Count > 0;
+        AnySide(def.Kind) || IsJunction(def.Kind) || def.Kind == MachineKind.Production && Content.Recipes[def.Recipe!].Inputs.Count > 0;
 
     /// <summary>
-    /// Puertos de una colocación. Producción: salida al frente; entrada detrás y, con menos prioridad, por los lados
+    /// Puertos de una colocación. Producción y unificador: salida al frente; entrada detrás y, con menos prioridad, por los lados
     /// (una fundición de dos celdas de ancho no recibiría cuatro cintas solo por detrás). Ver D-031.
+    /// Divisor: entrada detrás; salida al frente y por los lados. Con una celda de lado, cada cara admite una sola cinta.
     /// </summary>
     public IEnumerable<BeltPort> BeltPorts(int planet, string defId, int x, int z, int rot, bool output)
     {
@@ -56,7 +64,13 @@ public sealed partial class World
         for (var dir = 0; dir < 4; dir++)
         {
             var side = false;
-            if (!AnySide(def.Kind))
+            if (def.Kind == MachineKind.Splitter)
+            {
+                var back = dir == (front + 2) % 4;
+                if (output == back) continue;
+                side = output && dir != front;
+            }
+            else if (!AnySide(def.Kind))
             {
                 if (output && dir != front) continue;
                 if (!output && dir == front) continue;
@@ -146,6 +160,9 @@ public sealed partial class World
         _linkList = Links.Values.ToArray();
         _beltsOut.Clear();
         foreach (var group in _linkList.GroupBy(l => l.From)) _beltsOut[group.Key] = group.ToArray();
+        _beltsIn.Clear();
+        foreach (var group in _linkList.GroupBy(l => l.To)) _beltsIn[group.Key] = group.ToArray();
+        _junctionAccepts.Clear();
     }
 
     private void ReindexBelts()
@@ -350,11 +367,12 @@ public sealed partial class World
         var slots = l.Slots;
         var moved = false;
         var last = slots.Length - 1;
-        if (slots[last] is { } head && InputRoom(b, head) > 0)
+        if (slots[last] is { } head && InputRoom(b, head) > 0 && DeliveryTurn(l, b))
         {
             b.In.Add(head, 1);
             slots[last] = null;
             l.Load--;
+            l.DeliveredTurn = ++_deliveryTurn;
             DirtySimMachines.Add(b.Id);
             moved = true;
         }
@@ -372,6 +390,87 @@ public sealed partial class World
     }
 
     private Inventory BeltSource(Machine a) => Content.Machines[a.Def].Kind == MachineKind.Production ? a.Out : a.In;
+
+    /// <summary>Varias cintas hacia un unificador entregan por turnos: sin esto, la primera en procesarse dejaría sin paso a las demás.</summary>
+    private bool DeliveryTurn(Link l, Machine b)
+    {
+        if (!IsJunction(Content.Machines[b.Def].Kind) || !_beltsIn.TryGetValue(b.Id, out var ins) || ins.Length < 2) return true;
+        foreach (var other in ins)
+            if (other != l && other.DeliveredTurn < l.DeliveredTurn && other.Slots[^1] is { } waiting && InputRoom(b, waiting) > 0) return false;
+        return true;
+    }
+
+    /// <summary>
+    /// Regla de no atasco: lo que ya ninguna salida conectada puede aceptar vuelve al depósito, igual que al retirar una cinta.
+    /// Sin salidas se espera sin más: el jugador puede estar a medio conectar. Un objeto por tick, sin coste si no hay nada retenido.
+    /// </summary>
+    private void StepJunction(Machine m)
+    {
+        if (m.In.Kinds == 0 || !_beltsOut.ContainsKey(m.Id)) return;
+        string? stuck = null;
+        foreach (var kv in m.In.Items)
+        {
+            if (JunctionAccepts(m, kv.Key)) continue;
+            stuck = kv.Key;
+            break;
+        }
+        if (stuck == null || DepotOf(m.Planet) is not { } depot) return;
+        m.In.TryRemove(stuck, 1);
+        depot.In.Add(stuck, 1);
+        DirtySimMachines.Add(m.Id);
+        DirtySimMachines.Add(depot.Id);
+    }
+
+    private bool JunctionAccepts(Machine j, string item)
+    {
+        if (!_junctionAccepts.TryGetValue(j.Id, out var set))
+        {
+            set = ReachableInputs(j);
+            _junctionAccepts[j.Id] = set;
+        }
+        return set == null || set.Contains(item);
+    }
+
+    /// <summary>Lo que aceptan los destinos reales alcanzables; null si llega a un almacén o a una salida aún sin conectar.</summary>
+    private HashSet<string>? ReachableInputs(Machine start)
+    {
+        var accepted = new HashSet<string>(StringComparer.Ordinal);
+        var seen = new HashSet<int> { start.Id };
+        var pending = new Stack<int>();
+        pending.Push(start.Id);
+        while (pending.Count > 0)
+        {
+            if (!_beltsOut.TryGetValue(pending.Pop(), out var outs)) return null;
+            foreach (var o in outs)
+            {
+                if (!Machines.TryGetValue(o.To, out var to)) continue;
+                var def = Content.Machines[to.Def];
+                if (AnySide(def.Kind)) return null;
+                if (IsJunction(def.Kind))
+                {
+                    if (seen.Add(to.Id)) pending.Push(to.Id);
+                }
+                else if (def.Kind == MachineKind.Production)
+                {
+                    foreach (var input in Content.Recipes[def.Recipe!].Inputs.Keys) accepted.Add(input);
+                }
+            }
+        }
+        return accepted;
+    }
+
+    /// <summary>Hueco para un objeto contando lo que hay detrás de un divisor: su búfer mínimo no debe limitar una cinta larga de varios tipos.</summary>
+    private long ReachRoom(Machine b, string item, int depth = 0)
+    {
+        var room = InputRoom(b, item);
+        if (depth >= 3 || !IsJunction(Content.Machines[b.Def].Kind) || !_beltsOut.TryGetValue(b.Id, out var outs)) return room;
+        foreach (var o in outs)
+        {
+            if (!Machines.TryGetValue(o.To, out var to) || !AcceptsOnBelt(to, item)) continue;
+            room += Math.Max(0, ReachRoom(to, item, depth + 1) - OnBelt(o, item));
+        }
+        return room;
+    }
 
     private bool TryLoadBelt(Link l, Machine a, Machine b)
     {
@@ -417,9 +516,8 @@ public sealed partial class World
         var kinds = 0;
         foreach (var kv in source.Items)
         {
-            var room = InputRoom(b, kv.Key);
             if (!AcceptsOnBelt(b, kv.Key)) continue;
-            if (room - OnBelt(l, kv.Key) > 0) return kv.Key;
+            if (ReachRoom(b, kv.Key) - OnBelt(l, kv.Key) > 0) return kv.Key;
             only = kv.Key;
             kinds++;
         }
@@ -430,13 +528,14 @@ public sealed partial class World
     private bool AcceptsOnBelt(Machine b, string item)
     {
         var def = Content.Machines[b.Def];
+        if (IsJunction(def.Kind)) return JunctionAccepts(b, item);
         return AnySide(def.Kind) || def.Kind == MachineKind.Production && Content.Recipes[def.Recipe!].Inputs.ContainsKey(item);
     }
 
     private bool SingleLane(Machine b)
     {
         var def = Content.Machines[b.Def];
-        return AnySide(def.Kind) || def.Kind == MachineKind.Production && Content.Recipes[def.Recipe!].Inputs.Count == 1;
+        return AnySide(def.Kind) || IsJunction(def.Kind) || def.Kind == MachineKind.Production && Content.Recipes[def.Recipe!].Inputs.Count == 1;
     }
 
     private static long OnBelt(Link l, string item)

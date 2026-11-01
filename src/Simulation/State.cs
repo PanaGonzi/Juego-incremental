@@ -40,7 +40,7 @@ public sealed class Inventory
     public void Clear() => _items.Clear();
 }
 
-public enum MachineStatus : byte { Idle, Working, NoInput, OutputFull, NoPower, LowPower, Generating, Storing, Ready, Overheated, Cooling }
+public enum MachineStatus : byte { Idle, Working, NoInput, OutputFull, NoPower, LowPower, Generating, Storing, Ready, Overheated, Cooling, Passing }
 
 public sealed class Machine
 {
@@ -60,6 +60,8 @@ public sealed class Machine
     public bool AutoSell;
     public readonly SortedDictionary<string, long> Reserves = new(StringComparer.Ordinal);
     public int SellCooldown;
+    /// <summary>Solo en el servidor: ciclos completados en la ventana móvil. Derivado, no se guarda ni entra en firmas.</summary>
+    public RateWindow? Window;
 }
 
 /// <summary>Cinta abierta entre dos máquinas. Sin cuerpo físico: se puede pisar.</summary>
@@ -81,6 +83,8 @@ public sealed class Link
     public int Accum;
     /// <summary>Último turno servido al repartir entre varias salidas de una misma máquina.</summary>
     public long Turn;
+    /// <summary>Última entrega a un divisor o unificador compartido. Derivado: al cargar la partida el reparto vuelve a empezar.</summary>
+    public long DeliveredTurn;
     /// <summary>Huecos ocupados. Derivado de Slots.</summary>
     public int Load;
     /// <summary>Solo en el espejo del cliente: cuántas veces ha llegado carga nueva. La vista lo usa para corregir su copia.</summary>

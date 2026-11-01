@@ -4,7 +4,7 @@ namespace Pluton.Networking;
 
 public static class Protocol
 {
-    public const int Version = 6;
+    public const int Version = 7;
     public const string GameVersion = "0.4.1";
     public const int MaxPlayers = 12;
     public const int MaxClientPacket = 8192; // una ruta ocupa ~1 byte por tramo recto: miles de curvas caben
@@ -36,7 +36,7 @@ public enum MsgType : byte
     Hello = 1, Command = 2, Move = 3, ChatSend = 4, SaveRequest = 5,
     // Servidor a cliente
     Welcome = 20, Reject = 21, SnapshotChunk = 22, SnapshotDone = 23, Delta = 24, DeltaCompressed = 31,
-    Result = 25, Positions = 26, Chat = 27, Check = 28, Correct = 29, Notice = 30,
+    Result = 25, Positions = 26, Chat = 27, Check = 28, Correct = 29, Notice = 30, Rates = 32,
 }
 
 public static class CommandCodec

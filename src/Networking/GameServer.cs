@@ -53,6 +53,8 @@ public sealed class GameServer : IDisposable
     private readonly List<(int peer, long atMs)> _closing = new();
     private readonly PacketWriter _pw = new();
     private readonly MemoryStream _deltaStream = new();
+    private readonly List<(int id, int cycles, int seconds)> _rateChanges = new();
+    private long _rateSecond = -1;
     private readonly MemoryStream _compressed = new();
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private long _lastAutosaveMs;
@@ -367,7 +369,32 @@ public sealed class GameServer : IDisposable
         else if (World.Tick % _opt.FlushEveryTicks == 0) FlushDeltas();
         if (World.Tick % _opt.PositionsEveryTicks == 0) SendPositions();
         if (World.Tick % _opt.CheckEveryTicks == 0) SendCheck();
+        SendRates();
         Autosave();
+    }
+
+    /// <summary>Producción medida por máquina, una vez por segundo y solo lo que cambia. No está en la instantánea ni en la firma.</summary>
+    private void SendRates()
+    {
+        var second = World.Tick / World.Content.Balance.TicksPerSecond;
+        if (second == _rateSecond) return;
+        _rateSecond = second;
+        World.CollectRateChanges(_rateChanges);
+        if (_rateChanges.Count == 0) return;
+        WriteRates(_rateChanges);
+        SendAll(Channel.Reliable);
+    }
+
+    private void WriteRates(IReadOnlyCollection<(int id, int cycles, int seconds)> rates)
+    {
+        var w = _pw.Begin(MsgType.Rates);
+        w.Write7BitEncodedInt(rates.Count);
+        foreach (var (id, cycles, seconds) in rates)
+        {
+            w.Write7BitEncodedInt(id);
+            w.Write7BitEncodedInt(cycles);
+            w.Write((byte)seconds);
+        }
     }
 
     private void FlushDeltas(bool everything = false)
@@ -500,6 +527,11 @@ public sealed class GameServer : IDisposable
             w.Write(hash);
             _pw.Send(_transport, s.Peer, Channel.Reliable);
             s.Synced = true;
+            if (World.MeasuredRates.Count > 0)
+            {
+                WriteRates(World.MeasuredRates.Select(kv => (kv.Key, kv.Value.cycles, kv.Value.seconds)).ToList());
+                _pw.Send(_transport, s.Peer, Channel.Reliable);
+            }
             if (_opt.JoinNoticeKey.Length > 0)
             {
                 w = _pw.Begin(MsgType.Notice);

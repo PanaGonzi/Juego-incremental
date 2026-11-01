@@ -618,6 +618,8 @@ public sealed partial class World
             case MachineKind.Terminal:
             case MachineKind.Station:
             case MachineKind.CargoPad:
+            case MachineKind.Splitter:
+            case MachineKind.Merger:
                 return Math.Max(0, def.Capacity - m.In.Get(item));
             case MachineKind.Production:
                 var recipe = Content.Recipes[def.Recipe!];
@@ -899,6 +901,11 @@ public sealed partial class World
                 m.Status = MachineStatus.Storing;
                 if (m.AutoSell) StepAutoSell(m);
                 break;
+            case MachineKind.Splitter:
+            case MachineKind.Merger:
+                m.Status = MachineStatus.Passing;
+                StepJunction(m);
+                break;
             case MachineKind.Production:
                 StepProduction(m, def);
                 break;
@@ -955,6 +962,7 @@ public sealed partial class World
             m.Out.Add(item, qty);
             Bump("produced." + item, qty);
         }
+        RecordCycle(m);
         m.Processing = false;
         m.Progress = 0;
         DirtySimMachines.Add(m.Id);
