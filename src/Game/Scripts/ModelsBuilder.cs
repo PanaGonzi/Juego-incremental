@@ -500,7 +500,10 @@ public static partial class Models
             return this;
         }
 
-        /// <summary>Boca de carga en una cara ±Z: salida al frente (+Z), entrada atrás (−Z). Coincide con los puertos de cinta.</summary>
+        /// <summary>
+        /// Boca de carga en una cara ±Z: el modelo tiene su salida en +Z y su entrada en −Z. Los puertos de cinta salen por −Z
+        /// con Rot 0 (World.FrontDir); GameView.ModelYawDegrees da media vuelta a las máquinas de producción para que coincidan.
+        /// </summary>
         public Builder Port(float x, float z, bool output, float y = 0.62f)
         {
             var dir = z >= 0 ? 1f : -1f;
