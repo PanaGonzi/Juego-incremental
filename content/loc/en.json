@@ -152,7 +152,7 @@
   "belt_status_SourceIdle": "empty: the source isn't producing",
   "belt_status_SourceNoPower": "empty: the source has no power",
   "belt_load": "{0}/{1} slots · {2}/min",
-  "belt_preview": "{0} cells · {1} m · {2} supports · {3} ¤",
+  "belt_preview": "{0} cells · {1} m · {3} ¤",
   "belt_missing": "{0} ¤ short",
   "belt_alternative": "route {0}",
   "belt_tracing": "Tracing the route…",

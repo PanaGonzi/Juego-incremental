@@ -611,23 +611,29 @@ public static partial class Models
             case "chiller":
             {
                 b.Plinth(4, 6);
-                b.Box("panel", 0, 1.1f, 0, 3.1f, 1.75f, 4.8f);
-                b.Seams(0, 1.1f, 0, 3.1f, 1.75f, 4.8f);
-                for (var i = 0; i < 3; i++)
+                b.Box("panel", 0, 0.92f, 0.9f, 3.1f, 1.35f, 2.9f);
+                b.Seams(0, 0.92f, 0.9f, 3.1f, 1.35f, 2.9f);
+                b.Louvers("steel_dark", 0, 0.95f, 2.37f, 2.5f, 0.9f, 6);
+                // Condensador: depósito vertical con escarcha y serpentín de cobre a la vista.
+                b.Lathe("chrome", -0.75f, 0.6f, -1.35f, new[] { (0f, 0f), (0.72f, 0f), (0.78f, 0.12f), (0.78f, 2.5f), (0.5f, 3f), (0f, 3.08f) }, 16);
+                foreach (var y in new[] { 1.15f, 2.05f, 2.95f }) b.Cyl("cyan", -0.75f, y, -1.35f, 0.8f, 0.09f, sides: 16);
+                var coil = new List<Vector3>();
+                for (var i = 0; i <= 28; i++)
                 {
-                    b.Lathe("chrome", -0.9f + i * 0.9f, 2f, -1f, new[] { (0f, 0f), (0.34f, 0f), (0.38f, 0.1f), (0.38f, 1.3f), (0.2f, 1.6f), (0f, 1.62f) }, 14);
-                    b.Cyl("cyan", -0.9f + i * 0.9f, 2.7f, -1f, 0.4f, 0.1f, sides: 14);
+                    var angle = i * 0.62f;
+                    coil.Add(new Vector3(0.75f + Mathf.Cos(angle) * 0.42f, 0.75f + i * 0.082f, -1.35f + Mathf.Sin(angle) * 0.42f));
                 }
-                b.Louvers("steel_dark", 0, 1.1f, 2.42f, 2.5f, 1f, 6);
-                b.Tube("copper", 0.05f, 8, new Vector3(-0.9f, 3.5f, -1f), new Vector3(-0.9f, 3.75f, -0.4f), new Vector3(0.9f, 3.75f, -0.4f), new Vector3(0.9f, 3.5f, -1f));
-                b.Cyl("steel_dark", 0, 2.02f, 1.2f, 1f, 0.12f, sides: 18);
+                b.Tube("copper", 0.05f, 6, coil.ToArray());
+                b.Tube("copper", 0.07f, 8, new Vector3(-0.75f, 3.7f, -1.35f), new Vector3(-0.75f, 3.95f, -0.6f), new Vector3(0.75f, 3.95f, -0.6f), coil[^1]);
+                // Ventilador carenado: se ve girar cuando la máquina trabaja.
+                b.Lathe("steel_dark", 0, 1.6f, 1.05f, new[] { (0.98f, 0f), (1.16f, 0f), (1.16f, 0.34f), (0.98f, 0.34f) }, 22);
                 b.Port(0, 2.96f, true);
                 b.Port(0, -2.96f, false);
-                m.Rotor = new Builder().Box("steel", 0, 0, 0, 1.7f, 0.02f, 0.22f, roll: 12, bevel: 0).Box("steel", 0, 0, 0, 0.22f, 0.02f, 1.7f, pitch: 12, bevel: 0).Cyl("cyan", 0, 0, 0, 0.1f, 0.06f, sides: 8).Commit();
-                m.RotorPos = new Vector3(0, 2.13f, 1.2f);
+                m.Rotor = new Builder().Box("steel", 0, 0, 0, 1.85f, 0.02f, 0.26f, roll: 12, bevel: 0).Box("steel", 0, 0, 0, 0.26f, 0.02f, 1.85f, pitch: 12, bevel: 0).Cyl("cyan", 0, 0, 0, 0.12f, 0.08f, sides: 8).Commit();
+                m.RotorPos = new Vector3(0, 1.76f, 1.05f);
                 m.RotorSpeed = 6f;
-                m.Height = 3.8f;
-                m.LampPos = new Vector3(1.3f, 2.1f, 2.28f);
+                m.Height = 4.1f;
+                m.LampPos = new Vector3(1.3f, 1.72f, 2.28f);
                 m.GlowPos = new Vector3(0, 2.4f, 0);
                 m.GlowColor = new Color(0.4f, 0.85f, 1f);
                 break;
@@ -635,21 +641,38 @@ public static partial class Models
             case "wafer_refinery":
             {
                 b.Plinth(6, 6);
-                b.Box("cream", 0, 1.3f, 0, 5f, 2.15f, 5f);
-                b.Seams(0, 1.3f, 0, 5f, 2.15f, 5f);
-                for (var i = 0; i < 3; i++)
+                // Sala limpia baja con ventana del proceso y, detrás, horno de difusión de tubos verticales con su chimenea.
+                b.Box("cream", -0.55f, 0.95f, 0.65f, 3.9f, 1.45f, 3.5f);
+                b.Seams(-0.55f, 0.95f, 0.65f, 3.9f, 1.45f, 3.5f);
+                b.Box("steel_dark", -0.55f, 1.15f, 2.42f, 3.1f, 0.8f, 0.05f);
+                b.Box("heat", -0.55f, 1.15f, 2.46f, 2.8f, 0.58f, 0.012f, bevel: 0);
+                for (var i = -3; i <= 3; i++) b.Box("steel_dark", -0.55f + i * 0.4f, 1.15f, 2.49f, 0.04f, 0.62f, 0.03f, bevel: 0);
+                foreach (var (x, z) in new[] { (-1.55f, -1.75f), (-0.45f, -1.75f), (0.65f, -1.75f) })
                 {
-                    b.Lathe("chrome", -1.6f + i * 1.6f, 2.4f, -0.9f, new[] { (0.45f, 0f), (0.48f, 0.04f), (0.48f, 1f), (0.3f, 1.22f), (0f, 1.26f) }, 14);
-                    b.Cyl("cyan", -1.6f + i * 1.6f, 2.84f, -0.9f, 0.5f, 0.08f, sides: 14);
+                    b.Lathe("chrome", x, 0.5f, z, new[] { (0.46f, 0f), (0.5f, 0.06f), (0.5f, 3.1f), (0.32f, 3.38f), (0f, 3.44f) }, 14);
+                    b.Cyl("cyan", x, 3.1f, z, 0.52f, 0.08f, sides: 14);
+                    b.Cyl("steel_dark", x, 1.4f, z, 0.53f, 0.1f, sides: 14);
                 }
-                b.Box("steel_dark", 0, 1.6f, 2.52f, 3.5f, 1.1f, 0.06f);
-                b.Box("heat", 0, 1.6f, 2.56f, 3.2f, 0.82f, 0.012f, bevel: 0);
-                for (var i = -4; i <= 4; i++) b.Box("steel_dark", i * 0.4f, 1.6f, 2.585f, 0.04f, 0.86f, 0.03f, bevel: 0);
+                b.Beam("steel_dark", new Vector3(-2.05f, 2.95f, -1.75f), new Vector3(1.15f, 2.95f, -1.75f), 0.14f, 0.14f);
+                b.Lathe("steel_dark", 1.95f, 0.45f, -1.45f, new[] { (0f, 0f), (0.72f, 0f), (0.72f, 1.25f), (0.3f, 1.85f), (0.26f, 4.65f), (0.34f, 4.7f), (0.34f, 4.85f), (0f, 4.85f) }, 12);
+                b.Tube("copper", 0.07f, 8, new Vector3(0.65f, 2.95f, -1.75f), new Vector3(1.3f, 2.95f, -1.6f), new Vector3(1.7f, 2.5f, -1.45f));
+                // Estante de obleas al lado del brazo.
+                b.Box("steel_dark", 1.95f, 0.95f, 1f, 1.1f, 1.45f, 1.5f);
+                for (var i = 0; i < 4; i++) b.Cyl("cyan", 1.95f, 0.5f + i * 0.33f, 1f, 0.42f, 0.04f, sides: 12);
+                b.Cyl("steel_dark", -0.55f, 1.74f, 0.45f, 0.5f, 0.16f, sides: 14);
                 b.Port(0, 2.96f, true);
                 b.Port(0, -2.96f, false);
-                m.Height = 3.7f;
-                m.LampPos = new Vector3(2.15f, 2.4f, 2.56f);
-                m.GlowPos = new Vector3(0, 2, 3.4f);
+                // Brazo que lleva obleas: gira mientras trabaja.
+                m.Rotor = new Builder()
+                    .Beam("steel", new Vector3(0, 0.08f, 0), new Vector3(1.25f, 0.34f, 0), 0.14f, 0.14f)
+                    .Beam("steel", new Vector3(1.25f, 0.34f, 0), new Vector3(1.25f, 0.06f, 0.5f), 0.1f, 0.1f)
+                    .Cyl("cyan", 1.25f, 0.03f, 0.55f, 0.28f, 0.03f, sides: 12)
+                    .Commit();
+                m.RotorPos = new Vector3(-0.55f, 1.82f, 0.45f);
+                m.RotorSpeed = 1.3f;
+                m.Height = 5.3f;
+                m.LampPos = new Vector3(-2.5f, 1.72f, 2.5f);
+                m.GlowPos = new Vector3(-0.55f, 2, 3.4f);
                 break;
             }
             case "nav_fab":
@@ -677,18 +700,35 @@ public static partial class Models
             case "cryo_radiator":
             {
                 var depth = def == "radiator" ? 4f : 6f;
+                var cryoFins = def != "radiator";
                 b.Plinth(4, depth);
-                b.Box("hull", 0, 0.62f, 0, 3.15f, 0.72f, depth - 0.85f);
-                var rows = def == "radiator" ? 3 : 5;
-                for (var i = -rows; i <= rows; i++)
+                b.Box("hull", 0, 0.5f, 0, 3.15f, 0.5f, depth - 0.85f);
+                var fin = cryoFins ? "chrome" : "steel";
+                var tip = cryoFins ? "cyan" : "signal";
+                var rows = cryoFins ? 7 : 4;
+                var span = (depth - 1.1f) / 2;
+                foreach (var side in new[] { -1f, 1f })
                 {
-                    b.Box(def == "radiator" ? "steel" : "chrome", 0, 2.12f, i * 0.42f, 3.15f, 2.3f, 0.06f);
-                    b.Box(def == "radiator" ? "signal" : "cyan", 1.6f, 3.2f, i * 0.42f, 0.04f, 0.14f, 0.1f, bevel: 0);
+                    // Cada aleta va inclinada hacia fuera; entre ellas se ve el aire.
+                    for (var i = -rows; i <= rows; i++)
+                    {
+                        var z = span * i / (float)rows;
+                        b.Box(fin, side * 0.82f, 1.95f, z, 0.06f, 2.3f, 0.2f, roll: side * -22, bevel: 0);
+                    }
+                    b.Beam("copper", new Vector3(side * 0.42f, 0.82f, -span - 0.1f), new Vector3(side * 0.42f, 0.82f, span + 0.1f), 0.13f, 0.13f);
+                    b.Beam("copper", new Vector3(side * 1.25f, 3.03f, -span - 0.1f), new Vector3(side * 1.25f, 3.03f, span + 0.1f), 0.11f, 0.11f);
+                    b.Beam(tip, new Vector3(side * 1.25f, 3.16f, -span), new Vector3(side * 1.25f, 3.16f, span), 0.05f, 0.05f);
+                    foreach (var end in new[] { -1f, 1f })
+                        b.Beam("steel_dark", new Vector3(side * 0.3f, 0.75f, end * (span + 0.14f)), new Vector3(side * 1.36f, 3.1f, end * (span + 0.14f)), 0.1f, 0.1f);
                 }
-                b.Beam("copper", new Vector3(-1.48f, 1.02f, -rows * 0.46f), new Vector3(-1.48f, 1.02f, rows * 0.46f), 0.12f, 0.12f);
-                b.Beam("copper", new Vector3(1.48f, 3.15f, -rows * 0.46f), new Vector3(1.48f, 3.15f, rows * 0.46f), 0.12f, 0.12f);
+                // Colector central y ventilador: se ve girar mientras disipa.
+                b.Lathe("steel_dark", 0, 2.25f, 0, new[] { (0f, 0f), (0.42f, 0f), (0.42f, 0.14f), (0.14f, 0.2f), (0f, 0.2f) }, 12);
+                b.Beam("steel_dark", new Vector3(0, 0.75f, 0), new Vector3(0, 2.25f, 0), 0.18f, 0.18f);
+                m.Rotor = new Builder().Box("steel", 0, 0, 0, 1.4f, 0.02f, 0.2f, roll: 14, bevel: 0).Box("steel", 0, 0, 0, 0.2f, 0.02f, 1.4f, pitch: 14, bevel: 0).Commit();
+                m.RotorPos = new Vector3(0, 2.5f, 0);
+                m.RotorSpeed = 5f;
                 m.Height = 3.4f;
-                m.LampPos = new Vector3(1.5f, 1.1f, depth / 2 - 0.48f);
+                m.LampPos = new Vector3(1.45f, 0.86f, depth / 2 - 0.48f);
                 break;
             }
             case "cargo_pad":
@@ -741,8 +781,22 @@ public static partial class Models
             case "splitter":
             case "merger":
                 Junction(b, def == "splitter");
-                m.Height = 1.5f;
-                m.LampPos = new Vector3(0.62f, 1.05f, 0.62f);
+                if (def == "splitter")
+                {
+                    // Paleta desviadora que reparte a cada salida: gira mientras pasa material.
+                    b.Cyl("steel_dark", 0, 1.2f, 0, 0.3f, 0.1f, sides: 12);
+                    m.Rotor = new Builder().Box("amber", 0, 0, 0, 0.92f, 0.16f, 0.12f).Box("signal", 0.38f, 0, 0, 0.16f, 0.2f, 0.26f).Commit();
+                    m.RotorPos = new Vector3(0, 1.34f, 0);
+                    m.RotorSpeed = 3f;
+                }
+                else
+                {
+                    // Tolva de embudo: lo que entra por tres lados cae a una sola salida.
+                    b.Lathe("chrome", 0, 1.14f, 0, new[] { (0.16f, 0f), (0.2f, 0.02f), (0.56f, 0.4f), (0.6f, 0.46f), (0.52f, 0.46f), (0.16f, 0.08f) }, 16);
+                    b.Cyl("cyan", 0, 1.56f, 0, 0.61f, 0.05f, sides: 16);
+                }
+                m.Height = 1.7f;
+                m.LampPos = new Vector3(0.68f, 1.18f, 0.68f);
                 break;
             case "storage_crate":
             {
@@ -1096,7 +1150,7 @@ public static partial class Models
                 Quad(-0.3f, 0, 0.08f, 0.66f);
                 Quad(0.3f, 0, 0.08f, 0.66f);
                 Quad(0, 0, 0.36f, 0.36f);
-                material = IconWarn;
+                material = IconBad;
                 break;
             case Pluton.Simulation.MachineStatus.NoInput:
                 // Tres puntos: esperando material
@@ -1119,20 +1173,39 @@ public static partial class Models
     {
         const string key = "lamp";
         if (DebrisCache.TryGetValue(key, out var mesh)) return mesh;
-        var q = new SphereMesh { Radius = 0.075f, Height = 0.15f, RadialSegments = 8, Rings = 4 };
+        var q = new SphereMesh { Radius = 0.15f, Height = 0.3f, RadialSegments = 10, Rings = 5 };
         var a = new ArrayMesh();
         a.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, q.GetMeshArrays());
         DebrisCache[key] = a;
         return a;
     }
 
-    /// <summary>Material del piloto según estado: verde en marcha, ámbar a la espera, rojo parada.</summary>
-    public static StandardMaterial3D LampState(Pluton.Simulation.MachineStatus status) => status switch
+    /// <summary>Cómo se lee una máquina de lejos. El ritmo distingue los estados también sin ver el color.</summary>
+    public enum MachineMood { Running, Waiting, Blocked }
+
+    public static MachineMood Mood(Pluton.Simulation.MachineStatus status) => status switch
     {
-        Pluton.Simulation.MachineStatus.Working or Pluton.Simulation.MachineStatus.Generating or Pluton.Simulation.MachineStatus.Cooling or Pluton.Simulation.MachineStatus.Storing or Pluton.Simulation.MachineStatus.Passing or Pluton.Simulation.MachineStatus.Ready => Materials.Lamp("green"),
-        Pluton.Simulation.MachineStatus.NoPower or Pluton.Simulation.MachineStatus.Overheated or Pluton.Simulation.MachineStatus.LowPower => Materials.Lamp("red"),
-        _ => Materials.Lamp("amber"),
+        Pluton.Simulation.MachineStatus.Working or Pluton.Simulation.MachineStatus.Generating or Pluton.Simulation.MachineStatus.Cooling or Pluton.Simulation.MachineStatus.Storing or Pluton.Simulation.MachineStatus.Passing or Pluton.Simulation.MachineStatus.Ready => MachineMood.Running,
+        Pluton.Simulation.MachineStatus.NoPower or Pluton.Simulation.MachineStatus.Overheated or Pluton.Simulation.MachineStatus.LowPower or Pluton.Simulation.MachineStatus.OutputFull => MachineMood.Blocked,
+        _ => MachineMood.Waiting,
     };
+
+    private static StandardMaterial3D? _lampWaiting, _lampBlocked;
+
+    /// <summary>Material del piloto: verde fijo si funciona, ámbar lento si espera materiales, rojo más rápido si está bloqueada.</summary>
+    public static StandardMaterial3D LampState(Pluton.Simulation.MachineStatus status) => Mood(status) switch
+    {
+        MachineMood.Running => Materials.Lamp("green"),
+        MachineMood.Blocked => _lampBlocked ??= (StandardMaterial3D)Materials.Lamp("red").Duplicate(),
+        _ => _lampWaiting ??= (StandardMaterial3D)Materials.Lamp("amber").Duplicate(),
+    };
+
+    /// <summary>Un solo cambio por fotograma en dos materiales compartidos, sea cual sea el número de máquinas. Con «Reducir efectos», fijos.</summary>
+    public static void AnimateLamps(float time, bool calm)
+    {
+        if (_lampWaiting != null) _lampWaiting.EmissionEnergyMultiplier = calm ? 2.4f : 0.7f + 2.6f * (0.5f + 0.5f * Mathf.Sin(time * Mathf.Tau * 0.4f));
+        if (_lampBlocked != null) _lampBlocked.EmissionEnergyMultiplier = calm ? 3.4f : 0.8f + 4f * (0.5f + 0.5f * Mathf.Sin(time * Mathf.Tau));
+    }
 
     /// <summary>Decoración del evento: calabazas talladas y faroles. Sin colisión ni efecto en la economía.</summary>
     public static ArrayMesh HalloweenDecor()

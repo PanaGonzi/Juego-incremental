@@ -1069,6 +1069,8 @@ public partial class GameView : Node3D
     public ChainOverlay ChainForTest => _chain;
     public Vector3 TrainShownForTest(int id) => _trains.TryGetValue(id, out var node) ? node.LocoShown : Vector3.Zero;
     public ChainTag ChainTagForTest { get; private set; } = null!;
+    public Material? LampForTest(int id) => _machines.TryGetValue(id, out var node) ? node.Lamp.MaterialOverride : null;
+    public bool RotorTurnsForTest(int id) => _machines.TryGetValue(id, out var node) && node.Rotor != null;
     public Rect2 HudSafeArea => _hud.SafeArea();
     public Rect2 ObjectiveRect => _hud.ObjectiveRect;
     public LookReadout LookForTest => _hud.Look;
@@ -1601,9 +1603,10 @@ public partial class GameView : Node3D
     private void AnimateMachines(float delta)
     {
         var t = (float)_time;
+        Models.AnimateLamps(t, Scenery.Calm);
         foreach (var node in _machines.Values)
         {
-            var running = node.Status is MachineStatus.Working or MachineStatus.LowPower or MachineStatus.Overheated or MachineStatus.Generating or MachineStatus.Storing;
+            var running = node.Status is MachineStatus.Working or MachineStatus.LowPower or MachineStatus.Overheated or MachineStatus.Generating or MachineStatus.Storing or MachineStatus.Cooling or MachineStatus.Passing;
             if (node.Rotor != null && running) node.Rotor.RotateObjectLocal(node.RotorAxis, delta * node.RotorSpeed);
             if (node.Piston != null)
             {

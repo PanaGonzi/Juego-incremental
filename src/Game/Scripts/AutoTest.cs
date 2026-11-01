@@ -235,6 +235,10 @@ public partial class AutoTest : Node
             {
                 _main.StartSession(GameSession.Local(_main, RailWorld(), "autotest-rail", null, _main.Prefs));
             }
+            else if (_args.GetValueOrDefault("scenario") == "gallery")
+            {
+                _main.StartSession(GameSession.Local(_main, GalleryWorld(), "autotest-gallery", null, _main.Prefs));
+            }
             else if (_args.GetValueOrDefault("scenario") == "belts")
             {
                 _main.StartSession(GameSession.Local(_main, BeltWorld(), "autotest-belts", null, _main.Prefs));
@@ -312,6 +316,7 @@ public partial class AutoTest : Node
             else if (_args.GetValueOrDefault("scenario") == "coopfactory") await CoopFactoryScenario();
             else if (_args.GetValueOrDefault("scenario") == "rail") await RailScenario();
             else if (_args.GetValueOrDefault("scenario") == "belts") await BeltScenario();
+            else if (_args.GetValueOrDefault("scenario") == "gallery") await GalleryScenario();
             else if (_args.GetValueOrDefault("scenario") == "build") await BuildScenario();
             else if (_args.GetValueOrDefault("scenario") == "beltsv4") await BeltMigrationScenario();
             else if (_args.GetValueOrDefault("scenario") == "beltslong") await BeltLongScenario();
@@ -1331,6 +1336,111 @@ public partial class AutoTest : Node
         Check(!v.ChainForTest.Active && v.ChainForTest.ChevronCount == 0, "la segunda pulsación apaga el resaltado");
 
         await BeltEditChecks(crate, splitter);
+    }
+
+    private static readonly string[] GalleryProduction = { "recycler", "smelter", "assembler", "chiller", "cryo_assembler", "wafer_refinery", "nav_fab" };
+    private static readonly string[] GallerySingle = { "storage_crate", "rtg_generator", "radiator", "cryo_radiator", "cargo_pad", "splitter", "merger", "station" };
+    private const int GalleryX = -80;
+
+    /// <summary>Todas las máquinas con la misma cámara: cada una de producción en sus tres estados, para capturas comparables.</summary>
+    private World GalleryWorld()
+    {
+        var world = World.CreateNew(ContentDb.Load(ContentDb.LocateDirectory()));
+        foreach (var d in world.DebrisById.Values.ToList()) world.DebrisById.Remove(d.Id);
+        foreach (var u in world.Content.Upgrades.Keys.Where(u => u.StartsWith("tech_", StringComparison.Ordinal))) world.Upgrades.Add(u);
+        world.Credits = 10_000_000;
+        var depot = world.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
+        foreach (var item in world.Content.Items.Keys) depot.In.Add(item, 100_000);
+        world.Reindex();
+        var builder = new PlayerState { Key = "stage", Name = "stage", Role = Role.Owner };
+        world.Players[builder.Key] = builder;
+        void Place(string def, int x, int z)
+        {
+            builder.X = x * 2f;
+            builder.Z = z * 2f;
+            var result = world.Apply(builder, new Command { Type = CommandType.Place, Text = def, A = x, B = z });
+            if (!result.Ok) Log($"galería: {def} en {x},{z}: {result.Error}");
+        }
+        for (var i = 0; i < GalleryProduction.Length; i++)
+            for (var k = 0; k < 3; k++) Place(GalleryProduction[i], GalleryX + k * 8, -80 + i * 12);
+        for (var i = 0; i < GallerySingle.Length; i++) Place(GallerySingle[i], GalleryX + 30 + i % 3 * 12, -80 + i / 3 * 14);
+        for (var i = 0; i < 18; i++) Place("rtg_generator", GalleryX + 70 + i % 6 * 4, -80 + i / 6 * 4);
+        for (var i = 0; i < 12; i++) Place("radiator", GalleryX + 70 + i % 6 * 4, -60 + i / 6 * 6);
+        foreach (var n in world.Nodes.Values) n.Revealed = true;
+        foreach (var def in world.Content.Machines.Values.Where(d => d.Node != null).ToList())
+        {
+            var node = world.Nodes.Values.FirstOrDefault(n => n.Planet == 0 && n.Item == def.Node && n.OccupiedBy < 0);
+            if (node != null) Place(def.Id, node.X, node.Z);
+        }
+        world.Players.Remove(builder.Key);
+        world.ClearReplicationState();
+        foreach (var row in GalleryProduction)
+        {
+            var three = world.Machines.Values.Where(m => m.Def == row && m.X < GalleryX + 30).OrderBy(m => m.X).ToArray();
+            if (three.Length != 3) continue;
+            var recipe = world.Content.Recipes[world.Content.Machines[row].Recipe!];
+            // Izquierda: sin material. Centro: trabajando. Derecha: salida bloqueada.
+            foreach (var (item, qty) in recipe.Inputs)
+            {
+                three[1].In.Add(item, qty * 1000);
+                three[2].In.Add(item, qty * 1000);
+            }
+            foreach (var item in recipe.Outputs.Keys) three[2].Out.Add(item, 100_000);
+        }
+        world.Reindex();
+        return world;
+    }
+
+    private async Task GalleryScenario()
+    {
+        var v = _view!;
+        var client = v.Session.Client;
+        await Wait(2);
+        foreach (var row in GalleryProduction)
+        {
+            var three = W.Machines.Values.Where(m => m.Def == row && m.X < GalleryX + 30).OrderBy(m => m.X).ToArray();
+            if (three.Length != 3)
+            {
+                Log($"galería: {row} sin colocar");
+                continue;
+            }
+            var center = CenterOf(three[1]);
+            // La del centro sigue trabajando si se le saca lo producido: se hace con la orden normal.
+            var made = W.Content.Recipes[W.Content.Machines[row].Recipe!].Outputs.Keys.First();
+            await UseOn(three[1], () => client.Send(new Command { Type = CommandType.Extract, A = three[1].Id, Text = made }));
+            await WalkTo(center + new Vector3(0, -1.2f, 22), 20);
+            v.AimAt(center + new Vector3(0, 0.5f, 0));
+            await Wait(1.5);
+            var left = W.Machines[three[0].Id].Status;
+            var mid = W.Machines[three[1].Id].Status;
+            var right = W.Machines[three[2].Id].Status;
+            Check(left == MachineStatus.NoInput && mid == MachineStatus.Working && right == MachineStatus.OutputFull, $"{row}: {left} / {mid} / {right}");
+            var lamps = new[] { v.LampForTest(three[0].Id), v.LampForTest(three[1].Id), v.LampForTest(three[2].Id) };
+            Check(lamps[0] != lamps[1] && lamps[1] != lamps[2] && lamps[0] != lamps[2], $"{row}: un piloto distinto para cada estado");
+            await Shot("galeria_" + row);
+        }
+        foreach (var def in GallerySingle.Concat(new[] { "ore_extractor", "ice_extractor", "silicon_extractor", "depot", "export_terminal", "aux_core" }))
+        {
+            var machine = W.Machines.Values.FirstOrDefault(m => m.Def == def && m.Planet == 0);
+            if (machine == null)
+            {
+                Log($"galería: {def} sin colocar");
+                continue;
+            }
+            var center = CenterOf(machine);
+            var size = Mathf.Max(W.Content.Machines[def].W, W.Content.Machines[def].D) * 2f;
+            await WalkTo(center + new Vector3(size * 0.8f, -1.2f, size + 5f), 20);
+            v.AimAt(center);
+            await Wait(1.2);
+            await Shot("galeria_" + def);
+        }
+        foreach (var def in W.Content.Machines.Keys)
+        {
+            var model = Models.Machine(def);
+            var triangles = model.Body.GetFaces().Length / 3 + (model.Rotor?.GetFaces().Length ?? 0) / 3 + (model.Piston?.GetFaces().Length ?? 0) / 3;
+            Log($"triángulos {def}: {triangles}");
+        }
+        Log("galería completa");
     }
 
     /// <summary>Corrige una fábrica en marcha: divisor insertado en una cinta cargada y máquina movida con el fantasma.</summary>

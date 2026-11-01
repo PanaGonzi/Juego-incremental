@@ -151,7 +151,7 @@
   "belt_status_SourceIdle": "vacía: el origen no produce",
   "belt_status_SourceNoPower": "vacía: el origen no tiene energía",
   "belt_load": "{0}/{1} huecos · {2}/min",
-  "belt_preview": "{0} celdas · {1} m · {2} soportes · {3} ¤",
+  "belt_preview": "{0} celdas · {1} m · {3} ¤",
   "belt_missing": "faltan {0} ¤",
   "belt_alternative": "ruta {0}",
   "belt_tracing": "Trazando la ruta…",

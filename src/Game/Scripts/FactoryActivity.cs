@@ -62,7 +62,8 @@ public partial class FactoryActivity : Node3D
     private static (Puff kind, Vector3 at) VentOf(string def, float height) => def switch
     {
         "smelter" => (Puff.Smoke, new Vector3(0.55f, 5.35f, -0.85f)),
-        "wafer_refinery" or "nav_fab" => (Puff.Smoke, new Vector3(0, height + 0.1f, 0)),
+        "wafer_refinery" => (Puff.Smoke, new Vector3(1.95f, 5.35f, -1.45f)),
+        "nav_fab" => (Puff.Smoke, new Vector3(0, height + 0.1f, 0)),
         "chiller" or "radiator" or "cryo_radiator" or "cryo_assembler" => (Puff.Steam, new Vector3(0, height + 0.05f, 0)),
         "assembler" => (Puff.Steam, new Vector3(0.6f, height + 0.05f, 0)),
         "recycler" => (Puff.Dust, new Vector3(0, height, 0)),
