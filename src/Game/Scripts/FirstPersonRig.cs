@@ -9,7 +9,7 @@ public enum ImpactKind { Scrap, Ice, Rock }
 /// <summary>Materiales de brazos y herramienta. La versión de primera persona usa su propio FOV y se acerca a la cámara para no atravesar el mundo.</summary>
 internal sealed class RigMaterials
 {
-    public const float ViewFov = 56f;
+    public const float ViewFov = 66f;
     public const float ClipScale = 0.42f;
 
     private static RigMaterials? _view, _world;

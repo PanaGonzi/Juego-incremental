@@ -1377,9 +1377,9 @@ public partial class GameView : Node3D
         render_mode unshaded, blend_add, depth_draw_never, cull_back, shadows_disabled;
         uniform vec3 tint = vec3(1.0, 0.67, 0.25);
         void fragment(){
-          float rim = pow(1.0 - clamp(abs(dot(NORMAL, VIEW)), 0.0, 1.0), 2.2);
+          float rim = pow(1.0 - clamp(abs(dot(NORMAL, VIEW)), 0.0, 1.0), 4.0);
           ALBEDO = tint;
-          ALPHA = rim * 0.3 + 0.015 + 0.01 * sin(TIME * 5.0);
+          ALPHA = rim * 0.35 + 0.004 + 0.003 * sin(TIME * 5.0);
         }
         """ } };
 

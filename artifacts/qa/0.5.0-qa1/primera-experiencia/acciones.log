@@ -1,0 +1,26 @@
+05:10:23.327 start C:\Users\gonza\Desktop\Juego incremental\builds\alpha-0.5.0-qa1\client\Pluton.exe perfil=test-qa1 1600x900 pantalla=\\.\DISPLAY1
+05:10:23.895 wait 2000
+05:10:26.018 shot artifacts\qa\0.5.0-qa1\primera-experiencia\01.png 1280
+05:10:28.087 FOCO PERDIDO no se pudo activar la ventana del juego
+05:10:31.940 wait 2000
+05:10:34.097 info
+05:10:34.213 shot artifacts\qa\0.5.0-qa1\primera-experiencia\01.png 1280
+05:10:36.273 FOCO PERDIDO no se pudo activar la ventana del juego
+05:11:02.455 info
+05:11:02.625 move 800 450
+05:11:04.672 FOCO PERDIDO no se pudo activar la ventana del juego
+05:11:04.823 shot artifacts\qa\0.5.0-qa1\primera-experiencia\01.png 1280
+05:11:06.868 FOCO PERDIDO no se pudo activar la ventana del juego
+05:11:11.871 stop
+05:14:53.301 start C:\Users\gonza\Desktop\Juego incremental\builds\alpha-0.5.0-qa1\client\Pluton.exe perfil=test-qa1 1600x900 pantalla=\\.\DISPLAY1
+05:15:06.604 info
+05:15:06.793 shot artifacts\qa\0.5.0-qa1\primera-experiencia\01.png 1280
+05:15:08.831 FOCO PERDIDO no se pudo activar la ventana del juego
+05:15:19.371 shot artifacts\qa\0.5.0-qa1\primera-experiencia\01.png 1280
+05:15:21.403 FOCO PERDIDO no se pudo activar la ventana del juego
+05:24:29.474 shot artifacts\qa\0.5.0-qa1\primera-experiencia\01.png 1280
+05:24:31.540 FOCO PERDIDO no se pudo activar la ventana del juego
+05:24:38.909 info
+05:24:39.065 shot artifacts\qa\0.5.0-qa1\primera-experiencia\01.png 1280
+05:24:41.133 FOCO PERDIDO no se pudo activar la ventana del juego
+05:24:52.806 stop
