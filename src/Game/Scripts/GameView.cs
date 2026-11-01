@@ -42,6 +42,7 @@ public partial class GameView : Node3D
     private readonly Dictionary<int, MachineNode> _machines = new();
     private readonly Dictionary<int, MeshInstance3D> _debris = new();
     public readonly BeltView Belts = new();
+    private readonly ChainOverlay _chain = new();
     private readonly Dictionary<int, MeshInstance3D> _nodes = new();
     private readonly Dictionary<int, RemotePlayer> _remote = new();
     private readonly Dictionary<int, MeshInstance3D> _rails = new();
@@ -178,6 +179,8 @@ public partial class GameView : Node3D
         BuildEnvironment();
         BuildPlayer();
         AddChild(Belts);
+        AddChild(_chain);
+        _chain.LimitChanged += text => _hud.Toast(text, Ui.Warn);
         _hotbarEntries = HotbarLayout.Normalize(_main.Prefs.Hotbar);
         AddChild(new MachineThumbnails());
         var layer = new CanvasLayer();
@@ -936,11 +939,29 @@ public partial class GameView : Node3D
         {
             if (_aim.kind == "machine") _hud.OpenMachine(_aim.id);
         }
+        else if (e.IsActionPressed("chain_trace"))
+        {
+            // Una segunda pulsación apaga, se apunte a donde se apunte.
+            if (_chain.Active) _chain.Clear();
+            else if (_aim.kind == "machine") ToggleChain(_aim.id);
+        }
         else if (e.IsActionPressed("primary"))
         {
             if (_tool != Tool.Cutter) Primary();
         }
         else if (e.IsActionPressed("secondary")) Cancel();
+    }
+
+    public int ChainSeed => _chain.Seed;
+    public ChainOverlay ChainForTest => _chain;
+    public LookReadout LookForTest => _hud.Look;
+    public void OpenMachineForTest(int id) => _hud.OpenMachine(id);
+
+    /// <summary>Enciende el resaltado de la cadena de una máquina; sobre la misma máquina, lo apaga.</summary>
+    public void ToggleChain(int machine)
+    {
+        if (_chain.Seed == machine) _chain.Clear();
+        else _chain.Follow(Session.Client.World!, machine);
     }
 
     /// <summary>Clic derecho: primero anula el paso en curso; si no lo hay, vuelve a la multiherramienta.</summary>
@@ -1668,11 +1689,14 @@ public partial class GameView : Node3D
         var progressColor = Ui.Amber;
         GeometryInstance3D? highlight = null;
         var highlightColor = Ui.Amber;
+        Machine? lookAt = null;
 
         if (_aim.kind == "machine" && w.Machines.TryGetValue(_aim.id, out var aimed))
         {
-            status = $"{Loc.T("machine_" + aimed.Def)} — {Loc.T("status_" + aimed.Status)}";
-            statusColor = aimed.Status is MachineStatus.NoInput or MachineStatus.OutputFull or MachineStatus.NoPower or MachineStatus.LowPower or MachineStatus.Overheated ? Ui.Bad : Ui.Good;
+            // En producción, el estado va con icono y progreso en la lectura junto al punto de mira.
+            lookAt = w.Content.Machines[aimed.Def].Kind == MachineKind.Production ? aimed : null;
+            status = lookAt != null ? Loc.T("machine_" + aimed.Def) : $"{Loc.T("machine_" + aimed.Def)} — {Loc.T("status_" + aimed.Status)}";
+            statusColor = lookAt != null ? Ui.Ink : aimed.Status is MachineStatus.NoInput or MachineStatus.OutputFull or MachineStatus.NoPower or MachineStatus.LowPower or MachineStatus.Overheated ? Ui.Bad : Ui.Good;
             var inReach = MachineInReach(w, aimed);
             prompt = Loc.T(inReach ? "prompt_interact" : "prompt_too_far");
             if (_machines.TryGetValue(aimed.Id, out var aimedNode)) highlight = aimedNode.Root.GetChildOrNull<GeometryInstance3D>(0);
@@ -1745,6 +1769,10 @@ public partial class GameView : Node3D
         if (cutting) prompt = "";
         _targetBar.Set(blocked || _tool != Tool.Cutter ? null : progress, progressColor);
         _hud.SetPrompt(blocked ? "" : status, statusColor, blocked ? "" : prompt);
+        if (lookAt != null && !blocked && _tool is Tool.Cutter or Tool.Remove) _hud.Look.Present(w, lookAt, delta);
+        else _hud.Look.Visible = false;
+        if (_chain.Active && w.Machines.TryGetValue(_chain.Seed, out var chainSeed) && chainSeed.Planet != me.Planet) _chain.Clear();
+        _chain.Refresh(w, delta);
     }
 
     private void UpdateGhost(World w, PlayerState me, ref string status, ref Color color)
@@ -1850,6 +1878,7 @@ public static class Controls
         ["interact_insert"] = new[] { Godot.Key.F },
         ["interact_take"] = new[] { Godot.Key.G },
         ["interact_panel"] = new[] { Godot.Key.C },
+        ["chain_trace"] = new[] { Godot.Key.H },
     };
 
     public static IEnumerable<string> Rebindable => Defaults.Keys;

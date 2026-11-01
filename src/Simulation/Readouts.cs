@@ -76,9 +76,7 @@ public sealed partial class World
         if (def.Kind != MachineKind.Production || def.Recipe == null) return r;
 
         var recipe = Content.Recipes[def.Recipe];
-        var yieldPermille = m.NodeId >= 0 && Nodes.TryGetValue(m.NodeId, out var node) ? node.YieldPermille : 1000;
-        var speed = (1000 + Mod("speed." + recipe.Id)) * yieldPermille / 1000;
-        r.CycleSeconds = recipe.Ticks * 1000.0 / Math.Max(1, speed) / B.TicksPerSecond;
+        r.CycleSeconds = CycleSeconds(m, recipe);
         foreach (var (item, qty) in recipe.Outputs)
             r.Theoretical.Add((item, qty * 60.0 / r.CycleSeconds));
 

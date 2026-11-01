@@ -232,6 +232,10 @@ public partial class AutoTest : Node
             {
                 _main.StartSession(GameSession.Local(_main, BeltWorld(), "autotest-belts", null, _main.Prefs));
             }
+            else if (_args.GetValueOrDefault("scenario") == "manage")
+            {
+                _main.StartSession(GameSession.Local(_main, ManageWorld(), "autotest-manage", null, _main.Prefs));
+            }
             else if (_args.GetValueOrDefault("scenario") == "beltslong")
             {
                 _main.StartSession(GameSession.Local(_main, BeltStage(), "autotest-long", null, _main.Prefs));
@@ -273,6 +277,7 @@ public partial class AutoTest : Node
             else if (_args.GetValueOrDefault("scenario") == "belts") await BeltScenario();
             else if (_args.GetValueOrDefault("scenario") == "beltsv4") await BeltMigrationScenario();
             else if (_args.GetValueOrDefault("scenario") == "beltslong") await BeltLongScenario();
+            else if (_args.GetValueOrDefault("scenario") == "manage") await ManageScenario();
             else if (_args.GetValueOrDefault("scenario") == "fp") await FirstPersonScenario();
             else if (_args.GetValueOrDefault("scenario") == "travel") await TravelScenario();
             else if (_args.GetValueOrDefault("scenario") == "halloween") await HalloweenScenario();
@@ -1006,6 +1011,119 @@ public partial class AutoTest : Node
         world.Upgrades.Add("tech_assembly");
         world.Reindex();
         return world;
+    }
+
+    private World ManageWorld()
+    {
+        var world = BeltWorld();
+        world.Upgrades.Add("tech_logistics");
+        // Sin el núcleo auxiliar, la energía depende de un generador que el escenario puede retirar con el comando normal.
+        var core = world.Machines.Values.First(m => m.Def == "aux_core" && m.Planet == 0);
+        world.Machines.Remove(core.Id);
+        var depot = world.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
+        depot.In.Clear();
+        depot.In.Add("recovered", 40);
+        depot.In.Add("scrap", 500);
+        world.Reindex();
+        return world;
+    }
+
+    /// <summary>
+    /// Regresión de gestión con entrada inyectada: divisor con cintas cargadas, lectura al mirar en cada estado, panel con producción medida
+    /// y cadena resaltada con su motivo. No sustituye a una prueba con entrada real.
+    /// </summary>
+    private async Task ManageScenario()
+    {
+        var v = _view!;
+        var client = v.Session.Client;
+        var depot = W.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
+
+        Check(await Build("rtg_generator", 2, -12), "generador");
+        var rtg = W.Machines.Values.Last(m => m.Def == "rtg_generator");
+        Check(await Build("splitter", 8, -8), "divisor construido");
+        var splitter = W.Machines.Values.Last(m => m.Def == "splitter");
+        Check(await Build("recycler", 7, -14), "reciclador al frente del divisor");
+        Check(await Build("storage_crate", 13, -9), "contenedor al lado del divisor");
+        var recycler = W.Machines.Values.Last(m => m.Def == "recycler");
+        var crate = W.Machines.Values.Last(m => m.Def == "storage_crate");
+        var near = CenterOf(recycler) + new Vector3(5, -1.2f, 6);
+
+        // Sin materiales, antes de conectar nada.
+        await WalkTo(near);
+        v.AimAt(CenterOf(recycler));
+        await Wait(0.6);
+        Check(v.LookForTest.Showing && v.LookForTest.StateText == Loc.T("look_NoInput"), $"lectura al mirar sin material: {v.LookForTest.StateText}");
+        await Shot("gestion_01_mirar_sin_materiales");
+
+        Check(await LinkMachines(depot, splitter), "cinta depósito → divisor");
+        Check(await LinkMachines(splitter, recycler), "cinta divisor → reciclador");
+        Check(await LinkMachines(splitter, crate), "cinta divisor → contenedor");
+        Check(await Until(() => W.Machines[recycler.Id].In.Get("scrap") > 0 && W.Machines[crate.Id].In.Get("scrap") > 0, 60), "el divisor reparte chatarra a las dos salidas");
+
+        var c = CenterOf(splitter);
+        await WalkTo(new Vector3(c.X + 7, 0, c.Z + 6));
+        v.AimAt(c);
+        await Wait(0.5);
+        Check(W.Links.Values.Sum(l => l.Load) > 0, "cintas cargadas alrededor del divisor");
+        await Shot("gestion_02_divisor_cintas_cargadas");
+
+        await WalkTo(near);
+        v.AimAt(CenterOf(recycler));
+        Check(await Until(() => W.Machines[recycler.Id].Status == MachineStatus.Working, 20), "reciclador trabajando");
+        await Wait(0.8);
+        Check(v.LookForTest.StateText == Loc.T("look_Working") && v.LookForTest.BarValue > 0, $"lectura al mirar: {v.LookForTest.StateText} barra {v.LookForTest.BarValue:0.00}");
+        await Shot("gestion_03_mirar_trabajando");
+
+        // Panel con la producción medida por el servidor para esta máquina.
+        var output = W.Content.Recipes["recycle_scrap"].Outputs.Keys.First();
+        Check(await Until(() => W.MeasuredPerMinute(W.Machines[recycler.Id], output) > 0, 30), $"medición de la máquina: {W.MeasuredPerMinute(W.Machines[recycler.Id], output):0.#}/min");
+        v.OpenMachineForTest(recycler.Id);
+        await Wait(1.2);
+        await Shot("gestion_04_panel_real_y_teorica");
+        v.ClosePanelForTest();
+        await Wait(0.2);
+
+        // Cadena con la tecla: se envía la acción por la misma entrada que el teclado.
+        v.AimAt(CenterOf(recycler));
+        await Wait(0.3);
+        PressAction("chain_trace");
+        await Wait(1.2);
+        Check(v.ChainForTest.Active && v.ChainForTest.ChevronCount > 0, $"cadena con {v.ChainForTest.ChevronCount} flechas: {v.ChainForTest.Summary}");
+        await WalkTo(new Vector3(c.X + 11, 0, c.Z + 9));
+        v.AimAt(c);
+        await Wait(0.6);
+        await Shot("gestion_05_cadena_resaltada");
+
+        // Sin energía: se retira el generador con el comando normal.
+        await WalkTo(CenterOf(rtg) + new Vector3(4, -1.2f, 5));
+        client.Send(new Command { Type = CommandType.Remove, A = rtg.Id });
+        await WalkTo(near);
+        v.AimAt(CenterOf(recycler));
+        Check(await Until(() => W.Machines[recycler.Id].Status == MachineStatus.NoPower, 15), "reciclador sin energía");
+        await Wait(1.3);
+        Check(v.LookForTest.StateText == Loc.T("look_NoPower"), $"lectura al mirar: {v.LookForTest.StateText}");
+        Check(v.ChainForTest.Current?.Limit.Cause == ChainCause.NoPower && v.ChainForTest.Current.Limit.Machine == recycler.Id, $"motivo: {v.ChainForTest.Summary}");
+        await Shot("gestion_06_sin_energia_y_motivo");
+
+        // Con energía de nuevo y sin salida conectada, acaba con la salida bloqueada.
+        Check(await Build("rtg_generator", 2, -12), "generador repuesto");
+        await WalkTo(near);
+        v.AimAt(CenterOf(recycler));
+        Check(await Until(() => W.Machines[recycler.Id].Status == MachineStatus.OutputFull, 90), "salida bloqueada");
+        await Wait(1.3);
+        Check(v.LookForTest.StateText == Loc.T("look_OutputFull"), $"lectura al mirar: {v.LookForTest.StateText}");
+        Check(v.ChainForTest.Current?.Limit.Cause == ChainCause.OutputFull && v.ChainForTest.Current.Limit.Machine == recycler.Id, $"motivo: {v.ChainForTest.Summary}");
+        await Shot("gestion_07_salida_bloqueada_y_motivo");
+
+        PressAction("chain_trace");
+        await Wait(0.2);
+        Check(!v.ChainForTest.Active && v.ChainForTest.ChevronCount == 0, "la segunda pulsación apaga el resaltado");
+    }
+
+    private static void PressAction(string action)
+    {
+        Input.ParseInputEvent(new InputEventAction { Action = action, Pressed = true });
+        Input.ParseInputEvent(new InputEventAction { Action = action, Pressed = false });
     }
 
     /// <summary>Regresión visual del recorrido exigible: extractor → cinta → fundición → cinta → almacén, cruce, atasco e inspección.</summary>
