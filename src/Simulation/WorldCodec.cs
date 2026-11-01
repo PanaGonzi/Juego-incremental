@@ -7,7 +7,7 @@ namespace Pluton.Simulation;
 /// </summary>
 public static class WorldCodec
 {
-    public const int FormatVersion = 4;
+    public const int FormatVersion = 5;
 
     private static void WriteInv(BinaryWriter w, Inventory inv)
     {
@@ -96,21 +96,116 @@ public static class WorldCodec
         return m;
     }
 
-    public static void WriteLink(BinaryWriter w, Link l)
+    /// <param name="forHash">Sin datos que el espejo del cliente no mantiene (acumulador y turno).</param>
+    public static void WriteLink(BinaryWriter w, Link l, bool forHash = false)
     {
         w.Write(l.Id);
         w.Write(l.From);
         w.Write(l.To);
         w.Write7BitEncodedInt(l.Planet);
+        w.Write(l.Elevated);
+        w.Write7BitEncodedInt64(l.Paid);
+        if (!forHash)
+        {
+            w.Write7BitEncodedInt(l.Accum);
+            w.Write7BitEncodedInt64(l.Turn);
+        }
+        w.Write7BitEncodedInt(l.Cells.Count);
+        foreach (var (x, z) in l.Cells)
+        {
+            w.Write7BitEncodedInt(Zig(x));
+            w.Write7BitEncodedInt(Zig(z));
+        }
+        w.Write7BitEncodedInt(l.Slots.Length);
+        ForEachRun(l.Slots, (length, item) =>
+        {
+            w.Write7BitEncodedInt(length);
+            w.Write(item ?? "");
+        });
     }
 
-    public static Link ReadLink(BinaryReader r) => new()
+    private static int Zig(int v) => (v << 1) ^ (v >> 31);
+    private static int Unzig(int v) => (int)((uint)v >> 1) ^ -(v & 1);
+
+    private static void ForEachRun(string?[] slots, Action<int, string?> run)
     {
-        Id = r.ReadInt32(),
-        From = r.ReadInt32(),
-        To = r.ReadInt32(),
-        Planet = r.Read7BitEncodedInt(),
-    };
+        var i = 0;
+        while (i < slots.Length)
+        {
+            var item = slots[i];
+            var j = i + 1;
+            while (j < slots.Length && slots[j] == item) j++;
+            run(j - i, item);
+            i = j;
+        }
+    }
+
+    public static Link ReadLink(BinaryReader r, ContentDb content, int version = FormatVersion)
+    {
+        var l = new Link
+        {
+            Id = r.ReadInt32(),
+            From = r.ReadInt32(),
+            To = r.ReadInt32(),
+            Planet = r.Read7BitEncodedInt(),
+        };
+        if (version < 5) return l; // la ruta y los huecos los crea la migración
+        l.Elevated = r.ReadBoolean();
+        l.Paid = r.Read7BitEncodedInt64();
+        l.Accum = r.Read7BitEncodedInt();
+        l.Turn = r.Read7BitEncodedInt64();
+        var cells = r.Read7BitEncodedInt();
+        if (cells < 0 || cells > MaxBeltSlots) throw new InvalidDataException("Ruta de cinta inválida");
+        for (var i = 0; i < cells; i++) l.Cells.Add((Unzig(r.Read7BitEncodedInt()), Unzig(r.Read7BitEncodedInt())));
+        var slots = r.Read7BitEncodedInt();
+        if (slots <= 0 || slots > MaxBeltSlots) throw new InvalidDataException("Cinta sin huecos válidos");
+        l.Slots = new string?[slots];
+        for (var i = 0; i < slots;)
+        {
+            var length = r.Read7BitEncodedInt();
+            var item = r.ReadString();
+            if (length <= 0 || i + length > slots) throw new InvalidDataException("Carga de cinta inválida");
+            // Se comparte la cadena del contenido: la memoria no depende de cuánto lleve la cinta.
+            var shared = item.Length == 0 ? null : content.ItemIndex.TryGetValue(item, out var known) ? content.ItemOrder[known] : item;
+            for (var k = 0; k < length; k++) l.Slots[i + k] = shared;
+            if (shared != null) l.Load += length;
+            i += length;
+        }
+        return l;
+    }
+
+    private const int MaxBeltSlots = 4096;
+
+    /// <summary>Carga de una cinta para un delta, por tramos de huecos iguales: 0 es vacío; n, el objeto n-1 del contenido.</summary>
+    public static void WriteSlotsCompact(BinaryWriter w, Link l, ContentDb content)
+    {
+        w.Write(l.Id);
+        ForEachRun(l.Slots, (length, item) =>
+        {
+            w.Write7BitEncodedInt(length);
+            w.Write7BitEncodedInt(item == null ? 0 : content.ItemIndex[item] + 1);
+        });
+    }
+
+    /// <summary>Aplica la carga recibida. El servidor solo envía cintas que el cliente ya conoce por el mismo mensaje o uno anterior.</summary>
+    public static void ReadSlotsCompact(BinaryReader r, World world)
+    {
+        var id = r.ReadInt32();
+        var content = world.Content;
+        if (!world.Links.TryGetValue(id, out var l)) throw new InvalidDataException("Carga de una cinta desconocida");
+        l.Load = 0;
+        for (var i = 0; i < l.Slots.Length;)
+        {
+            var length = r.Read7BitEncodedInt();
+            var index = r.Read7BitEncodedInt();
+            if (length <= 0 || i + length > l.Slots.Length || index < 0 || index > content.ItemOrder.Count) throw new InvalidDataException("Carga de cinta inválida");
+            var item = index == 0 ? null : content.ItemOrder[index - 1];
+            for (var k = 0; k < length; k++) l.Slots[i + k] = item;
+            if (item != null) l.Load += length;
+            i += length;
+        }
+        l.SlotsVersion++;
+    }
 
     public static void WriteDebris(BinaryWriter w, Debris d)
     {
@@ -436,7 +531,7 @@ public static class WorldCodec
         n = r.Read7BitEncodedInt();
         for (var i = 0; i < n; i++)
         {
-            var l = ReadLink(r);
+            var l = ReadLink(r, content, formatVersion);
             world.Links[l.Id] = l;
         }
         n = r.Read7BitEncodedInt();
@@ -491,6 +586,12 @@ public static class WorldCodec
             foreach (var planet in content.Planets) world.EnsureNodes(planet);
         }
         world.Reindex();
+        if (formatVersion < 5)
+        {
+            // v5: los enlaces pasan a ser cintas con ruta y carga. Requiere los índices ya reconstruidos.
+            world.MigrateLinksToBelts();
+            world.Reindex();
+        }
         return world;
     }
 
@@ -526,7 +627,7 @@ public static class WorldCodec
         using var w = new BinaryWriter(ms);
         WriteGlobal(w, world, forHash: true);
         foreach (var m in world.Machines.Values) WriteMachine(w, m, forHash: true);
-        foreach (var l in world.Links.Values) WriteLink(w, l);
+        foreach (var l in world.Links.Values) WriteLink(w, l, forHash: true);
         foreach (var d in world.DebrisById.Values) WriteDebris(w, d);
         foreach (var n in world.Nodes.Values) WriteNode(w, n);
         foreach (var p in world.Players.Values) WritePlayer(w, p, forHash: true);

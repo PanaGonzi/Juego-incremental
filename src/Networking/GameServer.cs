@@ -379,13 +379,19 @@ public sealed class GameServer : IDisposable
             World.DirtySimTrains.Clear();
             World.DirtyGlobal |= World.DirtyGlobalSim;
             World.DirtyGlobalSim = false;
+            World.DirtySlots.UnionWith(World.DirtySimSlots);
+            World.DirtySimSlots.Clear();
         }
         if (World.DirtyMachines.Count == 0 && World.DirtyDebris.Count == 0 && World.DirtyNodes.Count == 0 &&
             World.DirtyLinks.Count == 0 && World.DirtyPlayers.Count == 0 && !World.DirtyGlobal &&
             World.RemovedMachines.Count == 0 && World.RemovedDebris.Count == 0 && World.RemovedLinks.Count == 0 &&
             World.DirtyRailNodes.Count == 0 && World.DirtyRailSegments.Count == 0 && World.DirtyTrains.Count == 0 &&
-            World.RemovedRailNodes.Count == 0 && World.RemovedRailSegments.Count == 0 && World.RemovedTrains.Count == 0 && !World.DirtyShipments)
+            World.RemovedRailNodes.Count == 0 && World.RemovedRailSegments.Count == 0 && World.RemovedTrains.Count == 0 && !World.DirtyShipments && World.DirtySlots.Count == 0)
             return;
+
+        // Una cinta nueva o reencaminada ya lleva sus huecos; una retirada no los necesita.
+        World.DirtySlots.ExceptWith(World.DirtyLinks);
+        World.DirtySlots.RemoveWhere(id => !World.Links.ContainsKey(id));
 
         _deltaStream.SetLength(0);
         using (var w = new BinaryWriter(_deltaStream, System.Text.Encoding.UTF8, leaveOpen: true))
@@ -423,6 +429,8 @@ public sealed class GameServer : IDisposable
             foreach (var id in World.RemovedTrains) w.Write(id);
             w.Write(World.DirtyShipments);
             if (World.DirtyShipments) WorldCodec.WriteShipments(w, World);
+            w.Write7BitEncodedInt(World.DirtySlots.Count);
+            foreach (var id in World.DirtySlots) WorldCodec.WriteSlotsCompact(w, World.Links[id], World.Content);
         }
         var buffer = _deltaStream.GetBuffer();
         var length = (int)_deltaStream.Length;
@@ -443,6 +451,7 @@ public sealed class GameServer : IDisposable
         World.DirtyDebris.Clear();
         World.DirtyNodes.Clear();
         World.DirtyLinks.Clear();
+        World.DirtySlots.Clear();
         World.DirtyPlayers.Clear();
         World.RemovedMachines.Clear();
         World.RemovedDebris.Clear();

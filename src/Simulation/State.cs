@@ -62,13 +62,29 @@ public sealed class Machine
     public int SellCooldown;
 }
 
+/// <summary>Cinta abierta entre dos máquinas. Sin cuerpo físico: se puede pisar.</summary>
 public sealed class Link
 {
     public int Id;
     public int From;
     public int To;
     public int Planet;
-    public int Cooldown;
+    /// <summary>Ruta ordenada de origen a destino. Vacía si la cinta es elevada.</summary>
+    public readonly List<(int x, int z)> Cells = new();
+    /// <summary>Carga real por huecos; el índice 0 es la entrada y el último, la cabeza que llega a destino.</summary>
+    public string?[] Slots = Array.Empty<string?>();
+    /// <summary>Recta sobre soportes, sin ocupar celdas: enlace antiguo sin ruta posible.</summary>
+    public bool Elevated;
+    /// <summary>Créditos pagados al tenderla; es lo que se devuelve al retirarla.</summary>
+    public long Paid;
+    /// <summary>Acumulador del avance (ticks por velocidad).</summary>
+    public int Accum;
+    /// <summary>Último turno servido al repartir entre varias salidas de una misma máquina.</summary>
+    public long Turn;
+    /// <summary>Huecos ocupados. Derivado de Slots.</summary>
+    public int Load;
+    /// <summary>Solo en el espejo del cliente: cuántas veces ha llegado carga nueva. La vista lo usa para corregir su copia.</summary>
+    public int SlotsVersion;
 }
 
 public sealed class Debris

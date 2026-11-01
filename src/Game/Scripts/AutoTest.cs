@@ -228,6 +228,16 @@ public partial class AutoTest : Node
             {
                 _main.StartSession(GameSession.Local(_main, RailWorld(), "autotest-rail", null, _main.Prefs));
             }
+            else if (_args.GetValueOrDefault("scenario") == "belts")
+            {
+                _main.StartSession(GameSession.Local(_main, BeltWorld(), "autotest-belts", null, _main.Prefs));
+            }
+            else if (_args.GetValueOrDefault("scenario") == "beltsv4")
+            {
+                // Guardado real de la 0.4.1 cargado por la ruta normal: migra a cintas con copia .v4.bak.
+                System.IO.File.Copy(_args["fixture"], _main.Store.PathOf("autotest-v4"), true);
+                _main.StartSolo("autotest-v4", false);
+            }
             else
             {
                 _main.StartSolo("autotest-" + DateTime.Now.ToString("HHmmss"), true);
@@ -248,6 +258,8 @@ public partial class AutoTest : Node
 
             if (_args.ContainsKey("measure")) await MeasureScenario();
             else if (_args.GetValueOrDefault("scenario") == "rail") await RailScenario();
+            else if (_args.GetValueOrDefault("scenario") == "belts") await BeltScenario();
+            else if (_args.GetValueOrDefault("scenario") == "beltsv4") await BeltMigrationScenario();
             else if (_args.GetValueOrDefault("scenario") == "travel") await TravelScenario();
             else if (_args.GetValueOrDefault("scenario") == "halloween") await HalloweenScenario();
             else if (_args.GetValueOrDefault("scenario") == "mars") await MarsScenario();
@@ -865,6 +877,150 @@ public partial class AutoTest : Node
         Check(W.Trains.Count == trains && W.RailSegments.Count >= 5, $"vías {W.RailSegments.Count} y trenes {W.Trains.Count} conservados");
         await Wait(1.5);
         await Shot("rail_09_reanudado");
+    }
+
+    /// <summary>Base limpia y con material: el recorrido se monta después con comandos y herramientas normales.</summary>
+    private World BeltWorld()
+    {
+        var world = World.CreateNew(_main.Content);
+        foreach (var d in world.DebrisById.Values.Where(d => d.Planet == 0 && d.CoversNode < 0 && d.X > -12 && d.X < 34 && d.Z > -18 && d.Z < 12).ToList()) world.DebrisById.Remove(d.Id);
+        foreach (var d in world.DebrisById.Values.Where(d => d.CoversNode >= 0 && world.Nodes[d.CoversNode].X == 18 && world.Nodes[d.CoversNode].Z == -6).ToList())
+        {
+            world.DebrisById.Remove(d.Id);
+            world.Nodes[d.CoversNode].Revealed = true;
+        }
+        world.Credits = 5000;
+        var depot = world.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
+        depot.In.Add("recovered", 600); // más que el almacén y la cinta juntos: el atasco debe llenar la cinta entera
+        depot.In.Add("ingot", 100);
+        world.Upgrades.Add("tech_assembly");
+        world.Reindex();
+        return world;
+    }
+
+    /// <summary>Regresión visual del recorrido exigible: extractor → cinta → fundición → cinta → almacén, cruce, atasco e inspección.</summary>
+    private async Task BeltScenario()
+    {
+        var v = _view!;
+        var client = v.Session.Client;
+        Check(await Build("ore_extractor", 18, -6), "extractor sobre el yacimiento");
+        Check(await Build("smelter", 18, -11), "fundición al frente del extractor");
+        var ex = W.Machines.Values.Last(m => m.Def == "ore_extractor");
+        var sm = W.Machines.Values.Last(m => m.Def == "smelter");
+
+        // Previsualización con la herramienta: origen elegido y destino apuntado.
+        v.SetTool(Tool.Link);
+        await UseOn(ex, v.Primary);
+        var c = CenterOf(sm);
+        await WalkTo(new Vector3(c.X + 7, 0, c.Z + 5));
+        v.AimAt(c);
+        await Wait(0.5);
+        await Shot("belt_01_previsualizacion");
+        v.Primary();
+        Check(await Until(() => W.Stats.GetValueOrDefault("linked") >= 1, 3), "cinta extractor → fundición");
+        v.SetTool(Tool.Cutter);
+
+        Check(await Build("storage_crate", 26, -16), "almacén de lingotes");
+        var crate = W.Machines.Values.Last(m => m.Def == "storage_crate");
+        Check(await LinkMachines(sm, crate), "cinta fundición → almacén");
+        var toCrate = W.Links.Values.Last();
+
+        var along = new Vector3(c.X + 9, 0, c.Z + 7);
+        await WalkTo(along);
+        v.AimAt(new Vector3(c.X + 2, 0.5f, c.Z + 2));
+        Check(await Until(() => W.Links.Values.Sum(l => l.Load) > 0, 15), "las cintas llevan carga real");
+        Check(await Until(() => crate.In.Get("ingot") + W.Machines[crate.Id].In.Get("ingot") > 0, 60), "lingotes en el almacén");
+        await Shot("belt_02_flujo");
+
+        // Inspección apuntando a la cinta.
+        var cell = toCrate.Cells[toCrate.Cells.Count / 2];
+        var mid = new Vector3((cell.x + 0.5f) * 2, 0.5f, (cell.z + 0.5f) * 2);
+        await WalkTo(mid + new Vector3(4, -0.5f, 4));
+        v.AimAt(mid);
+        await Wait(0.4);
+        Check(v.AimTarget == ("belt", toCrate.Id), $"se apunta a la cinta: {v.AimTarget}");
+        await Shot("belt_03_inspeccion");
+
+        // Cruce perpendicular.
+        var server = v.Session.Runner!.Server.World;
+        client.Send(new Command { Type = CommandType.Place, Text = "storage_crate", A = cell.x, B = cell.z + 5 });
+        client.Send(new Command { Type = CommandType.Place, Text = "storage_crate", A = cell.x, B = cell.z - 5 });
+        await Wait(0.5);
+        var south = W.Machines.Values.Last(m => m.Def == "storage_crate" && m.Z == cell.z - 5);
+        var north = W.Machines.Values.Last(m => m.Def == "storage_crate" && m.Z == cell.z + 5);
+        client.Send(new Command { Type = CommandType.Link, A = north.Id, B = south.Id });
+        Check(await Until(() => W.Links.Values.Any(l => l.From == north.Id), 3), "cinta que cruza");
+        var crossing = W.Links.Values.Last(l => l.From == north.Id);
+        Check(crossing.Cells.Intersect(toCrate.Cells).Count() == 1, "cruza por un puente en una sola celda");
+        await WalkTo(mid + new Vector3(6, -0.5f, 3));
+        v.AimAt(mid);
+        await Wait(0.6);
+        await Shot("belt_04_cruce");
+        _ = server;
+
+        // Carga densa y atasco reales: depósito → cinta larga → almacén hasta llenarlo (200 por tipo).
+        Check(await Build("storage_crate", 8, -16), "almacén que se llenará");
+        var full = W.Machines.Values.Last(m => m.Def == "storage_crate" && m.X == 8);
+        var depot = W.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
+        client.Send(new Command { Type = CommandType.Link, A = depot.Id, B = full.Id });
+        Check(await Until(() => W.Links.Values.Any(l => l.From == depot.Id && l.To == full.Id), 3), "cinta depósito → almacén");
+        var line = W.Links.Values.Last(l => l.From == depot.Id);
+        var lineMid = line.Cells[line.Cells.Count / 2];
+        var lineAim = new Vector3((lineMid.x + 0.5f) * 2, 0.5f, (lineMid.z + 0.5f) * 2);
+        await WalkTo(lineAim + new Vector3(5, -0.5f, 3));
+        v.AimAt(lineAim);
+        Check(await Until(() => W.Links[line.Id].Load >= W.Links[line.Id].Slots.Length - 1, 60), "cinta casi saturada");
+        await Wait(1.2);
+        await Shot("belt_05_carga_densa");
+        Check(await Until(() => W.BeltStatusOf(W.Links[line.Id]) == BeltStatus.BlockedFull, 110), $"la cinta se atasca con el destino lleno: {W.Machines[full.Id].In.Get("recovered")}");
+        await Wait(1.5);
+        v.AimAt(lineAim);
+        await Wait(0.3);
+        await Shot("belt_06_atasco");
+        var ids = W.Links[line.Id].Load;
+        Check(ids == W.Links[line.Id].Slots.Length, $"cinta llena: {ids}");
+        var totalBefore = W.CountEverywhere("recovered");
+        client.Send(new Command { Type = CommandType.Unlink, A = line.Id });
+        Check(await Until(() => !W.Links.ContainsKey(line.Id), 3), "retirar devuelve la carga");
+        await Wait(1.2);
+        Check(W.CountEverywhere("recovered") == totalBefore, $"sin pérdida al retirar: {totalBefore} → {W.CountEverywhere("recovered")}");
+
+        Check(client.HashMismatches == 0, $"sin divergencias ({client.HashChecks} comprobaciones)");
+        Log($"Cintas: {W.Links.Count}, objetos en cinta {W.Links.Values.Sum(l => l.Load)}, dibujados {v.Belts.DrawnItems}");
+    }
+
+    /// <summary>Partida 0.4.1 migrada: comprueba las cintas enrutadas, la elevada y que siguen transportando.</summary>
+    private async Task BeltMigrationScenario()
+    {
+        var v = _view!;
+        Check(System.IO.File.Exists(_main.Store.PathOf("autotest-v4") + ".v4.bak"), "copia .v4.bak creada");
+        Check(W.Links.Count == 6, $"seis conexiones conservadas: {W.Links.Count}");
+        var elevated = W.Links.Values.FirstOrDefault(l => l.Elevated);
+        Check(elevated != null, "enlace sin ruta posible queda elevado");
+        var smelter = W.Machines.Values.First(m => m.Def == "smelter");
+        var c = CenterOf(smelter);
+        await WalkTo(new Vector3(c.X - 3, 0, c.Z + 13));
+        v.AimAt(c);
+        Check(await Until(() => W.Links.Values.Sum(l => l.Load) > 0, 20), "las cintas migradas transportan carga");
+        await Wait(1);
+        await Shot("beltv4_01_fabrica");
+        if (elevated != null)
+        {
+            var a = CenterOf(W.Machines[elevated.From]);
+            var b = CenterOf(W.Machines[elevated.To]);
+            // Desde lejos y de lado: el rayo llega a la cinta por encima de las máquinas que une.
+            var lateral = new Vector3(a.Z - b.Z, 0, b.X - a.X).Normalized(); // en este guardado, el lado sin máquinas
+            var ground = (a + b) / 2;
+            ground.Y = 0;
+            var stand = ground + lateral * 24f;
+            await WalkTo(stand, 15);
+            var mid = v.Belts.CenterOfBelt(elevated.Id);
+            v.AimAt(mid);
+            await Wait(0.5);
+            Check(v.AimTarget == ("belt", elevated.Id), $"la elevada se puede apuntar: {v.AimTarget}");
+            await Shot("beltv4_02_elevada");
+        }
+        Check(v.Session.Client.HashMismatches == 0, $"sin divergencias ({v.Session.Client.HashChecks} comprobaciones)");
     }
 
     private async Task<bool> LinkMachines(Machine a, Machine b)

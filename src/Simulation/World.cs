@@ -86,6 +86,8 @@ public sealed partial class World
         var node = new ResourceNode { Id = NextId++, Item = n.Item, Planet = planet, X = n.X, Z = n.Z, YieldPermille = n.YieldPermille };
         Nodes[node.Id] = node;
         for (var dx = 0; dx < 2; dx++)
+        for (var dz = 0; dz < 2; dz++) _nodeCells.Add((planet, n.X + dx, n.Z + dz));
+        for (var dx = 0; dx < 2; dx++)
         for (var dz = 0; dz < 2; dz++)
         {
             // Si algo ocupa ya la celda (mundo migrado), esa celda queda sin costra.
@@ -146,6 +148,7 @@ public sealed partial class World
             // Se mantiene libre la zona inicial para no bloquear las primeras máquinas.
             if (Math.Abs(x - planet.Spawn.X) < 4 && Math.Abs(z - planet.Spawn.Z) < 4) continue;
             if (_occupied.ContainsKey((planet.Id, x, z)) || _debrisCells.ContainsKey((planet.Id, x, z))) continue;
+            if (_beltCells.ContainsKey((planet.Id, x, z))) continue;
             if (IsOnNode(planet.Id, x, z)) continue;
             var d = new Debris { Id = NextId++, Def = f.Def, Planet = planet.Id, X = x, Z = z, Hp = B.Debris[f.Def].Hp };
             DebrisById[d.Id] = d;
@@ -177,7 +180,7 @@ public sealed partial class World
                 if (m.NodeId == n.Id) n.OccupiedBy = m.Id;
         }
         _machineList = Machines.Values.ToArray();
-        _linkList = Links.Values.ToArray();
+        ReindexBelts();
         ReindexRail();
         RecomputeMods();
     }
@@ -462,6 +465,7 @@ public sealed partial class World
             if (_occupied.TryGetValue((planet, cell.x, cell.z), out var occupant) && occupant != ignoreMachine) return "err_blocked";
             if (_debrisCells.ContainsKey((planet, cell.x, cell.z))) return "err_debris";
             if (RailBlocksCell(planet, cell.x, cell.z) && ignoreMachine < 0) return "err_blocked";
+            if (BeltBlocks(planet, cell.x, cell.z, ignoreMachine)) return "err_blocked";
         }
         if (def.Kind == MachineKind.Station)
         {
@@ -565,12 +569,8 @@ public sealed partial class World
             foreach (var (item, qty) in Content.Recipes[def.Recipe].Inputs) depot.In.Add(item, qty);
         DirtyMachines.Add(depot.Id);
 
-        foreach (var link in Links.Values.Where(l => l.From == id || l.To == id).ToList())
-        {
-            Links.Remove(link.Id);
-            RemovedLinks.Add((link.Planet, link.Id));
-        }
-        _linkList = Links.Values.ToArray();
+        // Las cintas conectadas devuelven su carga y su coste con la misma regla que al retirarlas a mano.
+        foreach (var link in _linkList.Where(l => l.From == id || l.To == id).ToList()) DismantleBelt(link);
         foreach (var cell in Footprint(m.Def, m.X, m.Z, m.Rot)) _occupied.Remove((m.Planet, cell.x, cell.z));
         if (m.NodeId >= 0 && Nodes.TryGetValue(m.NodeId, out var node))
         {
@@ -611,53 +611,7 @@ public sealed partial class World
         }
         DirtyMachines.Add(id);
 
-        // Los enlaces que quedan demasiado largos se retiran; el jugador lo ve en el mundo.
-        foreach (var link in Links.Values.Where(l => l.From == id || l.To == id).ToList())
-            if (!LinkInRange(Machines[link.From], Machines[link.To]))
-            {
-                Links.Remove(link.Id);
-                RemovedLinks.Add((link.Planet, link.Id));
-            }
-        _linkList = Links.Values.ToArray();
-        return CommandResult.Success;
-    }
-
-    public bool LinkInRange(Machine a, Machine b)
-    {
-        var (ax, az) = MachineCenterMm(a);
-        var (bx, bz) = MachineCenterMm(b);
-        var dx = (double)(ax - bx);
-        var dz = (double)(az - bz);
-        return dx * dx + dz * dz <= (double)B.LinkMaxMm * B.LinkMaxMm;
-    }
-
-    private CommandResult AddLink(PlayerState p, int from, int to)
-    {
-        if (from == to) return CommandResult.Fail("err_invalid");
-        if (!Machines.TryGetValue(from, out var a) || !Machines.TryGetValue(to, out var b)) return CommandResult.Fail("err_gone");
-        if (a.Planet != p.Planet || b.Planet != p.Planet) return CommandResult.Fail("err_gone");
-        if (!LinkInRange(a, b)) return CommandResult.Fail("err_link_range");
-        var aDef = Content.Machines[a.Def];
-        var bDef = Content.Machines[b.Def];
-        if (aDef.Kind is MachineKind.Generator or MachineKind.Shuttle || bDef.Kind is MachineKind.Generator or MachineKind.Shuttle) return CommandResult.Fail("err_link_kind");
-        foreach (var l in Links.Values)
-            if (l.From == from && l.To == to) return CommandResult.Fail("err_link_exists");
-
-        var link = new Link { Id = NextId++, From = from, To = to, Planet = p.Planet };
-        Links[link.Id] = link;
-        _linkList = Links.Values.ToArray();
-        DirtyLinks.Add(link.Id);
-        Bump("linked");
-        return CommandResult.Success;
-    }
-
-    private CommandResult RemoveLink(PlayerState p, int id)
-    {
-        if (!Links.TryGetValue(id, out var link) || link.Planet != p.Planet) return CommandResult.Fail("err_gone");
-        Links.Remove(id);
-        _linkList = Links.Values.ToArray();
-        DirtyLinks.Remove(id);
-        RemovedLinks.Add((link.Planet, id));
+        RerouteBeltsOf(id);
         return CommandResult.Success;
     }
 
@@ -842,7 +796,7 @@ public sealed partial class World
         Tick += TimeScale;
         StepPower();
         foreach (var m in _machineList) StepMachine(m);
-        foreach (var l in _linkList) StepLink(l);
+        StepBelts();
         StepTrains();
         StepShipments();
         StepTransit();
@@ -1006,29 +960,6 @@ public sealed partial class World
         DirtySimMachines.Add(m.Id);
     }
 
-    private void StepLink(Link l)
-    {
-        l.Cooldown -= TimeScale;
-        if (l.Cooldown > 0) return;
-        var intervals = 1 + (-l.Cooldown) / B.LinkIntervalTicks;
-        if (!Machines.TryGetValue(l.From, out var a) || !Machines.TryGetValue(l.To, out var b)) return;
-        var source = Content.Machines[a.Def].Kind == MachineKind.Production ? a.Out : a.In;
-        var units = (1 + Mod("link_rate")) * intervals;
-        foreach (var kv in source.Items)
-        {
-            var qty = Math.Min(Math.Min(kv.Value, units), InputRoom(b, kv.Key));
-            if (qty <= 0) continue;
-            var item = kv.Key;
-            source.TryRemove(item, qty);
-            b.In.Add(item, qty);
-            DirtySimMachines.Add(a.Id);
-            DirtySimMachines.Add(b.Id);
-            l.Cooldown = B.LinkIntervalTicks;
-            return;
-        }
-        l.Cooldown = B.LinkIntervalTicks;
-    }
-
     /// <summary>Lo enviado sale de la plataforma al crear el envío y entra en destino al llegar: nunca está en dos sitios.</summary>
     private void StepCargoPad(Machine m)
     {
@@ -1090,6 +1021,8 @@ public sealed partial class World
         DirtyDebris.Clear();
         DirtyNodes.Clear();
         DirtyLinks.Clear();
+        DirtySlots.Clear();
+        DirtySimSlots.Clear();
         DirtyPlayers.Clear();
         DirtyTrains.Clear();
         DirtySimTrains.Clear();
@@ -1124,6 +1057,10 @@ public sealed partial class World
         foreach (var p in Players.Values) total += p.Bag.Get(item);
         foreach (var t in Trains.Values) total += t.Cargo.Get(item);
         foreach (var s in Shipments.Values) total += s.Cargo.Get(item);
+        foreach (var l in Links.Values)
+            if (l.Load > 0)
+                foreach (var slot in l.Slots)
+                    if (slot == item) total++;
         return total;
     }
 }

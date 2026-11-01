@@ -1,0 +1,22 @@
+﻿[    0,4] OK    entrada en el mundo
+[    0,4] Renderizador forward_plus GPU AMD Radeon RX 7800 XT ventana (1600, 900)
+[   15,3] OK    extractor sobre el yacimiento
+[   17,1] OK    fundición al frente del extractor
+[   20,8] OK    cinta extractor → fundición
+[   22,7] OK    almacén de lingotes
+[   26,3] OK    cinta fundición → almacén
+[   28,0] OK    las cintas llevan carga real
+[   39,9] OK    lingotes en el almacén
+[   42,0] OK    se apunta a la cinta: (belt, 225)
+[   42,7] OK    cinta que cruza
+[   42,7] OK    cruza por un puente en una sola celda
+[   47,2] OK    almacén que se llenará
+[   47,2] OK    cinta depósito → almacén
+[   78,9] OK    cinta casi saturada
+[  168,8] OK    la cinta se atasca con el destino lleno: 200
+[  170,6] OK    cinta llena: 104
+[  170,9] OK    retirar devuelve la carga
+[  172,1] OK    sin pérdida al retirar: 556 → 556
+[  172,1] OK    sin divergencias (17 comprobaciones)
+[  172,1] Cintas: 3, objetos en cinta 4, dibujados 4
+[  172,1] RESULTADO: CORRECTO

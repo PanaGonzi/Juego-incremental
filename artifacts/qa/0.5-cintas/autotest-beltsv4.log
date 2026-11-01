@@ -1,0 +1,9 @@
+﻿[    0,4] OK    entrada en el mundo
+[    0,4] Renderizador forward_plus GPU AMD Radeon RX 7800 XT ventana (1600, 900)
+[    1,9] OK    copia .v4.bak creada
+[    1,9] OK    seis conexiones conservadas: 6
+[    1,9] OK    enlace sin ruta posible queda elevado
+[    6,2] OK    las cintas migradas transportan carga
+[   10,7] OK    la elevada se puede apuntar: (belt, 228)
+[   10,7] OK    sin divergencias (1 comprobaciones)
+[   10,7] RESULTADO: CORRECTO

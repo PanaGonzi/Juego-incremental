@@ -77,10 +77,10 @@ public class PlaythroughTests
             }
         }
 
-        public Machine Build(string def, int x, int z)
+        public Machine Build(string def, int x, int z, int rot = 0)
         {
             WalkToCell(x, z);
-            Do(new Command { Type = CommandType.Place, Text = def, A = x, B = z });
+            Do(new Command { Type = CommandType.Place, Text = def, A = x, B = z, C = rot });
             return W.Machines.Values.Last();
         }
 
@@ -165,11 +165,11 @@ public class PlaythroughTests
             Earn(credits);
             foreach (var (item, qty) in cost) Stock(item, qty);
         }
-        Machine Build(string def, int x, int z)
+        Machine Build(string def, int x, int z, int rot = 0)
         {
             var d = w.Content.Machines[def];
             if (p.Planet == 0) Afford(d.Credits, d.Cost);
-            return bot.Build(def, x, z);
+            return bot.Build(def, x, z, rot);
         }
         void Buy(string id)
         {
@@ -189,12 +189,13 @@ public class PlaythroughTests
         bot.Link(recycler, depot);
         var ore = w.Nodes.Values.Where(n => n.Item == "ore" && n.YieldPermille == 1000).OrderBy(n => n.X * n.X + n.Z * n.Z).ToList();
         foreach (var n in ore) Reveal(n);
-        var ex1 = Build("ore_extractor", ore[0].X, ore[0].Z);
+        var ex1 = Build("ore_extractor", ore[0].X, ore[0].Z, rot: 3);
         var smelter = Build("smelter", 21, -3);
         bot.Link(ex1, smelter);
         crates["ingot"] = Build("storage_crate", 16, -2);
         bot.Link(smelter, crates["ingot"]);
-        var ex2 = Build("ore_extractor", ore[1].X, ore[1].Z);
+        // El segundo yacimiento toca la fundición: se gira para que su salida quede libre.
+        var ex2 = Build("ore_extractor", ore[1].X, ore[1].Z, rot: 3);
         bot.Link(ex2, smelter);
         Stock("ingot", 10);
         bot.Do(new Command { Type = CommandType.FulfillContract, Text = "c_first_ingots" });
@@ -205,7 +206,8 @@ public class PlaythroughTests
         crates["parts"] = Build("storage_crate", 5, -3);
         bot.Link(assembler, crates["parts"]);
         Build("rtg_generator", 8, 8);
-        var ex3 = Build("ore_extractor", ore[2].X, ore[2].Z);
+        // Girado hacia la fundición: deja libre la fila norte, donde irá la estación.
+        var ex3 = Build("ore_extractor", ore[2].X, ore[2].Z, rot: 1);
         bot.Link(ex3, smelter);
         var byAssembly = w.Tick / 600.0;
 
@@ -216,7 +218,6 @@ public class PlaythroughTests
         foreach (var n in rich) Reveal(n);
         var baseStation = Build("station", 21, -9);
         bot.Do(new Command { Type = CommandType.StationMode, A = baseStation.Id, B = 1 });
-        bot.Link(baseStation, smelter);
         var mine = Build("station", 55, -37);
         Earn(200);
         bot.WalkToCell(35, -17);
@@ -224,6 +225,8 @@ public class PlaythroughTests
         bot.WalkToCell(49, -31);
         bot.Do(new Command { Type = CommandType.PlaceRail, A = 45, B = -27, C = 53, D = -35 });
         bot.Do(new Command { Type = CommandType.PlaceRail, A = 53, B = -35, C = 55, D = -35 });
+        // Tras tender la vía: la cinta rodea lo que ya está colocado.
+        bot.Link(baseStation, smelter);
         foreach (var n in rich)
         {
             var e = Build("ore_extractor", n.X, n.Z);
@@ -315,7 +318,8 @@ public class PlaythroughTests
         _out.WriteLine($"Tras depositar: mochila [{string.Join(",", p.Bag.Items.Select(i => i.Key + "=" + i.Value))}] depósito [{string.Join(",", marsDepot.In.Items.Select(i => i.Key + "=" + i.Value))}]");
         bot.Do(new Command { Type = CommandType.FulfillContract, Text = "c_mars_samples" }, mustWork: false);
         Earn(0);
-        var fab = bot.Build("nav_fab", 9, 8);
+        // Mira al sur: entra por la fila que la separa de la plataforma y sale hacia el almacén.
+        var fab = bot.Build("nav_fab", 9, 9, rot: 2);
         bot.Link(padMars, fab);
         var cores = bot.Build("storage_crate", 13, 10);
         bot.Link(fab, cores);
@@ -393,7 +397,7 @@ public class PlaythroughTests
             foreach (var d in w.DebrisById.Values.Where(d => d.CoversNode == node.Id).ToList()) bot.Cut(d);
         }
         bot.GatherRecovered(recycler, depot, 8);
-        var ex2 = bot.Build("ore_extractor", ore[1].X, ore[1].Z);
+        var ex2 = bot.Build("ore_extractor", ore[1].X, ore[1].Z, rot: 3);
         bot.Link(ex2, smelter);
 
         bot.WaitUntil(() => midDepot.In.Get("ingot") >= 30, 6000, "lingotes para ensamblaje");

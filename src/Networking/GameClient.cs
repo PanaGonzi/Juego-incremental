@@ -28,6 +28,7 @@ public sealed class GameClient : IDisposable
     public int HashChecks => Volatile.Read(ref _hashChecks);
     public int PendingCount => _pending.Count;
     public int StructuralDeltas { get; private set; }
+    public int SlotDeltas { get; private set; }
 
     public event Action<uint, CommandResult>? ResultReceived;
     public event Action<string, string>? ChatReceived;
@@ -233,7 +234,8 @@ public sealed class GameClient : IDisposable
         structural |= n > 0;
         for (var i = 0; i < n; i++)
         {
-            var l = WorldCodec.ReadLink(r);
+            var l = WorldCodec.ReadLink(r, Content);
+            if (world.Links.TryGetValue(l.Id, out var known)) l.SlotsVersion = known.SlotsVersion + 1;
             world.Links[l.Id] = l;
         }
         n = r.Read7BitEncodedInt();
@@ -293,6 +295,9 @@ public sealed class GameClient : IDisposable
         structural |= n > 0;
         for (var i = 0; i < n; i++) world.Trains.Remove(r.ReadInt32());
         if (r.ReadBoolean()) WorldCodec.ReadShipments(r, world);
+        n = r.Read7BitEncodedInt();
+        for (var i = 0; i < n; i++) WorldCodec.ReadSlotsCompact(r, world);
+        if (n > 0) SlotDeltas++;
         if (structural)
         {
             StructuralDeltas++;
