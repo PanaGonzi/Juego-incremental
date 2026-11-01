@@ -8,7 +8,6 @@
 
 **Bloqueado, requiere intervención del usuario:**
 
-0. Ventana «Seguridad de Windows» (proceso `PickerHost`, abierta el 01-11-2026 a las 05:07, origen desconocido) con el primer plano: impide a `PlayDriver` jugar con entradas reales. No se ha cerrado ni se ha forzado el foco. Al resolverla, repetir la QA de primera experiencia (E-6) con un perfil nuevo.
 1. Jugar: duración real de la campaña, comprensión de objetivos y sensación general. Es lo que más información aportaría ahora.
 2. Dos PC o un amigo: LAN e Internet reales.
 3. Segunda cuenta de Steam o probador, y más adelante AppID propio: invitaciones y relays.
