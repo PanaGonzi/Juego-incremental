@@ -117,7 +117,7 @@ public partial class AutoTest : Node
     private async Task CutDebris(Debris d)
     {
         var pos = DebrisPos(d);
-        var approach = _view!.PlayerPosition.DirectionTo(pos) * -4f + pos;
+        var approach = _view!.PlayerPosition.DirectionTo(pos) * -3f + pos;
         approach.Y = 0;
         await WalkTo(approach);
         _view.SetTool(Tool.Cutter);
@@ -323,9 +323,9 @@ public partial class AutoTest : Node
         Key(Godot.Key.L);
         await Wait(0.1);
         Check(v.CurrentTool == Tool.Link, "L selecciona el enlazador");
-        Key(Godot.Key.Q);
+        Key(Godot.Key.Z);
         await Wait(0.1);
-        Check(v.CurrentTool == Tool.Cutter, "Q cancela y vuelve al cortador");
+        Check(v.CurrentTool == Tool.Cutter, "Z cancela y vuelve a la multiherramienta");
 
         Controls.Rebind("tool_link", Godot.Key.K);
         Key(Godot.Key.L);
@@ -338,27 +338,49 @@ public partial class AutoTest : Node
         Controls.Rebind("rotate", Godot.Key.K);
         Check(Controls.KeyNames("tool_link") == "—" || !Controls.KeyNames("tool_link").Contains("K"), "una tecla no queda asignada a dos acciones");
         Controls.ResetAll();
-        Key(Godot.Key.Q);
+        Key(Godot.Key.Z);
         await Wait(0.1);
         Key(Godot.Key.L);
         await Wait(0.1);
         Check(v.CurrentTool == Tool.Link, "restaurar controles recupera L");
-        Key(Godot.Key.Q);
+        Key(Godot.Key.Z);
         await Wait(0.1);
 
         Key(Godot.Key.Tab);
         await Wait(0.2);
-        Check(v.PanelIsOpen && Input.MouseMode == Input.MouseModeEnum.Visible, "Tab abre el panel y libera el ratón");
+        Check(v.InventoryOpen && Input.MouseMode == Input.MouseModeEnum.Visible, "Tab abre el inventario y libera el ratón");
+        await Shot("00_inventario");
+        Key(Godot.Key.Tab);
+        await Wait(0.2);
+        Check(!v.InventoryOpen && Input.MouseMode == Input.MouseModeEnum.Captured, "otra pulsación de Tab lo cierra y recupera el ratón");
+        Key(Godot.Key.Tab);
+        await Wait(0.2);
         Key(Godot.Key.Escape);
         await Wait(0.2);
-        Check(!v.PanelIsOpen && !v.IsPaused, "Esc cierra el panel sin pausar");
+        Check(!v.PanelIsOpen && !v.IsPaused, "Esc cierra el inventario sin pausar");
 
-        Key(Godot.Key.B);
+        Key(Godot.Key.Q);
         await Wait(0.2);
-        Check(v.PanelIsOpen, "B abre el menú de construcción");
+        Check(v.InventoryOpen && v.Inventory.CurrentTab == InventoryTab.Catalog, "Q abre el catálogo de construcción");
+        await Wait(0.4);
         await Shot("00_menu_construir");
         Key(Godot.Key.Escape);
         await Wait(0.2);
+
+        Key(Godot.Key.Key2);
+        await Wait(0.1);
+        Check(v.CurrentTool == Tool.Link, "la casilla 2 de la barra selecciona la cinta");
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.WheelDown, Pressed = true });
+        await Wait(0.1);
+        Check(v.CurrentTool == Tool.Remove, "la ruedecilla pasa a la casilla siguiente");
+        Key(Godot.Key.Key1);
+        await Wait(0.1);
+        Check(v.CurrentTool == Tool.Cutter && !v.IsStowed, "la casilla 1 saca la multiherramienta");
+        Key(Godot.Key.Key1);
+        await Wait(0.1);
+        Check(v.IsStowed, "repetir la casilla 1 la guarda");
+        Key(Godot.Key.Key1);
+        await Wait(0.1);
 
         var serverWorld = v.Session.Runner!.Server.World;
         var running = serverWorld.Tick;
@@ -378,7 +400,7 @@ public partial class AutoTest : Node
         // Corte con el botón real sobre el escombro más cercano
         var d = W.DebrisById.Values.Where(x => x.Def == "scrap_pile").OrderBy(x => DebrisPos(x).DistanceSquaredTo(v.PlayerPosition)).First();
         var pos = DebrisPos(d);
-        var approach = v.PlayerPosition.DirectionTo(pos) * -4f + pos;
+        var approach = v.PlayerPosition.DirectionTo(pos) * -3f + pos;
         await WalkTo(new Vector3(approach.X, 0, approach.Z));
         v.AimAt(pos);
         await Wait(0.2);

@@ -30,6 +30,8 @@ public partial class GameView : Node3D
         public Vector3 Target;
         public float TargetYaw;
         public double LastSeen;
+        public RemoteToolView Tool = null!;
+        public byte Action;
     }
 
     public readonly GameSession Session;
@@ -70,8 +72,15 @@ public partial class GameView : Node3D
     private Camera3D _camera = null!;
     private WorldEnvironment _env = null!;
     private DirectionalLight3D _sun = null!;
-    private MeshInstance3D _beam = null!;
     private GpuParticles3D _sparks = null!;
+    private FirstPersonRig _rig = null!;
+    private ImpactEffects _impacts = null!;
+    private ToolAudio _toolAudio = null!;
+    private InventoryUi _inv = null!;
+    private Hotbar _hotbar = null!;
+    private TargetBar _targetBar = null!;
+    private CanvasLayer _uiLayer = null!;
+    private readonly Dictionary<int, ImpactKind> _debrisKinds = new();
     private ShaderMaterial _ground = null!;
     private ShaderMaterial _sky = null!;
     private int _viewPlanet = -1;
@@ -106,6 +115,18 @@ public partial class GameView : Node3D
     private float _bobPhase;
     private double _time;
 
+    /// <summary>Distancia a la que el cabezal alcanza de verdad el objetivo. El servidor sigue validando su propio alcance.</summary>
+    private const float WorkReach = 4.4f;
+    private bool _stowed;
+    private bool _working;
+    private bool _suppressPrimary;
+    private int _ignoreMotion;
+    private Vector2 _lookAccum;
+    private float _wallDistance = 9f;
+    private float _kick;
+    private GeometryInstance3D? _highlighted;
+    private List<string> _hotbarEntries = HotbarLayout.Default.ToList();
+
     private Tool _tool = Tool.Cutter;
     private string _buildDef = "";
     private int _buildRot;
@@ -125,7 +146,13 @@ public partial class GameView : Node3D
     private float _autoStuck, _autoSidestep;
     public bool TestCapture;
     public Tool CurrentTool => _tool;
-    public bool PanelIsOpen => _hud.PanelOpen;
+    public bool PanelIsOpen => _hud.PanelOpen || _inv.IsOpen;
+    public bool InventoryOpen => _inv.IsOpen;
+    public InventoryUi Inventory => _inv;
+    public FirstPersonRig Rig => _rig;
+    public bool IsWorking => _working;
+    public bool IsStowed => _stowed;
+    public IList<string> HotbarEntries => _hotbarEntries;
     public bool IsPaused => _paused;
     public float Yaw => _yaw;
 
@@ -147,11 +174,21 @@ public partial class GameView : Node3D
     {
         BuildEnvironment();
         BuildPlayer();
+        _hotbarEntries = HotbarLayout.Normalize(_main.Prefs.Hotbar);
+        AddChild(new MachineThumbnails());
         var layer = new CanvasLayer();
+        _uiLayer = layer;
         AddChild(layer);
         _hud = new Hud(this);
         layer.AddChild(_hud);
         _hud.SetTool(0);
+        _targetBar = new TargetBar();
+        layer.AddChild(_targetBar);
+        layer.AddChild(new PickupFeed(this));
+        _inv = new InventoryUi(this);
+        layer.AddChild(_inv);
+        _hotbar = new Hotbar(this);
+        layer.AddChild(_hotbar);
 
         _loading = new PanelContainer();
         _loading.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
@@ -169,6 +206,7 @@ public partial class GameView : Node3D
         client.NoticeReceived += (key, arg) => _hud.AddChat(Loc.T(key, arg));
         client.PositionCorrected += (x, y, z) => _body.GlobalPosition = new Vector3(x, y, z);
         client.RemoteMoved += OnRemoteMoved;
+        client.RemoteAction += OnRemoteAction;
         for (var i = 0; i < 6; i++)
         {
             var hum = new AudioStreamPlayer3D { Stream = Sfx.Hum, MaxDistance = 28, UnitSize = 5, VolumeDb = Sfx.MachineDb, Autoplay = false };
@@ -400,14 +438,12 @@ public partial class GameView : Node3D
         _camera.AddChild(lamp);
         AddChild(_body);
 
-        _beam = new MeshInstance3D
-        {
-            Mesh = new CylinderMesh { TopRadius = 0.025f, BottomRadius = 0.025f, Height = 1, RadialSegments = 6 },
-            MaterialOverride = Models.Mat("amber"),
-            Visible = false,
-            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-        };
-        AddChild(_beam);
+        _toolAudio = new ToolAudio(_main.Prefs);
+        AddChild(_toolAudio);
+        _rig = new FirstPersonRig { Sound = _toolAudio.Play };
+        _camera.AddChild(_rig);
+        _impacts = new ImpactEffects();
+        AddChild(_impacts);
     }
 
     private void OnWorldReady()
@@ -458,8 +494,10 @@ public partial class GameView : Node3D
     private void ClearWorldView()
     {
         foreach (var id in _machines.Keys.ToList()) FreeMachine(id);
+        _highlighted = null;
         foreach (var mesh in _debris.Values) mesh.QueueFree();
         _debris.Clear();
+        _debrisKinds.Clear();
         foreach (var body in _debrisBodies.Values)
         {
             _pickables.Remove(body.GetInstanceId());
@@ -492,6 +530,7 @@ public partial class GameView : Node3D
         _flightSwapped = _viewPlanet == _flightTo;
         SetTool(Tool.Cutter);
         _hud.ClosePanel();
+        _inv.Close();
 
         _shuttle = new Node3D { Position = _body.GlobalPosition with { Y = 0.5f } };
         _shuttle.AddChild(new MeshInstance3D { Mesh = Models.ShuttleCabin(), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
@@ -624,7 +663,9 @@ public partial class GameView : Node3D
         foreach (var id in _debris.Keys.Where(k => !seen.Contains(k)).ToList())
         {
             var mesh = _debris[id];
-            BreakEffect(mesh.GlobalPosition);
+            BreakEffect(mesh.GlobalPosition, _debrisKinds.GetValueOrDefault(id));
+            if (_highlighted == mesh) _highlighted = null;
+            _debrisKinds.Remove(id);
             mesh.QueueFree();
             _debris.Remove(id);
             if (_debrisBodies.Remove(id, out var body))
@@ -937,6 +978,7 @@ public partial class GameView : Node3D
     private void FreeMachine(int id)
     {
         if (!_machines.Remove(id, out var node)) return;
+        if (_highlighted != null && node.Root.IsAncestorOf(_highlighted)) _highlighted = null;
         _pickables.Remove(((StaticBody3D)node.Root.GetChildren().First(c => c is StaticBody3D)).GetInstanceId());
         node.Root.QueueFree();
     }
@@ -952,6 +994,7 @@ public partial class GameView : Node3D
             VisibilityRangeEnd = 220,
         };
         AddChild(mesh);
+        _debrisKinds[d.Id] = ImpactOf(d.Def);
         var body = new StaticBody3D { CollisionLayer = PickMask, CollisionMask = 0, Position = pos };
         body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(1.9f, 1.4f, 1.9f) }, Position = new Vector3(0, 0.7f, 0) });
         // Núcleo sólido menor que la zona de apuntado: impide meterse dentro sin atascar al caminar.
@@ -964,11 +1007,17 @@ public partial class GameView : Node3D
         return mesh;
     }
 
-    private void BreakEffect(Vector3 at)
+    /// <summary>Material de cada escombro a efectos de partículas y sonido.</summary>
+    private static ImpactKind ImpactOf(string debrisDef) => debrisDef switch
     {
-        _sparks.GlobalPosition = at + Vector3.Up * 0.6f;
-        _sparks.Restart();
-        _sparks.Emitting = true;
+        "ice_block" or "ice_crust" => ImpactKind.Ice,
+        "red_rock" => ImpactKind.Rock,
+        _ => ImpactKind.Scrap,
+    };
+
+    private void BreakEffect(Vector3 at, ImpactKind kind)
+    {
+        _impacts.Burst(kind, at + Vector3.Up * 0.6f);
         Sfx.Play("break", 0.1f);
     }
 
@@ -1008,16 +1057,29 @@ public partial class GameView : Node3D
 
     // ---------- Entrada ----------
 
+    /// <summary>La tecla del inventario llega antes que la navegación por foco de la interfaz, que también usa Tab.</summary>
+    public override void _Input(InputEvent e)
+    {
+        if (!_worldReady || _hud.ChatOpen || _paused || !e.IsActionPressed("inventory")) return;
+        if (_hud.PanelOpen) _hud.ClosePanel();
+        else if (!_inFlight) OpenInventory(InventoryTab.Items);
+        GetViewport().SetInputAsHandled();
+    }
+
     public override void _UnhandledInput(InputEvent e)
     {
         if (!_worldReady) return;
         if (e is InputEventMouseMotion motion && Input.MouseMode == Input.MouseModeEnum.Captured)
         {
+            // Al recuperar el ratón llega un salto acumulado que no es movimiento del jugador.
+            if (_ignoreMotion > 0) return;
             var s = 0.0022f * _main.Prefs.Sensitivity;
             _yaw -= motion.Relative.X * s;
             _pitch = Mathf.Clamp(_pitch - motion.Relative.Y * s, -1.5f, 1.5f);
+            _lookAccum += motion.Relative;
             return;
         }
+        if (_inv.IsOpen) return;
         if (e.IsActionPressed("pause"))
         {
             if (_hud.ChatOpen) _hud.CloseChat();
@@ -1040,8 +1102,23 @@ public partial class GameView : Node3D
         }
         if (_hud.PanelOpen || _inFlight) return;
 
-        if (e.IsActionPressed("tool_cutter")) SetTool(Tool.Cutter);
-        else if (e.IsActionPressed("tool_build")) OpenBuildMenu();
+        if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.WheelUp or MouseButton.WheelDown } wheel)
+        {
+            var from = _hotbarEntries.IndexOf(ActiveEntry);
+            var next = HotbarLayout.Step(_hotbarEntries, from, wheel.ButtonIndex == MouseButton.WheelDown ? 1 : -1);
+            // La rueda solo cambia de herramienta: nunca guarda la multiherramienta por repetir casilla.
+            if (next >= 0 && next != from) ActivateEntry(_hotbarEntries[next]);
+            return;
+        }
+        for (var i = 0; i < HotbarLayout.Slots; i++)
+        {
+            if (!e.IsActionPressed("hotbar_" + (i + 1))) continue;
+            SelectHotbar(i);
+            return;
+        }
+
+        if (e.IsActionPressed("tool_cutter")) ActivateEntry(HotbarLayout.Cutter);
+        else if (e.IsActionPressed("tool_build")) OpenInventory(InventoryTab.Catalog);
         else if (e.IsActionPressed("tool_link")) SetTool(Tool.Link);
         else if (e.IsActionPressed("tool_remove")) SetTool(Tool.Remove);
         else if (e.IsActionPressed("tool_rail")) SetTool(Tool.Rail);
@@ -1049,8 +1126,10 @@ public partial class GameView : Node3D
         {
             if (_tool == Tool.Rail) _railShape = (byte)((_railShape + 1) % 3);
             else _buildRot = (_buildRot + 1) % 4;
+            if (_tool is Tool.Rail or Tool.Build) _rig.OnTap();
         }
-        else if (e.IsActionPressed("cancel")) { SetTool(Tool.Cutter); _linkFrom = -1; }
+        else if (e.IsActionPressed("cancel")) Cancel();
+        else if (e.IsActionPressed("interact")) Interact();
         else if (e.IsActionPressed("interact_insert")) AimedMachine(CommandType.Insert);
         else if (e.IsActionPressed("interact_take")) AimedMachine(CommandType.Extract);
         else if (e.IsActionPressed("interact_panel"))
@@ -1061,12 +1140,149 @@ public partial class GameView : Node3D
         {
             if (_tool != Tool.Cutter) Primary();
         }
-        else if (e.IsActionPressed("secondary"))
-        {
-            if (_tool == Tool.Link) _linkFrom = -1;
-            if (_tool == Tool.Rail) _railPlacing = false;
-        }
+        else if (e.IsActionPressed("secondary")) Cancel();
     }
+
+    /// <summary>Clic derecho: primero anula el paso en curso; si no lo hay, vuelve a la multiherramienta.</summary>
+    private void Cancel()
+    {
+        if (_tool == Tool.Link && _linkFrom >= 0) _linkFrom = -1;
+        else if (_tool == Tool.Rail && _railPlacing) _railPlacing = false;
+        else if (_tool != Tool.Cutter) SetTool(Tool.Cutter);
+    }
+
+    /// <summary>E: abre o actúa sobre lo apuntado. El gesto es breve y nunca bloquea la acción.</summary>
+    private void Interact()
+    {
+        var w = Session.Client.World!;
+        _rig.OnGesture();
+        if (_aim.kind == "debris" && _tool == Tool.Cutter && !_stowed && w.DebrisById.TryGetValue(_aim.id, out var d))
+        {
+            // Recoger a mano: el servidor valida alcance y enfriamiento igual que con el cabezal.
+            var at = new Vector3((d.X + 0.5f) * Cell, 0.6f, (d.Z + 0.5f) * Cell);
+            if (_body.GlobalPosition.DistanceTo(at) <= WorkReach) Session.Client.Send(new Command { Type = CommandType.CutDebris, A = d.Id });
+            return;
+        }
+        if (_aim.kind != "machine" || !w.Machines.TryGetValue(_aim.id, out var m)) return;
+        if (!MachineInReach(w, m))
+        {
+            _hud.Toast(Loc.T("err_range"));
+            Sfx.Play("error");
+            return;
+        }
+        if (w.Content.Machines[m.Def].Kind is MachineKind.Generator or MachineKind.Shuttle or MachineKind.Radiator) _hud.OpenMachine(m.Id);
+        else OpenInventory(InventoryTab.Items, m.Id);
+    }
+
+    private bool MachineInReach(World w, Machine m)
+    {
+        var (cx, cz) = w.MachineCenterMm(m);
+        return new Vector2(cx / 1000f - _body.GlobalPosition.X, cz / 1000f - _body.GlobalPosition.Z).Length() <= w.Content.Balance.InteractRangeMm / 1000f;
+    }
+
+    // ---------- Barra rápida e inventario ----------
+
+    /// <summary>Lo que corresponde a la barra rápida en este momento, o vacío si la herramienta está guardada.</summary>
+    public string ActiveEntry => _stowed ? "" : _tool switch
+    {
+        Tool.Cutter => HotbarLayout.Cutter,
+        Tool.Build => "build:" + _buildDef,
+        Tool.Link => "tool:link",
+        Tool.Remove => "tool:remove",
+        Tool.Rail => "tool:rail",
+        _ => "",
+    };
+
+    public void SelectHotbar(int index)
+    {
+        if (index < 0 || index >= _hotbarEntries.Count || _hotbarEntries[index].Length == 0) return;
+        ActivateEntry(_hotbarEntries[index]);
+        RefreshHotbar();
+    }
+
+    public void ActivateEntry(string entry)
+    {
+        switch (EntryInfo.ToolOf(entry))
+        {
+            case "cutter":
+                // Repetir la casilla de la herramienta la guarda y libera las manos.
+                if (_tool == Tool.Cutter && !_stowed) _stowed = true;
+                else SetTool(Tool.Cutter);
+                return;
+            case "link": SetTool(Tool.Link); return;
+            case "remove": SetTool(Tool.Remove); return;
+            case "rail": SetTool(Tool.Rail); return;
+        }
+        var def = EntryInfo.DefOf(entry);
+        var w = Session.Client.World;
+        if (w == null || !w.Content.Machines.TryGetValue(def, out var d)) return;
+        if (d.Unlock != null && !w.Upgrades.Contains(d.Unlock))
+        {
+            Notify(Loc.T("hotbar_locked"));
+            return;
+        }
+        SelectBuild(def);
+    }
+
+    public void AssignHotbar(int index, string entry)
+    {
+        HotbarLayout.Assign(_hotbarEntries, index, entry);
+        SaveHotbar();
+    }
+
+    public void ClearHotbar(int index)
+    {
+        HotbarLayout.Clear(_hotbarEntries, index);
+        SaveHotbar();
+    }
+
+    private void SaveHotbar()
+    {
+        _main.Prefs.Hotbar = _hotbarEntries.ToList();
+        _main.Prefs.Save();
+        RefreshHotbar();
+    }
+
+    public void RefreshHotbar() => _hotbar?.Refresh();
+
+    public void OpenInventory(InventoryTab tab, int machine = -1)
+    {
+        if (_inFlight) return;
+        if (_hud.PanelOpen) _hud.ClosePanel();
+        _inv.Open(tab, machine);
+    }
+
+    public void OnInventoryClosed()
+    {
+        UpdateMouseMode();
+        RefreshHotbar();
+    }
+
+    public void OpenTechFromInventory()
+    {
+        _inv.Close();
+        _hud.OpenTech();
+    }
+
+    public void OpenPlayersFromInventory()
+    {
+        _inv.Close();
+        _hud.OpenPlayers();
+    }
+
+    public void OpenMachineFromInventory(int id)
+    {
+        _inv.Close();
+        _hud.OpenMachine(id);
+    }
+
+    public void Notify(string text)
+    {
+        _hud.Toast(text);
+        Sfx.Play("error");
+    }
+
+    public void RigGesture() => _rig.OnGesture();
 
     private void TogglePause()
     {
@@ -1091,6 +1307,12 @@ public partial class GameView : Node3D
     private void ApplyPrefs()
     {
         _hud.RefreshStaticText();
+        // Sus botones llevan texto e indicación de tecla fijos: tras cambiar idioma o controles se rehace.
+        var old = _inv;
+        _inv = new InventoryUi(this);
+        _uiLayer.AddChild(_inv);
+        _uiLayer.MoveChild(_inv, old.GetIndex());
+        old.QueueFree();
         if (_ambience != null) _ambience.VolumeDb = Sfx.AmbienceDb;
         if (_eventLight != null) _eventLight.LightEnergy = 1.6f * _main.Prefs.EventAmbience;
         if (_eventAmbience != null)
@@ -1106,28 +1328,27 @@ public partial class GameView : Node3D
 
     public void UpdateMouseMode()
     {
-        var free = _paused || _hud.PanelOpen || _hud.ChatOpen || !_worldReady;
-        Input.MouseMode = _main.Auto != null && !TestCapture ? Input.MouseModeEnum.Visible : free ? Input.MouseModeEnum.Visible : Input.MouseModeEnum.Captured;
+        var free = _paused || _hud.PanelOpen || _hud.ChatOpen || _inv.IsOpen || !_worldReady;
+        var mode = _main.Auto != null && !TestCapture ? Input.MouseModeEnum.Visible : free ? Input.MouseModeEnum.Visible : Input.MouseModeEnum.Captured;
+        if (mode == Input.MouseModeEnum.Captured && Input.MouseMode != mode)
+        {
+            // Recupera el control sin clics accidentales ni salto de cámara.
+            _ignoreMotion = 3;
+            _suppressPrimary = Input.IsActionPressed("primary");
+        }
+        Input.MouseMode = mode;
     }
 
     public void SetTool(Tool t)
     {
         _tool = t;
+        _stowed = false;
         _linkFrom = -1;
         _hud.SetTool((int)t);
         _railPlacing = false;
         _ground.SetShaderParameter("grid_strength", t is Tool.Build or Tool.Rail ? 1f : 0f);
         if (t != Tool.Build) RemoveGhost();
         if (t != Tool.Rail) RemoveRailGhost();
-    }
-
-    private void OpenBuildMenu()
-    {
-        _hud.OpenBuild(def =>
-        {
-            SelectBuild(def);
-            _hud.ClosePanel();
-        });
     }
 
     public void SelectBuild(string def)
@@ -1141,19 +1362,23 @@ public partial class GameView : Node3D
         if (_aim.kind != "machine") return;
         Session.Client.Send(new Command { Type = type, A = _aim.id });
         Sfx.Play(type == CommandType.Insert ? "deposit" : "take");
+        _rig.OnGesture();
     }
 
     /// <summary>Acción principal de la herramienta activa sobre lo que apunta la cámara.</summary>
     public void Primary()
     {
         var client = Session.Client;
+        if (_tool != Tool.Cutter) _rig.OnTap();
         switch (_tool)
         {
             case Tool.Cutter:
                 if (_aim.kind == "debris")
                 {
                     client.Send(new Command { Type = CommandType.CutDebris, A = _aim.id });
-                    Sfx.Play("cut", 0.12f);
+                    _toolAudio.Hit(_debrisKinds.GetValueOrDefault(_aim.id));
+                    _rig.OnHit();
+                    if (_main.Prefs.CameraBob) _kick = 0.0032f * _main.Prefs.BobIntensity;
                 }
                 break;
             case Tool.Build:
@@ -1224,12 +1449,20 @@ public partial class GameView : Node3D
             root.AddChild(new Label3D { Text = name, Billboard = BaseMaterial3D.BillboardModeEnum.Enabled, Position = new Vector3(0, 2.15f, 0), PixelSize = 0.008f, FontSize = 48, OutlineSize = 10 });
             AddChild(root);
             root.GlobalPosition = new Vector3(x, y, z);
-            r = new RemotePlayer { Root = root };
+            // Herramienta del modelo externo. El modelo mira a +Z; la mano derecha queda en -X.
+            var tool = new RemoteToolView { Position = new Vector3(-0.3f, 1.02f, 0.42f), RotationDegrees = new Vector3(0, 180, 0) };
+            root.AddChild(tool);
+            r = new RemotePlayer { Root = root, Tool = tool };
             _remote[num] = r;
         }
         r.Target = new Vector3(x, y, z);
         r.TargetYaw = yaw;
         r.LastSeen = _time;
+    }
+
+    private void OnRemoteAction(int num, byte action)
+    {
+        if (_remote.TryGetValue(num, out var r)) r.Action = action;
     }
 
     // ---------- Bucle ----------
@@ -1282,17 +1515,68 @@ public partial class GameView : Node3D
         UpdateRemote(delta);
         UpdateAudio(delta);
         UpdateTool(delta);
+        UpdateRig((float)delta);
 
         _moveTimer -= delta;
         if (_moveTimer <= 0 && !_inFlight)
         {
             _moveTimer = 0.05;
             var p = _body.GlobalPosition;
-            client.SendMove(p.X, p.Y, p.Z, _yaw);
+            var equipped = _stowed ? PlayerAction.Stowed : _tool == Tool.Cutter ? PlayerAction.Cutter : PlayerAction.Device;
+            client.SendMove(p.X, p.Y, p.Z, _yaw, PlayerAction.Pack(equipped, _working));
             var me = client.LocalPlayer;
             if (me != null) { me.X = p.X; me.Y = p.Y; me.Z = p.Z; }
         }
     }
+
+    /// <summary>Alimenta los brazos con el estado del jugador. Solo representación.</summary>
+    private void UpdateRig(float dt)
+    {
+        if (_ignoreMotion > 0) _ignoreMotion--;
+        var hidden = _inFlight || _paused || _hud.PanelOpen || _hud.ChatOpen || _inv.IsOpen;
+        var input = new FirstPersonRig.Input
+        {
+            Mode = _stowed || hidden ? RigMode.Stowed : _tool == Tool.Cutter ? RigMode.Cutter : RigMode.Device,
+            Tool = _tool,
+            Velocity = _body.Velocity,
+            OnFloor = _body.IsOnFloor(),
+            Sprinting = Input.IsActionPressed("sprint"),
+            Working = _working,
+            BobOn = _main.Prefs.CameraBob,
+            BobScale = _main.Prefs.BobIntensity,
+            WallDistance = _wallDistance,
+            Look = _lookAccum / Mathf.Max(dt, 0.001f) * 0.016f,
+            Target = _working ? _aimPoint : null,
+        };
+        _lookAccum = Vector2.Zero;
+        _rig.Tick(dt, input);
+        _toolAudio.Motor(dt, _working);
+
+        _kick = Mathf.MoveToward(_kick, 0f, dt * 0.03f);
+        _camera.Rotation = new Vector3(_kick * Mathf.Sin((float)_time * 70f), _kick * 0.6f * Mathf.Sin((float)_time * 53f), 0);
+    }
+
+    private void UpdateHighlight(GeometryInstance3D? target, Color color)
+    {
+        if (_highlighted != target)
+        {
+            if (_highlighted != null && GodotObject.IsInstanceValid(_highlighted)) _highlighted.MaterialOverlay = null;
+            _highlighted = target;
+            if (target != null) target.MaterialOverlay = HighlightMaterial;
+        }
+        if (target != null) HighlightMaterial.SetShaderParameter("tint", new Vector3(color.R, color.G, color.B));
+    }
+
+    private static readonly ShaderMaterial HighlightMaterial = new() { Shader = new Shader { Code = """
+        shader_type spatial;
+        render_mode unshaded, blend_add, depth_draw_never, cull_back, shadows_disabled;
+        uniform vec3 tint = vec3(1.0, 0.67, 0.25);
+        void fragment(){
+          float rim = pow(1.0 - clamp(abs(dot(NORMAL, VIEW)), 0.0, 1.0), 2.2);
+          ALBEDO = tint;
+          ALPHA = rim * 0.7 + 0.05 + 0.03 * sin(TIME * 5.0);
+        }
+        """ } };
 
     private void AnimateMachines(float delta)
     {
@@ -1323,6 +1607,7 @@ public partial class GameView : Node3D
             var k = 1f - Mathf.Exp((float)-delta * 12f);
             r.Root.GlobalPosition = r.Root.GlobalPosition.Lerp(r.Target, k);
             r.Root.Rotation = new Vector3(0, Mathf.LerpAngle(r.Root.Rotation.Y, r.TargetYaw + Mathf.Pi, k), 0);
+            r.Tool.Tick((float)delta, PlayerAction.Equipped(r.Action), PlayerAction.IsWorking(r.Action));
         }
     }
 
@@ -1357,7 +1642,7 @@ public partial class GameView : Node3D
         if (!_worldReady || _inFlight) return;
         var dt = (float)delta;
         var dir = Vector3.Zero;
-        var typing = _hud.ChatOpen || _hud.PanelOpen || _paused;
+        var typing = _hud.ChatOpen || _hud.PanelOpen || _inv.IsOpen || _paused;
         if (AutoWalkTarget is { } target)
         {
             var flat = target - _body.GlobalPosition;
@@ -1399,7 +1684,7 @@ public partial class GameView : Node3D
         if (_main.Prefs.CameraBob && dir != Vector3.Zero && _body.IsOnFloor())
         {
             _bobPhase += dt * speed * 1.4f;
-            _camera.Position = new Vector3(0, Mathf.Sin(_bobPhase) * 0.035f, 0);
+            _camera.Position = new Vector3(0, Mathf.Sin(_bobPhase) * 0.035f * _main.Prefs.BobIntensity, 0);
         }
         else
         {
@@ -1419,6 +1704,11 @@ public partial class GameView : Node3D
             var collider = (GodotObject)hit["collider"];
             if (_pickables.TryGetValue(collider.GetInstanceId(), out var target2)) _aim = target2;
         }
+
+        // Distancia al primer sólido delante de la cámara: gobierna la retracción de los brazos.
+        var wallQuery = PhysicsRayQueryParameters3D.Create(from, from - _camera.GlobalBasis.Z * 1.3f, 1);
+        var wall = GetWorld3D().DirectSpaceState.IntersectRay(wallQuery);
+        _wallDistance = wall.Count > 0 ? from.DistanceTo((Vector3)wall["position"]) : 9f;
     }
 
     private bool TryGroundPoint(out Vector3 point)
@@ -1557,45 +1847,61 @@ public partial class GameView : Node3D
         var client = Session.Client;
         var w = client.World!;
         var me = client.LocalPlayer!;
-        var blocked = _hud.PanelOpen || _hud.ChatOpen || _paused || _inFlight;
+        var blocked = _hud.PanelOpen || _hud.ChatOpen || _paused || _inFlight || _inv.IsOpen;
         var status = "";
         var statusColor = Ui.Ink;
         var prompt = "";
+        float? progress = null;
+        var progressColor = Ui.Amber;
+        GeometryInstance3D? highlight = null;
+        var highlightColor = Ui.Amber;
 
         if (_aim.kind == "machine" && w.Machines.TryGetValue(_aim.id, out var aimed))
         {
             status = $"{Loc.T("machine_" + aimed.Def)} — {Loc.T("status_" + aimed.Status)}";
             statusColor = aimed.Status is MachineStatus.NoInput or MachineStatus.OutputFull or MachineStatus.NoPower or MachineStatus.LowPower or MachineStatus.Overheated ? Ui.Bad : Ui.Good;
-            prompt = Loc.T("prompt_interact");
+            var inReach = MachineInReach(w, aimed);
+            prompt = Loc.T(inReach ? "prompt_interact" : "prompt_too_far");
+            if (_machines.TryGetValue(aimed.Id, out var aimedNode)) highlight = aimedNode.Root.GetChildOrNull<GeometryInstance3D>(0);
+            highlightColor = _tool == Tool.Remove ? Ui.Bad : inReach ? Ui.Amber : Ui.Dim;
         }
         else if (_aim.kind == "debris" && w.DebrisById.TryGetValue(_aim.id, out var aimedDebris))
         {
-            status = $"{Loc.T("item_" + w.Content.Balance.Debris[aimedDebris.Def].Drop)} · {aimedDebris.Hp}";
-            prompt = Loc.T("prompt_cut");
+            var dropDef = w.Content.Balance.Debris[aimedDebris.Def];
+            status = $"{Loc.T("item_" + dropDef.Drop)} · {aimedDebris.Hp} / {dropDef.Hp}";
+            var debrisPos = new Vector3((aimedDebris.X + 0.5f) * Cell, 0.6f, (aimedDebris.Z + 0.5f) * Cell);
+            var inReach = _body.GlobalPosition.DistanceTo(debrisPos) <= WorkReach;
+            prompt = Loc.T(_stowed ? "prompt_stowed" : inReach ? "prompt_cut" : "prompt_too_far");
+            progress = aimedDebris.Hp / (float)dropDef.Hp;
+            progressColor = inReach ? Ui.Amber : Ui.Dim;
+            highlight = _debris.GetValueOrDefault(aimedDebris.Id);
+            highlightColor = inReach && !_stowed ? Ui.Amber : Ui.Dim;
         }
 
-        var holding = !blocked && (AutoHoldPrimary || Input.IsActionPressed("primary"));
+        if (_suppressPrimary && !Input.IsActionPressed("primary")) _suppressPrimary = false;
+        var holding = !blocked && !_suppressPrimary && (AutoHoldPrimary || Input.IsActionPressed("primary"));
         var cutting = false;
+        var impact = ImpactKind.Scrap;
         switch (_tool)
         {
             case Tool.Cutter:
                 _cutTimer -= delta;
-                if (holding && _aim.kind == "debris" && w.DebrisById.TryGetValue(_aim.id, out var target))
+                if (holding && !_stowed && _aim.kind == "debris" && w.DebrisById.TryGetValue(_aim.id, out var target))
                 {
+                    // Solo se trabaja al alcance del cabezal; al soltar, alejarse o abrir un menú se interrumpe.
                     var targetPos = new Vector3((target.X + 0.5f) * Cell, 0.6f, (target.Z + 0.5f) * Cell);
-                    if (_body.GlobalPosition.DistanceTo(targetPos) <= w.Content.Balance.CutterRangeMm / 1000f)
+                    if (_body.GlobalPosition.DistanceTo(targetPos) <= Mathf.Min(WorkReach, w.Content.Balance.CutterRangeMm / 1000f))
                     {
                         cutting = true;
-                        ShowBeam(_aimPoint);
+                        impact = _debrisKinds.GetValueOrDefault(target.Id);
                         if (_cutTimer <= 0)
                         {
                             _cutTimer = w.Content.Balance.CutterCooldownTicks / (float)w.Content.Balance.TicksPerSecond + 0.01f;
                             Primary();
-                            _sparks.GlobalPosition = _aimPoint;
-                            _sparks.Emitting = true;
                         }
                     }
                 }
+                if (_stowed && _aim.kind == "") prompt = Loc.T("prompt_stowed");
                 break;
             case Tool.Build:
                 prompt = Loc.T("prompt_build");
@@ -1614,20 +1920,11 @@ public partial class GameView : Node3D
                 UpdateRailGhost(w, me, ref status, ref statusColor);
                 break;
         }
-        _beam.Visible = cutting;
+        _working = cutting;
+        _impacts.Work(cutting ? impact : null, _aimPoint, (_camera.GlobalPosition - _aimPoint).Normalized());
+        UpdateHighlight(blocked ? null : highlight, highlightColor);
+        _targetBar.Set(blocked ? null : progress, progressColor);
         _hud.SetPrompt(blocked ? "" : status, statusColor, blocked ? "" : prompt);
-    }
-
-    private void ShowBeam(Vector3 to)
-    {
-        var from = _camera.GlobalPosition + _camera.GlobalBasis * new Vector3(0.28f, -0.25f, -0.4f);
-        var mid = (from + to) / 2;
-        var dir = to - from;
-        var length = Mathf.Max(0.05f, dir.Length());
-        var y = dir / length;
-        var x = y.Cross(Mathf.Abs(y.Y) > 0.9f ? Vector3.Right : Vector3.Up).Normalized();
-        var z = x.Cross(y);
-        _beam.GlobalTransform = new Transform3D(new Basis(x, y * length, z), mid);
     }
 
     private void UpdateGhost(World w, PlayerState me, ref string status, ref Color color)
@@ -1680,7 +1977,11 @@ public partial class GameView : Node3D
     public Vector3 PlayerPosition => _body.GlobalPosition;
     public void SetRotation(int rot) => _buildRot = rot;
     public void OpenTechPanel() => _hud.OpenTech();
-    public void ClosePanelForTest() => _hud.ClosePanel();
+    public void ClosePanelForTest()
+    {
+        _hud.ClosePanel();
+        _inv.Close();
+    }
     public void OpenMachinePanel(int id) => _hud.OpenMachine(id);
 }
 
@@ -1697,17 +1998,28 @@ public static class Controls
         ["sprint"] = new[] { Godot.Key.Shift },
         ["jump"] = new[] { Godot.Key.Space },
         ["chat"] = new[] { Godot.Key.Enter },
-        ["tech"] = new[] { Godot.Key.Tab },
+        ["inventory"] = new[] { Godot.Key.Tab },
+        ["interact"] = new[] { Godot.Key.E },
+        ["tech"] = new[] { Godot.Key.J },
         ["players"] = new[] { Godot.Key.P },
-        ["tool_cutter"] = new[] { Godot.Key.Key1 },
-        ["tool_build"] = new[] { Godot.Key.Key2, Godot.Key.B },
-        ["tool_link"] = new[] { Godot.Key.Key3, Godot.Key.L },
-        ["tool_remove"] = new[] { Godot.Key.Key4, Godot.Key.X },
-        ["tool_rail"] = new[] { Godot.Key.Key5, Godot.Key.T },
+        ["hotbar_1"] = new[] { Godot.Key.Key1 },
+        ["hotbar_2"] = new[] { Godot.Key.Key2 },
+        ["hotbar_3"] = new[] { Godot.Key.Key3 },
+        ["hotbar_4"] = new[] { Godot.Key.Key4 },
+        ["hotbar_5"] = new[] { Godot.Key.Key5 },
+        ["hotbar_6"] = new[] { Godot.Key.Key6 },
+        ["hotbar_7"] = new[] { Godot.Key.Key7 },
+        ["hotbar_8"] = new[] { Godot.Key.Key8 },
+        ["hotbar_9"] = new[] { Godot.Key.Key9 },
+        ["tool_cutter"] = new[] { Godot.Key.V },
+        ["tool_build"] = new[] { Godot.Key.B, Godot.Key.Q },
+        ["tool_link"] = new[] { Godot.Key.L },
+        ["tool_remove"] = new[] { Godot.Key.X },
+        ["tool_rail"] = new[] { Godot.Key.T },
         ["rotate"] = new[] { Godot.Key.R },
-        ["cancel"] = new[] { Godot.Key.Q },
-        ["interact_insert"] = new[] { Godot.Key.E },
-        ["interact_take"] = new[] { Godot.Key.F },
+        ["cancel"] = new[] { Godot.Key.Z },
+        ["interact_insert"] = new[] { Godot.Key.F },
+        ["interact_take"] = new[] { Godot.Key.G },
         ["interact_panel"] = new[] { Godot.Key.C },
     };
 
@@ -1716,6 +2028,12 @@ public static class Controls
     public static void Setup(Settings prefs)
     {
         _prefs = prefs;
+        if (prefs.ControlsVersion < ControlsMigration.Current)
+        {
+            ControlsMigration.Migrate(prefs.Bindings, prefs.ControlsVersion);
+            prefs.ControlsVersion = ControlsMigration.Current;
+            prefs.Save();
+        }
         if (_done) return;
         _done = true;
         InputMap.AddAction("pause");
@@ -1725,6 +2043,7 @@ public static class Controls
             InputMap.AddAction(action);
             Apply(action);
         }
+        ResolveConflicts();
         Mouse("primary", MouseButton.Left);
         Mouse("secondary", MouseButton.Right);
     }
@@ -1738,6 +2057,15 @@ public static class Controls
             return;
         }
         foreach (var k in Defaults[action]) InputMap.ActionAddEvent(action, new InputEventKey { PhysicalKeycode = k });
+    }
+
+    /// <summary>Una reasignación del jugador siempre gana: la tecla deja de pertenecer a otro valor por omisión.</summary>
+    private static void ResolveConflicts()
+    {
+        foreach (var (action, code) in _prefs.Bindings)
+            foreach (var other in Defaults.Keys.Where(a => a != action))
+                foreach (var e in InputMap.ActionGetEvents(other).OfType<InputEventKey>().ToList())
+                    if (e.PhysicalKeycode == (Godot.Key)code) InputMap.ActionEraseEvent(other, e);
     }
 
     public static void Rebind(string action, Godot.Key key)

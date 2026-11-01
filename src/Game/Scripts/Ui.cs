@@ -147,7 +147,7 @@ public partial class Hud : Control
         _bag = Ui.Text("", 16);
         bagPanel.AddChild(_bag);
 
-        var hotbar = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+        var hotbar = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore, Visible = false }; // sustituida por Hotbar
         hotbar.SetAnchorsAndOffsetsPreset(LayoutPreset.CenterBottom);
         hotbar.GrowHorizontal = GrowDirection.Both;
         hotbar.GrowVertical = GrowDirection.Begin;
