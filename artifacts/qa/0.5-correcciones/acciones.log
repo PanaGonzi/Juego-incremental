@@ -1,0 +1,323 @@
+11:54:26.136 start C:\Users\gonza\Desktop\Juego incremental\.claude\worktrees\agent-a05d24e4749add4b2\builds\alpha-dev\client\Pluton.exe perfil=test-correc 1600x900 pantalla=\\.\DISPLAY1
+11:54:26.674 info
+11:54:30.967 shot artifacts\qa\0.5-correcciones\00_menu.png 800
+11:54:36.984 click 200 450
+11:54:37.231 wait 2500
+11:54:39.856 shot artifacts\qa\0.5-correcciones\01_inicio.png 1280
+11:55:10.005 key 1
+11:55:10.198 wait 400
+11:55:10.727 shot artifacts\qa\0.5-correcciones\04_guardada.png 1000
+11:55:10.979 key 1
+11:55:11.167 wait 300
+11:55:11.588 look 560 60
+11:55:12.018 wait 300
+11:55:12.443 shot artifacts\qa\0.5-correcciones\02_objetivo_girado.png 1000
+11:55:22.299 key W 1100
+11:55:23.531 wait 200
+11:55:23.876 shot artifacts\qa\0.5-correcciones\t1.png 700
+11:55:33.251 press left 3500
+11:55:36.875 wait 200
+11:55:37.228 key Escape
+11:55:37.421 wait 500
+11:55:38.071 shot artifacts\qa\0.5-correcciones\t2.png 800
+11:55:44.644 shot artifacts\qa\0.5-correcciones\18_pausa_foco.png 800
+11:55:44.898 click 800 518
+11:55:45.156 wait 500
+11:55:45.775 shot artifacts\qa\0.5-correcciones\08_ajustes.png 1000
+11:55:54.002 click 920 571
+11:55:54.252 wait 400
+11:55:54.777 shot artifacts\qa\0.5-correcciones\t3.png 800
+11:56:02.885 click 880 603
+11:56:03.162 wait 800
+11:56:04.094 info
+11:56:04.219 shot artifacts\qa\0.5-correcciones\08_ventana_1280x720.png 1280
+11:56:12.922 click 640 426
+11:56:13.193 wait 1200
+11:56:14.521 info
+11:56:14.646 shot artifacts\qa\0.5-correcciones\08_completa_sin_bordes.png 960
+11:56:34.489 click 766 640
+11:56:34.746 wait 1000
+11:56:35.877 info
+11:56:36.005 stop
+11:57:32.835 start C:\Users\gonza\Desktop\Juego incremental\.claude\worktrees\agent-a05d24e4749add4b2\builds\alpha-dev\client\Pluton.exe perfil=test-correc 1600x900 pantalla=\\.\DISPLAY1
+11:57:33.400 wait 1500
+11:57:35.016 click 200 450
+11:57:35.267 wait 2500
+11:57:37.903 shot artifacts\qa\0.5-correcciones\t4.png 800
+11:57:45.306 stop
+11:57:59.839 start C:\Users\gonza\Desktop\Juego incremental\.claude\worktrees\agent-a05d24e4749add4b2\builds\alpha-dev\client\Pluton.exe perfil=test-correc 1600x900 pantalla=\\.\DISPLAY1
+11:58:00.408 wait 1500
+11:58:02.037 shot artifacts\qa\0.5-correcciones\t4.png 700
+11:58:06.878 click 200 450
+11:58:07.124 wait 3000
+11:58:10.249 shot artifacts\qa\0.5-correcciones\t5.png 1000
+11:58:10.500 key J
+11:58:10.698 wait 600
+11:58:11.413 shot artifacts\qa\0.5-correcciones\01_mejora_con_contenedor.png 1280
+11:58:23.594 stop
+11:58:24.484 start C:\Users\gonza\Desktop\Juego incremental\.claude\worktrees\agent-a05d24e4749add4b2\builds\alpha-dev\client\Pluton.exe perfil=test-correc 1600x900 pantalla=\\.\DISPLAY1
+11:58:25.016 wait 1500
+11:58:26.636 shot artifacts\qa\0.5-correcciones\t4.png 700
+11:58:32.907 click 200 403
+11:58:33.153 wait 3000
+11:58:36.288 shot artifacts\qa\0.5-correcciones\t5.png 1000
+11:58:36.536 key J
+11:58:36.741 wait 600
+11:58:37.463 shot artifacts\qa\0.5-correcciones\01_mejora_con_contenedor.png 1280
+11:58:46.775 click 1041 560
+11:58:47.041 wait 900
+11:58:48.074 shot artifacts\qa\0.5-correcciones\01_comprada.png 1280
+11:58:48.323 key J
+11:58:48.508 wait 500
+11:58:49.139 shot artifacts\qa\0.5-correcciones\03_objetivo_falta.png 1280
+11:58:58.723 look -335 20
+11:58:59.165 key Shift+W 2600
+11:59:01.918 wait 300
+11:59:02.366 shot artifacts\qa\0.5-correcciones\t6.png 800
+11:59:10.336 shot artifacts\qa\0.5-correcciones\05_texto_sobre_pared.png 800
+11:59:10.592 key C
+11:59:10.802 wait 600
+11:59:11.546 shot artifacts\qa\0.5-correcciones\16_terminal.png 1280
+11:59:24.766 click 859 495
+11:59:25.029 wait 700
+11:59:25.867 shot artifacts\qa\0.5-correcciones\16_vendido_lingote.png 1000
+11:59:26.135 key Escape
+11:59:26.333 wait 300
+11:59:26.781 look -500 15
+11:59:27.222 wait 300
+11:59:27.660 shot artifacts\qa\0.5-correcciones\t7.png 800
+11:59:37.735 look 90 0
+11:59:38.166 key Shift+W 1800
+11:59:40.100 wait 300
+11:59:40.533 shot artifacts\qa\0.5-correcciones\t8.png 800
+12:00:02.352 look 640 20
+12:00:02.787 wait 300
+12:00:03.208 shot artifacts\qa\0.5-correcciones\t9.png 800
+12:00:24.259 key L
+12:00:24.454 wait 400
+12:00:24.983 press left 80
+12:00:25.197 wait 300
+12:00:25.617 look 760 0
+12:00:26.062 wait 300
+12:00:26.499 shot artifacts\qa\0.5-correcciones\t10.png 800
+12:00:38.807 look -60 -60
+12:00:39.244 wait 300
+12:00:39.703 key Shift+D 500
+12:00:40.352 wait 300
+12:00:40.782 look -120 0
+12:00:41.223 wait 300
+12:00:41.662 shot artifacts\qa\0.5-correcciones\t11.png 800
+12:00:50.208 look -400 20
+12:00:50.638 wait 400
+12:00:51.184 shot artifacts\qa\0.5-correcciones\t12.png 1000
+12:01:04.976 look 300 30
+12:01:05.407 wait 500
+12:01:06.037 shot artifacts\qa\0.5-correcciones\10_ruta_directa.png 1280
+12:01:36.310 stop
+12:02:34.146 start C:\Users\gonza\Desktop\Juego incremental\.claude\worktrees\agent-a05d24e4749add4b2\builds\alpha-dev\client\Pluton.exe perfil=test-correc 1600x900 pantalla=\\.\DISPLAY1
+12:02:38.934 wait 1500
+12:02:40.563 click 200 403
+12:02:40.811 wait 3000
+12:02:43.947 shot artifacts\qa\0.5-correcciones\03_objetivo_material.png 1280
+12:02:54.449 key L
+12:02:54.636 wait 300
+12:02:55.072 look -280 70
+12:02:55.502 wait 300
+12:02:55.932 shot artifacts\qa\0.5-correcciones\t13.png 640
+12:02:56.160 press left 80
+12:02:56.366 wait 300
+12:02:56.787 look 500 0
+12:02:57.227 wait 1000
+12:02:58.354 shot artifacts\qa\0.5-correcciones\10_ruta_directa.png 1280
+12:03:11.724 look -590 0
+12:03:12.159 wait 400
+12:03:12.682 shot artifacts\qa\0.5-correcciones\t13.png 640
+12:03:22.991 look 150 15
+12:03:23.421 wait 400
+12:03:23.955 shot artifacts\qa\0.5-correcciones\t14.png 640
+12:03:24.189 press left 80
+12:03:24.410 wait 300
+12:03:24.828 look 440 0
+12:03:25.269 wait 1000
+12:03:26.397 shot artifacts\qa\0.5-correcciones\10_ruta_directa.png 1280
+12:03:38.285 press left 80
+12:03:38.493 wait 800
+12:03:39.419 shot artifacts\qa\0.5-correcciones\10_cinta_construida.png 1000
+12:03:39.671 key 6
+12:03:39.857 wait 300
+12:03:40.280 look 0 110
+12:03:40.718 wait 500
+12:03:41.344 shot artifacts\qa\0.5-correcciones\06_fantasma_extractor_cerca.png 1000
+12:03:41.592 key 8
+12:03:41.783 wait 500
+12:03:42.417 shot artifacts\qa\0.5-correcciones\06_fantasma_contenedor_cerca.png 1000
+12:03:42.674 key 7
+12:03:42.866 wait 300
+12:03:43.293 look 0 -60
+12:03:43.724 wait 500
+12:03:44.353 shot artifacts\qa\0.5-correcciones\06_fantasma_fundicion_medio.png 1000
+12:04:09.096 key 3
+12:04:09.280 wait 200
+12:04:09.617 shot artifacts\qa\0.5-correcciones\07_aviso_desmontar.png 800
+12:04:09.856 look -530 -45
+12:04:10.299 wait 600
+12:04:11.022 shot artifacts\qa\0.5-correcciones\17_desmontar.png 1280
+12:04:19.880 look -50 -54
+12:04:20.309 wait 500
+12:04:20.945 shot artifacts\qa\0.5-correcciones\17_desmontar.png 1280
+12:04:21.210 press left 80
+12:04:21.423 wait 800
+12:04:22.349 shot artifacts\qa\0.5-correcciones\17_desmontado.png 800
+12:04:22.590 key Tab
+12:04:22.785 wait 500
+12:04:23.410 shot artifacts\qa\0.5-correcciones\17_inventario_stock.png 1280
+12:04:36.124 key Tab
+12:04:36.316 wait 400
+12:04:36.850 shot artifacts\qa\0.5-correcciones\03_objetivo_listo.png 800
+12:04:37.096 key Q
+12:04:37.288 wait 500
+12:04:37.909 shot artifacts\qa\0.5-correcciones\11_catalogo_cerrar.png 1000
+12:04:38.153 move 400 300
+12:04:38.269 wait 400
+12:04:38.788 shot artifacts\qa\0.5-correcciones\13_catalogo_hover.png 1000
+12:04:39.010 key Q
+12:04:39.196 wait 300
+12:04:39.615 key 7
+12:04:39.812 wait 300
+12:04:40.237 look 0 45
+12:04:40.669 wait 500
+12:04:41.295 shot artifacts\qa\0.5-correcciones\t15.png 700
+12:04:41.522 press left 80
+12:04:41.735 wait 900
+12:04:42.763 shot artifacts\qa\0.5-correcciones\17_material_usado.png 1000
+12:04:58.976 key Z
+12:04:59.169 wait 300
+12:04:59.591 key Q
+12:04:59.783 wait 500
+12:05:00.397 move 300 180
+12:05:00.511 wait 300
+12:05:00.929 move 310 185
+12:05:01.051 wait 500
+12:05:01.679 shot artifacts\qa\0.5-correcciones\13_catalogo_hover.png 1000
+12:05:01.901 move 300 270
+12:05:02.019 wait 200
+12:05:02.348 move 305 275
+12:05:02.463 wait 500
+12:05:03.083 shot artifacts\qa\0.5-correcciones\13_catalogo_hover2.png 1000
+12:05:03.321 key Q
+12:05:03.514 wait 300
+12:05:03.941 key Escape
+12:05:04.140 wait 400
+12:05:04.660 click 800 518
+12:05:04.918 wait 500
+12:05:05.542 shot artifacts\qa\0.5-correcciones\t16.png 500
+12:05:05.756 key Escape
+12:05:05.954 wait 500
+12:05:06.576 shot artifacts\qa\0.5-correcciones\18_esc_retrocede.png 600
+12:05:21.082 click 800 518
+12:05:21.338 stop
+12:05:22.289 start C:\Users\gonza\Desktop\Juego incremental\.claude\worktrees\agent-a05d24e4749add4b2\builds\alpha-dev\client\Pluton.exe perfil=test-correc 3440x1392 pantalla=\\.\DISPLAY2
+12:05:22.843 info
+12:05:23.408 wait 1500
+12:05:25.029 shot artifacts\qa\0.5-correcciones\t17.png 800
+12:05:38.128 click 395 625
+12:05:38.378 wait 4000
+12:05:42.501 key J
+12:05:42.686 wait 700
+12:05:43.523 shot artifacts\qa\0.5-correcciones\09_contratos_ultrawide.png 1720
+12:05:43.821 key J
+12:05:44.009 wait 300
+12:05:44.441 shot artifacts\qa\0.5-correcciones\02_ultrawide_hud.png 1720
+12:05:44.758 stop
+12:05:45.632 start C:\Users\gonza\Desktop\Juego incremental\.claude\worktrees\agent-a05d24e4749add4b2\builds\alpha-dev\client\Pluton.exe perfil=test-correc 1600x900 pantalla=\\.\DISPLAY1
+12:05:46.174 wait 1500
+12:05:47.796 info
+12:05:47.912 shot artifacts\qa\0.5-correcciones\t18.png 800
+12:06:00.899 click 230 485
+12:06:01.156 wait 4000
+12:06:05.280 key J
+12:06:05.468 wait 700
+12:06:06.306 shot artifacts\qa\0.5-correcciones\09_contratos_1080p.png 960
+12:06:06.553 stop
+12:06:10.429 start C:\Users\gonza\Desktop\Juego incremental\.claude\worktrees\agent-a05d24e4749add4b2\builds\alpha-dev\client\Pluton.exe perfil=test-correc 1600x900 pantalla=\\.\DISPLAY1
+12:06:10.969 wait 1500
+12:06:12.597 click 200 403
+12:06:12.847 wait 3000
+12:06:15.982 shot artifacts\qa\0.5-correcciones\07_recicladora_inicio.png 1000
+12:06:29.499 key G
+12:06:29.689 wait 200
+12:06:30.034 key F
+12:06:30.222 wait 300
+12:06:30.659 shot artifacts\qa\0.5-correcciones\07_tras_G_F_1.png 800
+12:06:30.915 key G
+12:06:31.116 wait 200
+12:06:31.438 key F
+12:06:31.633 wait 300
+12:06:32.057 key G
+12:06:32.245 wait 200
+12:06:32.576 key F
+12:06:32.761 wait 300
+12:06:33.184 key 1
+12:06:33.393 wait 400
+12:06:33.938 shot artifacts\qa\0.5-correcciones\07_tras_G_F_pulsar1.png 800
+12:06:34.195 key 1
+12:06:34.418 wait 300
+12:06:34.920 key G
+12:06:35.137 wait 200
+12:06:35.472 key F
+12:06:35.656 wait 300
+12:06:36.083 shot artifacts\qa\0.5-correcciones\07_tras_G_F_ultimo.png 800
+12:06:53.026 scroll -2
+12:06:53.153 wait 400
+12:06:53.687 shot artifacts\qa\0.5-correcciones\07_rueda_salta_desmontar.png 800
+12:06:53.941 key 1
+12:06:54.146 wait 300
+12:06:54.578 key Tab
+12:06:54.766 wait 500
+12:06:55.400 move 500 170
+12:06:55.528 wait 200
+12:06:55.871 move 505 175
+12:06:55.992 wait 400
+12:06:56.523 shot artifacts\qa\0.5-correcciones\12_ficha_antes.png 1000
+12:06:56.776 click 505 175
+12:06:57.042 wait 700
+12:06:57.869 shot artifacts\qa\0.5-correcciones\12_ficha_despues.png 1000
+12:06:58.112 key Tab
+12:06:58.307 wait 400
+12:06:58.831 shot artifacts\qa\0.5-correcciones\t19.png 500
+12:07:14.027 move 425 150
+12:07:14.146 wait 200
+12:07:14.470 move 428 152
+12:07:14.591 wait 400
+12:07:15.114 shot artifacts\qa\0.5-correcciones\12_ficha_antes.png 800
+12:07:15.352 click 428 152
+12:07:15.614 wait 700
+12:07:16.439 shot artifacts\qa\0.5-correcciones\12_ficha_despues.png 800
+12:07:16.676 key Tab
+12:07:16.858 wait 400
+12:07:17.377 key 2
+12:07:17.562 wait 300
+12:07:17.979 scroll -1
+12:07:18.097 wait 400
+12:07:18.615 shot artifacts\qa\0.5-correcciones\07_rueda_salta_desmontar.png 800
+12:07:18.838 key 1
+12:07:19.029 wait 18000
+12:07:37.166 shot artifacts\qa\0.5-correcciones\15_por_recoger.png 800
+12:07:53.404 move 424 148
+12:07:53.526 wait 200
+12:07:53.860 move 428 152
+12:07:53.986 wait 400
+12:07:54.518 shot artifacts\qa\0.5-correcciones\12_ficha_antes.png 800
+12:07:54.741 click 428 152
+12:07:54.999 wait 800
+12:07:55.928 move 700 500
+12:07:56.047 wait 300
+12:07:56.474 shot artifacts\qa\0.5-correcciones\12_ficha_despues.png 800
+12:07:56.694 key Tab
+12:07:56.881 wait 400
+12:07:57.408 key 2
+12:07:57.604 wait 300
+12:07:58.024 scroll -1
+12:07:58.155 wait 400
+12:07:58.690 shot artifacts\qa\0.5-correcciones\07_rueda_salta_desmontar.png 800
+12:07:58.939 stop

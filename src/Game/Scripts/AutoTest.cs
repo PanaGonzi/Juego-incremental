@@ -1536,7 +1536,8 @@ public partial class AutoTest : Node
         Check(W.Machines.ContainsKey(baseDepot.Id), "lo instalado no se desmonta");
 
         // Una cinta: se retira ella y no sus extremos.
-        client.Send(new Command { Type = CommandType.Link, A = baseDepot.Id, B = built[2].Id });
+        // La orden lleva su ruta desde D-037: sin celdas, el servidor la rechaza.
+        client.Send(World.LinkCommand(baseDepot.Id, built[2].Id, W.RouteBelt(baseDepot.Id, built[2].Id, 200000).Cells));
         Check(await Until(() => W.Links.Values.Any(l => l.From == baseDepot.Id && l.To == built[2].Id), 3), "cinta tendida para retirarla");
         var belt = W.Links.Values.Last(l => l.From == baseDepot.Id);
         var cell = belt.Cells[belt.Cells.Count / 2];
