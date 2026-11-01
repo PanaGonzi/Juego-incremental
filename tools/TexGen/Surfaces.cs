@@ -21,7 +21,7 @@ public static class Surfaces
         ("goma", Rubber, 3.5f),
         ("roca", Rock, 6f),
         ("hielo", Ice, 3.5f),
-        ("regolito", Regolith, 5f),
+        ("regolito", Regolith, 3.2f),
         ("peligro", Hazard, 2f),
         ("chapa_lagrimada", Tread, 5f),
         ("oxido", Rust, 4f),
@@ -106,15 +106,15 @@ public static class Surfaces
     {
         var (big, cell) = Voronoi(u, v, 6, 61);
         var (small, _) = Voronoi(u + Perlin(u, v, 9, 9, 63) * 0.02f, v, 22, 65);
-        var cracks = (1 - Smooth(0f, 0.035f, big)) * 0.9f + (1 - Smooth(0f, 0.03f, small)) * 0.28f * Smooth(0.4f, 0.7f, Perlin(u, v, 5, 5, 67));
+        var cracks = (1 - Smooth(0f, 0.035f, big)) * 0.9f + (1 - Smooth(0f, 0.03f, small)) * 0.1f * Smooth(0.4f, 0.7f, Perlin(u, v, 5, 5, 67));
         var cloud = Fbm(u, v, 5, 5, 69);
         var fine = Fbm(u, v, 40, 3, 71);
         var milky = 0.72f + cloud * 0.3f + (cell - 0.5f) * 0.1f;
-        var dark = cracks * 0.34f;
+        var dark = cracks * 0.22f;
         return new Sample
         {
             R = (milky - dark) * 0.86f, G = (milky - dark) * 0.94f, B = (milky - dark) * 1.02f,
-            Height = cloud * 0.3f + fine * 0.05f - cracks * 0.28f,
+            Height = cloud * 0.3f + fine * 0.05f - cracks * 0.14f,
             Rough = 0.14f + cloud * 0.2f + fine * 0.18f + cracks * 0.3f,
             Cavity = 1 - cracks * 0.5f,
             Mask = cloud,
@@ -127,11 +127,11 @@ public static class Surfaces
         var grains = Fbm(u, v, 48, 3, 83, 0.65f);
         var (stone, id) = Voronoi(u, v, 26, 85);
         var clods = Smooth(0.12f, 0.42f, stone) * Smooth(0.68f, 0.92f, id);
-        var shade = 0.6f + (big - 0.5f) * 0.6f + (grains - 0.5f) * 0.55f + clods * 0.14f;
+        var shade = 0.6f + (big - 0.5f) * 0.6f + (grains - 0.5f) * 0.6f + clods * 0.04f;
         return new Sample
         {
             R = shade * 1.01f, G = shade, B = shade * 0.98f,
-            Height = big * 0.45f + grains * 0.22f + clods * 0.3f,
+            Height = big * 0.5f + grains * 0.26f + clods * 0.05f,
             Rough = 0.84f + grains * 0.14f,
             Cavity = 0.78f + grains * 0.22f,
             Mask = big,
@@ -183,10 +183,10 @@ public static class Surfaces
         var t = big * 0.7f + pits * 0.3f;
         return new Sample
         {
-            R = 0.7f + t * 0.3f - flake * 0.18f,
-            G = 0.68f + t * 0.3f - flake * 0.22f,
-            B = 0.62f + t * 0.3f - flake * 0.22f,
-            Height = flake * 0.25f + pits * 0.3f,
+            R = 0.5f + t * 0.45f - flake * 0.1f,
+            G = 0.48f + t * 0.45f - flake * 0.12f,
+            B = 0.44f + t * 0.45f - flake * 0.12f,
+            Height = flake * 0.1f + pits * 0.3f,
             Rough = 0.72f + pits * 0.26f,
             Cavity = 0.72f + pits * 0.28f,
             Mask = big,

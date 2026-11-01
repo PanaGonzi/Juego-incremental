@@ -8,3 +8,7 @@ Fuente por defecto de Godot,Incluida en Godot,Open Sans / Godot,Apache-2.0 u OFL
 LiteNetLib 2.1.5,NuGet,RevenantX,MIT,Incluir aviso,Sin modificar,Sí
 Steamworks.NET 2025.165.0,github.com/rlabrecque/Steamworks.NET,Riley Labrecque,MIT,Incluir aviso,Solo prueba técnica; aún no se redistribuye,No
 steam_api64.dll,Steamworks SDK vía Steamworks.NET,Valve,Acuerdo de Steamworks,Según acuerdo,Fuera de Git; aún no se redistribuye,No
+Superficies PBR y mapa macro,src/Game/Assets/Textures (tools/TexGen),Generadas por código (Claude Opus 5.5),Propio del proyecto,No requerida,—,Sí
+Iconos de objetos y estados,src/Game/Assets/Icons (tools/TexGen),Generados por código (Claude Opus 5.5),Propio del proyecto,No requerida,—,Sí
+Modelos de máquinas restos y objetos,src/Game/Scripts/ModelsCatalog.cs y ItemVisuals.cs,Generados por código (Claude Opus 5.5),Propio del proyecto,No requerida,—,Sí
+Shaders de material y terreno y cielo,src/Game/Scripts/Materials.cs y Scenery.cs,Claude Opus 5.5,Propio del proyecto,No requerida,—,Sí

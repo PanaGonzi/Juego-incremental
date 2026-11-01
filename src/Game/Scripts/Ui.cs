@@ -173,7 +173,7 @@ public partial class Hud : Control
         topBox.AddChild(Ui.Row(UiTheme.M, _objectiveStep, _objectiveReward));
         _objective = Ui.Text("", 18);
         _objective.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        _objective.CustomMinimumSize = new Vector2(640, 0);
+        _objective.CustomMinimumSize = new Vector2(760, 0);
         topBox.AddChild(_objective);
         _objectiveBar = Ui.Bar(0, 1, Ui.Amber, 8);
         _objectiveCount = Ui.Text("", UiTheme.Caption, Ui.Dim);
@@ -380,6 +380,13 @@ public partial class Hud : Control
         var mode = _view.Session.IsSolo ? "" : $"  ·  {client.RoundTripMs} ms";
         _players.Text = $"{Loc.T("hud_players")} {list.Count}/12{mode}\n" + string.Join("\n", list.Select(p => $"{p.Name} ({Loc.T("role_" + p.Role)})"));
 
+        if (PanelOpen)
+        {
+            // Centrado cada cuadro: el contenido cambia de tamaño al reconstruirse.
+            var size = _center.GetCombinedMinimumSize();
+            _center.Size = size;
+            _center.Position = ((GetRect().Size - size) / 2).Max(Vector2.Zero);
+        }
         if (PanelOpen && _panelBuilder != null)
         {
             _panelRefresh -= delta;
@@ -489,7 +496,6 @@ public partial class Hud : Control
     {
         foreach (var c in _centerBody.GetChildren()) { _centerBody.RemoveChild(c); c.QueueFree(); }
         _centerBody.CustomMinimumSize = Vector2.Zero;
-        _center.ResetSize();
     }
 
     private void Add(Control c) => _centerBody.AddChild(c);

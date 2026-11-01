@@ -41,10 +41,10 @@ public static class Materials
     private static readonly Dictionary<string, Surface> Specs = new()
     {
         // Pintura de máquina: gris cálido que destaca sobre el suelo frío, naranja como acento de señalización.
-        ["hull"] = P(0.27f, 0.27f, 0.26f),
-        ["panel"] = P(0.42f, 0.42f, 0.4f),
+        ["hull"] = P(0.2f, 0.2f, 0.195f),
+        ["panel"] = P(0.31f, 0.31f, 0.295f),
         ["signal"] = P(0.62f, 0.17f, 0.025f, 0.48f, 0.55f),
-        ["cream"] = P(0.52f, 0.49f, 0.42f),
+        ["cream"] = P(0.38f, 0.36f, 0.31f),
         ["navy"] = P(0.13f, 0.18f, 0.25f),
         ["dark"] = P(0.075f, 0.08f, 0.09f, 0.55f, 0.2f),
         ["stripe"] = new(Layer.Hazard, new Color(1, 1, 1), 0f, 0.5f, 0, 0.3f),
@@ -61,11 +61,11 @@ public static class Materials
         // Vidrio.
         ["glass"] = new(Layer.Steel, new Color(0.55f, 0.72f, 0.8f, 0.24f), 0f, 0.08f, 0, 0, Pass.Glass),
         // Óxido y chatarra.
-        ["rust"] = new(Layer.Rust, new Color(0.42f, 0.2f, 0.09f), 0.45f, 0.5f),
-        ["rustlight"] = new(Layer.Rust, new Color(0.62f, 0.38f, 0.2f), 0.5f, 0.45f),
+        ["rust"] = new(Layer.Rust, new Color(0.26f, 0.12f, 0.055f), 0.45f, 0.5f),
+        ["rustlight"] = new(Layer.Rust, new Color(0.38f, 0.21f, 0.1f), 0.5f, 0.45f),
         // Mineral.
         ["rock"] = new(Layer.Rock, new Color(0.26f, 0.22f, 0.2f), 0f, 0.5f),
-        ["rock_cold"] = new(Layer.Rock, new Color(0.3f, 0.3f, 0.33f), 0f, 0.5f),
+        ["rock_cold"] = new(Layer.Rock, new Color(0.15f, 0.145f, 0.16f), 0f, 0.5f),
         ["redrock"] = new(Layer.Rock, new Color(0.62f, 0.28f, 0.14f), 0f, 0.5f),
         ["regolith"] = new(Layer.Regolith, new Color(0.3f, 0.21f, 0.17f), 0f, 0.5f),
         ["ice"] = new(Layer.Ice, new Color(0.78f, 0.9f, 1f), 0f, 0.35f, 0.5f),

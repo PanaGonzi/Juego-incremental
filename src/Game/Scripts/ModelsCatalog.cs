@@ -183,7 +183,7 @@ public static partial class Models
             b.Beam("steel_dark", new Vector3(Mathf.Cos(a) * 1.4f, 0.55f, fz + Mathf.Sin(a) * 1.4f), new Vector3(Mathf.Cos(a) * 1.4f, 2.5f, fz + Mathf.Sin(a) * 1.4f), 0.06f, 0.09f);
         }
         // Chimenea desplazada con sombrerete y tirantes.
-        b.Tube("rustlight", 0.34f, 12, new Vector3(0, 3.6f, fz), new Vector3(0, 4.05f, fz), new Vector3(0.55f, 4.5f, fz), new Vector3(0.55f, 5.1f, fz));
+        b.Tube("steel_dark", 0.34f, 12, new Vector3(0, 3.6f, fz), new Vector3(0, 4.05f, fz), new Vector3(0.55f, 4.5f, fz), new Vector3(0.55f, 5.1f, fz));
         b.Lathe("steel_dark", 0.55f, 5.1f, fz, new[] { (0.36f, 0f), (0.4f, 0.04f), (0.4f, 0.14f), (0.34f, 0.18f) }, 12);
         b.Beam("steel_dark", new Vector3(0.75f, 4.7f, fz), new Vector3(1.28f, 2.8f, fz + 0.2f), 0.04f, 0.04f);
         // Cuerpo delantero con puerta de colada.
@@ -234,7 +234,7 @@ public static partial class Models
         b.Box("hull", 0, 1.05f, 0.25f, 3.15f, 1.65f, 2.75f);
         b.Seams(0, 1.05f, 0.25f, 3.15f, 1.65f, 2.75f);
         // Tolva de trituración abierta: se ve la boca y dentro los rodillos.
-        b.Taper("rustlight", 0, 2.42f, -0.2f, 2.3f, 1.7f, 3.05f, 2.45f, 1.05f);
+        b.Taper("hull", 0, 2.42f, -0.2f, 2.3f, 1.7f, 3.05f, 2.45f, 1.05f);
         b.Taper("dark", 0, 2.48f, -0.2f, 1.9f, 1.3f, 2.72f, 2.12f, 1f);
         b.Box("steel_dark", 0, 2.96f, 1.03f, 3.1f, 0.08f, 0.1f);
         b.Box("steel_dark", 0, 2.96f, -1.42f, 3.1f, 0.08f, 0.1f);
@@ -476,7 +476,7 @@ public static partial class Models
         b.Beam("steel", new Vector3(-0.2f, 3.3f, 0.9f), new Vector3(3.5f, 3.3f, 0.9f), 0.14f, 0.2f);
         b.Beam("steel", new Vector3(-0.2f, 3.3f, -1.1f), new Vector3(3.5f, 3.3f, -1.1f), 0.1f, 0.14f);
         // Tolva, apilado y barandilla del andén.
-        b.Taper("rustlight", 1.65f, 1.15f, -0.95f, 1.1f, 1f, 1.55f, 1.4f, 1.1f);
+        b.Taper("hull", 1.65f, 1.15f, -0.95f, 1.1f, 1f, 1.55f, 1.4f, 1.1f);
         Crate(b, 3.2f, 0.95f, -0.9f, 1.3f, 0.86f, 1.05f, "navy");
         Railing(b, new Vector3(-3.72f, 0.52f, -1.68f), new Vector3(3.8f, 0.52f, -1.68f));
         m.Body = b.Commit();

@@ -195,8 +195,8 @@ public static class Terrain
         uniform sampler2DArray detail_tex : filter_linear_mipmap_anisotropic, repeat_enable;
         uniform sampler2D macro_tex : filter_linear_mipmap, repeat_enable;
         uniform float grid_strength = 0.0;
-        uniform vec3 soil_a = vec3(0.05,0.033,0.028);
-        uniform vec3 soil_b = vec3(0.13,0.085,0.065);
+        uniform vec3 soil_a = vec3(0.03,0.02,0.018);
+        uniform vec3 soil_b = vec3(0.08,0.052,0.042);
         uniform vec3 ice_tint = vec3(0.62,0.72,0.86);
         uniform vec3 rock_tint = vec3(0.17,0.16,0.18);
         varying vec3 wp;
@@ -220,7 +220,7 @@ public static class Terrain
           soil *= mix(1.0,rn.r*1.6,near*0.6);
           soil *= 0.72+m2.g*0.56;
           // Hielo: láminas con polígonos de convección y borde irregular según el grano del suelo.
-          vec3 uvi = vec3(wp.xz/6.5,4.0);
+          vec3 uvi = vec3(wp.xz/11.0,4.0);
           vec4 ia = texture(albedo_tex,uvi);
           vec4 id = texture(detail_tex,uvi);
           float edge = COLOR.r+(m2.r-0.5)*0.55+(m2.g-0.5)*0.3+(ra.a-0.5)*0.22;
@@ -239,12 +239,13 @@ public static class Terrain
           float slope = 1.0-wn.y;
           float cliff = smoothstep(0.1,0.3,slope+(m2.r-0.5)*0.16);
           if (cliff>0.001){
-            // A distancia los estratos se agrandan: bancos de decenas de metros, no rayado fino.
-            float scale = mix(11.0,74.0,smoothstep(70.0,240.0,dist));
-            vec2 ruv = vec2((wp.x+wp.z*0.6)/scale,-wp.y/scale);
-            vec4 ka = texture(albedo_tex,vec3(ruv,3.0));
-            vec4 kd = texture(detail_tex,vec3(ruv,3.0));
-            vec3 rc = rock_tint*ka.rgb*(0.75+m1.g*1.1);
+            // La textura solo aporta de cerca; a distancia mandan los bancos de estratos de decenas de metros.
+            float farAway = smoothstep(60.0,190.0,dist);
+            vec2 ruv = vec2((wp.x+wp.z*0.6)/11.0,-wp.y/11.0);
+            vec4 ka = mix(texture(albedo_tex,vec3(ruv,3.0)),vec4(0.5,0.49,0.48,0.5),farAway);
+            vec4 kd = mix(texture(detail_tex,vec3(ruv,3.0)),vec4(0.5,0.5,0.9,1.0),farAway);
+            float beds = texture(macro_tex,vec2((wp.x+wp.z)*0.0007,wp.y/64.0)).r;
+            vec3 rc = rock_tint*ka.rgb*(0.7+m1.g*0.9)*(0.3+smoothstep(0.34,0.66,beds)*1.5);
             float snow = smoothstep(0.66,0.92,wn.y+(m1.r-0.5)*0.7+(m2.g-0.5)*0.25);
             rc = mix(rc,ice_tint*0.42,snow*0.75*step(0.001,ice_tint.b-ice_tint.r));
             c = mix(c,rc,cliff);
@@ -436,10 +437,10 @@ public sealed class Scenery
         Sun.LightEnergy = mars ? 2.3f : 1.9f;
         Env.Environment.FogLightColor = mars ? new Color(0.5f, 0.28f, 0.17f) : new Color(0.2f, 0.25f, 0.38f);
 
-        GroundMat.SetShaderParameter("soil_a", mars ? new Vector3(0.17f, 0.056f, 0.025f) : new Vector3(0.05f, 0.033f, 0.028f));
-        GroundMat.SetShaderParameter("soil_b", mars ? new Vector3(0.42f, 0.16f, 0.07f) : new Vector3(0.13f, 0.085f, 0.065f));
+        GroundMat.SetShaderParameter("soil_a", mars ? new Vector3(0.17f, 0.056f, 0.025f) : new Vector3(0.03f, 0.02f, 0.018f));
+        GroundMat.SetShaderParameter("soil_b", mars ? new Vector3(0.42f, 0.16f, 0.07f) : new Vector3(0.08f, 0.052f, 0.042f));
         GroundMat.SetShaderParameter("ice_tint", mars ? new Vector3(0.7f, 0.5f, 0.42f) : new Vector3(0.62f, 0.72f, 0.86f));
-        GroundMat.SetShaderParameter("rock_tint", mars ? new Vector3(0.3f, 0.11f, 0.055f) : new Vector3(0.17f, 0.16f, 0.18f));
+        GroundMat.SetShaderParameter("rock_tint", mars ? new Vector3(0.3f, 0.11f, 0.055f) : new Vector3(0.11f, 0.1f, 0.11f));
 
         SkyMat.SetShaderParameter("moon", mars ? 0f : 1f);
         SkyMat.SetShaderParameter("zenith", mars ? new Vector3(0.05f, 0.03f, 0.03f) : new Vector3(0.0009f, 0.0012f, 0.003f));
@@ -512,17 +513,17 @@ public sealed class Scenery
             for (var v = 0; v < variants.Length; v++)
             {
                 var list = new List<Transform3D>();
-                for (var i = 0; i < 90; i++)
+                for (var i = 0; i < 130; i++)
                 {
                     var x = (bx + rng.Next()) * block;
                     var z = (bz + rng.Next()) * block;
                     if (Mathf.Max(Mathf.Abs(x), Mathf.Abs(z)) > Terrain.Walkable + 6) continue;
                     // Densidad por manchas: zonas pedregosas y zonas limpias.
                     var patch = Terrain.Fbm(x * 0.05f + 9, z * 0.05f, 33, 2);
-                    if (rng.Next() > (patch - 0.32f) * 3.2f) continue;
+                    if (rng.Next() > (patch - 0.26f) * 3.6f) continue;
                     if (Terrain.IceMask(planet, x, z) > 0.5f && rng.Next() < 0.8f) continue;
                     // Altura máxima menor que la zapata de las máquinas: nada asoma bajo lo construido.
-                    var s = Mathf.Pow(rng.Next(), 3.5f) * 0.3f + 0.035f;
+                    var s = Mathf.Pow(rng.Next(), 2.6f) * 0.34f + 0.05f;
                     var basis = Basis.FromEuler(new Vector3(rng.Range(-0.3f, 0.3f), rng.Range(0, 6.28f), rng.Range(-0.3f, 0.3f))).Scaled(new Vector3(s, s * rng.Range(0.65f, 1f), s));
                     list.Add(new Transform3D(basis, new Vector3(x, Terrain.Height(planet, x, z) + s * 0.05f, z)));
                 }
@@ -565,9 +566,9 @@ public sealed class Scenery
         var mat = planet == 1 ? "redrock" : "rock_cold";
         var meshes = new[]
         {
-            new Models.Builder().Rock(mat, 0, 0, 0, 1f, 0.9f, 0.85f, 21, 2, 3.5f).Commit(),
-            new Models.Builder().Rock(mat, 0, 0, 0, 1.2f, 0.6f, 0.9f, 37, 2, 5f).Commit(),
-            new Models.Builder().Rock(mat, 0, 0, 0, 0.7f, 1.2f, 0.8f, 58, 2, 4f).Commit(),
+            new Models.Builder().Rock(mat, 0, 0, 0, 6f, 5.4f, 5.1f, 21, 2, 3.5f).Commit(),
+            new Models.Builder().Rock(mat, 0, 0, 0, 7.2f, 3.6f, 5.4f, 37, 2, 5f).Commit(),
+            new Models.Builder().Rock(mat, 0, 0, 0, 4.2f, 7.2f, 4.8f, 58, 2, 4f).Commit(),
         };
         var rng = new Models.Rng(4711 + planet);
         var lists = new[] { new List<Transform3D>(), new List<Transform3D>(), new List<Transform3D>() };
@@ -580,9 +581,9 @@ public sealed class Scenery
             var m = side / Mathf.Max(Mathf.Abs(x), Mathf.Abs(z));
             x *= m;
             z *= m;
-            var s = Mathf.Pow(rng.Next(), 2.6f) * 18f + 1.4f;
+            var s = (Mathf.Pow(rng.Next(), 2.6f) * 18f + 1.4f) / 6f;
             var basis = Basis.FromEuler(new Vector3(rng.Range(-0.08f, 0.08f), rng.Range(0, 6.28f), rng.Range(-0.08f, 0.08f))).Scaled(new Vector3(s, s, s));
-            lists[i % 3].Add(new Transform3D(basis, new Vector3(x, Terrain.Height(planet, x, z) + s * 0.1f, z)));
+            lists[i % 3].Add(new Transform3D(basis, new Vector3(x, Terrain.Height(planet, x, z) + s * 0.6f, z)));
         }
         for (var i = 0; i < 3; i++) AddInstances(parent, meshes[i], lists[i], 0, true);
     }
@@ -604,7 +605,7 @@ public sealed class Scenery
         else
         {
             // Silo destripado, nave derrumbada y torre de celosía inclinada.
-            b.Lathe("rustlight", 0, 0, 0, new[] { (7f, 0f), (7f, 22f), (6f, 25f), (0f, 26f) }, 20);
+            b.Lathe("rust", 0, 0, 0, new[] { (7f, 0f), (7f, 22f), (6f, 25f), (0f, 26f) }, 20);
             b.Box("rust", 0, 27f, 0, 16f, 1.4f, 16f, roll: 6);
             b.Box("hull", 14, 6.5f, 0, 16, 13, 11);
             b.Seams(14, 6.5f, 0, 16, 13, 11);
@@ -714,8 +715,8 @@ public partial class MenuScene : Node3D
         }
         // Desplazamiento muy lento: la escena respira sin distraer de los botones.
         var sway = Mathf.Sin(t * 0.05f);
-        var eye = new Vector3(-12f + sway * 6f, 4.2f + sway * 0.5f, 25f);
-        _camera.LookAtFromPosition(eye, new Vector3(-6f + sway * 3f, 3.2f, -2f), Vector3.Up);
+        var eye = new Vector3(-24f + sway * 5f, 4.4f + sway * 0.5f, 25f);
+        _camera.LookAtFromPosition(eye, new Vector3(-13f + sway * 3f, 3.6f, -2f), Vector3.Up);
     }
 }
 
@@ -745,10 +746,23 @@ public partial class DustDrift : GpuParticles3D
         VisibilityAabb = new Aabb(new Vector3(-40, -6, -40), new Vector3(80, 14, 80));
         DrawPass1 = new QuadMesh
         {
-            Size = new Vector2(0.09f, 0.09f),
+            Size = new Vector2(0.05f, 0.05f),
             Material = new StandardMaterial3D
             {
-                AlbedoColor = mars ? new Color(0.72f, 0.45f, 0.3f, 0.28f) : new Color(0.72f, 0.74f, 0.8f, 0.22f),
+                AlbedoTexture = new GradientTexture2D
+                {
+                    Gradient = new Gradient { Colors = new[] { Colors.White, new Color(1, 1, 1, 0) } },
+                    Fill = GradientTexture2D.FillEnum.Radial,
+                    FillFrom = new Vector2(0.5f, 0.5f),
+                    FillTo = new Vector2(1f, 0.5f),
+                    Width = 16,
+                    Height = 16,
+                },
+                // Se desvanece cerca de la cámara: una mota nunca tapa la vista.
+                DistanceFadeMode = BaseMaterial3D.DistanceFadeModeEnum.PixelAlpha,
+                DistanceFadeMinDistance = 1f,
+                DistanceFadeMaxDistance = 5f,
+                AlbedoColor = mars ? new Color(0.72f, 0.45f, 0.3f, 0.3f) : new Color(0.72f, 0.74f, 0.8f, 0.24f),
                 Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
                 ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
                 BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,
