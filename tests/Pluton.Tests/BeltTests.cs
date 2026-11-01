@@ -36,13 +36,13 @@ public class BeltTests
 
     internal static Link Lay(World w, PlayerState p, Machine a, Machine b)
     {
-        var r = w.Apply(p, new Command { Type = CommandType.Link, A = a.Id, B = b.Id });
+        var r = w.Apply(p, Fixture.LinkCmd(w, a, b));
         Assert.True(r.Ok, $"cinta {a.Def}→{b.Def}: {r.Error}");
         return w.Links.Values.Last();
     }
 
     private static string Fail(World w, PlayerState p, Machine a, Machine b) =>
-        w.Apply(p, new Command { Type = CommandType.Link, A = a.Id, B = b.Id }).Error;
+        w.RouteBelt(a.Id, b.Id).Error ?? w.Apply(p, Fixture.LinkCmd(w, a, b)).Error;
 
     private static void Run(World w, int ticks)
     {
@@ -138,12 +138,9 @@ public class BeltTests
     }
 
     [Fact]
-    public void Too_long_belt_is_refused_and_kinds_are_validated()
+    public void Kinds_are_validated()
     {
         var (w, p) = Open();
-        var a = Place(w, p, "storage_crate", -40, -40);
-        var b = Place(w, p, "storage_crate", 40, -40);
-        Assert.Equal("err_belt_long", Fail(w, p, a, b));
         var near = Place(w, p, "storage_crate", -40, -30);
         var generator = Place(w, p, "rtg_generator", -30, -40);
         Assert.Equal("err_link_kind", Fail(w, p, generator, near));
@@ -527,11 +524,13 @@ public class BeltTests
         Assert.True(b.In.Get("ore") > 0);
         Assert.Equal(total, w.CountEverywhere("ore"));
 
-        // Demasiado lejos: la cinta se retira y su coste vuelve.
+        // Sin ruta posible, rodeada de máquinas: la cinta se retira y su coste vuelve.
+        foreach (var (x, z) in new[] { (30, -46), (30, -42), (28, -44), (32, -44) }) Place(w, p, "storage_crate", x, z);
         var credits = w.Credits;
         var paid = moved.Paid;
-        p.X = 70 * 2f;
-        Assert.True(w.Apply(p, new Command { Type = CommandType.Move, A = b.Id, B = 70, C = -44, D = 0 }).Ok);
+        p.X = 30 * 2f;
+        p.Z = -44 * 2f;
+        Assert.True(w.Apply(p, new Command { Type = CommandType.Move, A = b.Id, B = 30, C = -44, D = 0 }).Ok);
         Assert.Empty(w.Links);
         Assert.Equal(credits + paid, w.Credits);
         Assert.Equal(total, w.CountEverywhere("ore"));
@@ -726,7 +725,7 @@ public class BeltTests
         {
             using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, lang + ".json")));
             var keys = doc.RootElement.EnumerateObject().Select(e => e.Name).ToHashSet();
-            foreach (var key in new[] { "err_belt_route", "err_belt_long", "err_belt_port_out", "err_belt_port_in", "err_link_kind", "err_link_exists", "belt_title", "belt_elevated", "belt_load", "belt_preview", "belt_port_hint" })
+            foreach (var key in new[] { "err_belt_route", "err_belt_stale", "err_belt_path", "err_belt_waypoint", "err_belt_waypoint_path", "err_belt_complex", "err_belt_port_out", "err_belt_port_in", "err_link_kind", "err_link_exists", "belt_title", "belt_elevated", "belt_load", "belt_preview", "belt_missing", "belt_alternative", "belt_tracing", "belt_sending", "belt_reconfirm", "belt_points", "belt_snap_on", "belt_snap_off", "action_belt_undo", "action_belt_snap", "action_belt_port", "prompt_link_way" })
                 Assert.Contains(key, keys);
             foreach (var status in Enum.GetNames<BeltStatus>())
                 Assert.Contains("belt_status_" + status, keys);
@@ -812,7 +811,7 @@ public class BeltNetworkTests
         h.Pump(() => a.World!.Machines.ContainsKey(to.Id));
         route = a.World!.RouteBelt(from.Id, to.Id);
         Assert.Null(route.Error);
-        Assert.True(Send(h, a, new Command { Type = CommandType.Link, A = from.Id, B = to.Id }).Ok);
+        Assert.True(Send(h, a, World.LinkCommand(from.Id, to.Id, route.Cells)).Ok);
         var link = world.Links.Values.Last();
         Assert.Equal(route.Cells, link.Cells); // la previsualización del cliente coincide con lo que valida el servidor
         h.Pump(() => b.World!.Links.ContainsKey(link.Id));

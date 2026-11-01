@@ -13,6 +13,7 @@ public static class Scenarios
         ["small"] = new Size(50, 5, 100),
         ["medium"] = new Size(500, 25, 2000),
         ["stress"] = new Size(2000, 100, 10000),
+        ["long"] = new Size(0, 0, 0),
     };
 
     public static World Build(ContentDb content, string name)
@@ -140,6 +141,17 @@ public static class Scenarios
             for (var s = 0; s < line.Slots.Length; s++) w.SeedBeltSlot(line, s, "scrap");
             machines += 2;
         }
+        // 30 cintas de 168 celdas con carga escasa y regular: mide huecos largos en simulación y red.
+        if (name == "long")
+            for (var row = 0; row < 30; row++)
+            {
+                var z = -88 + row * 3;
+                var ex = Add("ore_extractor", -86, z, Node(-86, z).Id, rot: 3);
+                var term = Add("export_terminal", 84, z);
+                term.AutoSell = true;
+                if (row % 4 == 0) Add("rtg_generator", -89, z);
+                Belt(ex, term, -84, 83, z, "ore");
+            }
         w.Reindex();
         return w;
     }

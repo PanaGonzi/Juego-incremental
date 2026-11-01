@@ -174,7 +174,7 @@ public static class WorldCodec
         return l;
     }
 
-    private const int MaxBeltSlots = 4096;
+    private const int MaxBeltSlots = 200000; // más que las celdas de un planeta por sus huecos: solo rechaza datos corruptos
 
     /// <summary>Carga de una cinta para un delta, por tramos de huecos iguales: 0 es vacío; n, el objeto n-1 del contenido.</summary>
     public static void WriteSlotsCompact(BinaryWriter w, Link l, ContentDb content)

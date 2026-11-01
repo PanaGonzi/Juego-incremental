@@ -191,7 +191,6 @@ public sealed class BalanceDef
     public int CutterCooldownTicks { get; set; }
     public int LinkIntervalTicks { get; set; }
     public int BeltSlotsPerCell { get; set; } = 4;
-    public int BeltMaxCells { get; set; } = 32;
     public long BeltCreditsPerCell { get; set; }
     public int RecipeBufferFactor { get; set; }
     public long OutputBuffer { get; set; }
@@ -337,7 +336,7 @@ public sealed class ContentDb
         }
         if (Planets.Count == 0) throw new ContentException("No hay planetas");
         if (Balance.TicksPerSecond <= 0 || Balance.CellSizeMm <= 0) throw new ContentException("Balance inválido");
-        if (Balance.LinkIntervalTicks <= 0 || Balance.BeltSlotsPerCell <= 0 || Balance.BeltMaxCells <= 0 || Balance.BeltCreditsPerCell < 0)
+        if (Balance.LinkIntervalTicks <= 0 || Balance.BeltSlotsPerCell <= 0 || Balance.BeltCreditsPerCell < 0)
             throw new ContentException("Balance de cintas inválido");
     }
 
