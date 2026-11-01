@@ -177,6 +177,13 @@ public sealed class RailDef
     public int TrainSpacingMm { get; set; }
     public long TransferUnitsPerTick { get; set; }
     public int MaxLoadWaitTicks { get; set; }
+    public long SignalCredits { get; set; }
+    /// <summary>Lo que se detiene un tren antes de una señal, para no pisar el desvío que protege.</summary>
+    public int SignalStopMm { get; set; }
+    /// <summary>La vía queda retenida hasta que la cola ha pasado esta distancia.</summary>
+    public int TrainLengthMm { get; set; }
+    /// <summary>Máximo que un tren espera ante una señal por una estación ocupada antes de entrar a la cola de la parada.</summary>
+    public int StationWaitMaxTicks { get; set; }
 }
 
 /// <summary>Fuente mínima de chatarra: sin ella, agotar los campos podría dejar al jugador sin material recuperado.</summary>

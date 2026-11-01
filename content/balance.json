@@ -30,7 +30,11 @@
     "trainCapacity": 200,
     "trainSpacingMm": 16500,
     "transferUnitsPerTick": 4,
-    "maxLoadWaitTicks": 150
+    "maxLoadWaitTicks": 150,
+    "signalCredits": 25,
+    "signalStopMm": 4000,
+    "trainLengthMm": 14000,
+    "stationWaitMaxTicks": 600
   },
   "debris": {
     "scrap_pile":  { "hp": 6,  "drop": "scrap", "perHit": 1, "final": 4, "credits": 2, "cells": 1 },

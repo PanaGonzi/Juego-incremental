@@ -7,7 +7,7 @@ namespace Pluton.Simulation;
 /// </summary>
 public static class WorldCodec
 {
-    public const int FormatVersion = 5;
+    public const int FormatVersion = 6;
 
     private static void WriteInv(BinaryWriter w, Inventory inv)
     {
@@ -285,14 +285,16 @@ public static class WorldCodec
         w.Write7BitEncodedInt(n.Planet);
         w.Write(n.X);
         w.Write(n.Z);
+        w.Write(n.Signal);
     }
 
-    public static RailNode ReadRailNode(BinaryReader r) => new()
+    public static RailNode ReadRailNode(BinaryReader r, int version = FormatVersion) => new()
     {
         Id = r.ReadInt32(),
         Planet = r.Read7BitEncodedInt(),
         X = r.ReadInt32(),
         Z = r.ReadInt32(),
+        Signal = version >= 6 && r.ReadBoolean(),
     };
 
     public static void WriteRailSegment(BinaryWriter w, RailSegment s)
@@ -339,10 +341,12 @@ public static class WorldCodec
         w.Write(t.Forward);
         w.Write7BitEncodedInt64(t.PosMm);
         w.Write7BitEncodedInt(t.Timer);
+        w.Write7BitEncodedInt(t.GrantEnd);
+        w.Write7BitEncodedInt(t.HoldTicks);
     }
 
     /// <param name="previous">Tren ya conocido, del que se conserva la ruta si no viene en el mensaje.</param>
-    public static Train ReadTrain(BinaryReader r, Func<int, Train?>? previous = null)
+    public static Train ReadTrain(BinaryReader r, Func<int, Train?>? previous = null, int version = FormatVersion)
     {
         var t = new Train
         {
@@ -369,6 +373,13 @@ public static class WorldCodec
         t.Forward = r.ReadBoolean();
         t.PosMm = r.Read7BitEncodedInt64();
         t.Timer = r.Read7BitEncodedInt();
+        if (version >= 6)
+        {
+            t.GrantEnd = r.Read7BitEncodedInt();
+            t.HoldTicks = r.Read7BitEncodedInt();
+        }
+        // Antes de las señales, un tren en marcha tenía reservado todo su trayecto.
+        else if (t.State == TrainState.Moving) t.GrantEnd = t.Path.Count;
         return t;
     }
 
@@ -559,7 +570,7 @@ public static class WorldCodec
             n = r.Read7BitEncodedInt();
             for (var i = 0; i < n; i++)
             {
-                var node = ReadRailNode(r);
+                var node = ReadRailNode(r, formatVersion);
                 world.RailNodes[node.Id] = node;
             }
             n = r.Read7BitEncodedInt();
@@ -571,7 +582,7 @@ public static class WorldCodec
             n = r.Read7BitEncodedInt();
             for (var i = 0; i < n; i++)
             {
-                var t = ReadTrain(r);
+                var t = ReadTrain(r, null, formatVersion);
                 world.Trains[t.Id] = t;
             }
         }

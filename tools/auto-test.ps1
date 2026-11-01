@@ -1,6 +1,6 @@
 ﻿# Ejecuta el cliente exportado en modo de recorrido automático y resume el resultado.
 # Uso: tools\auto-test.ps1 -Build dev -Tag prueba [-Width 1920 -Height 1080] [-Join host:puerto] [-Seconds 10]
-param([string]$Build = 'dev', [string]$Tag = 'auto', [int]$Width = 1280, [int]$Height = 720, [string]$Join = '', [string]$HostPort = '', [string]$Profile = 'test', [string]$Scenario = '', [string]$Measure = '', [string]$Language = '', [switch]$NoShots, [switch]$NoCapture, [int]$Seconds = 10, [int]$Timeout = 480)
+param([string]$Build = 'dev', [string]$Tag = 'auto', [int]$Width = 1280, [int]$Height = 720, [string]$Join = '', [string]$HostPort = '', [string]$Profile = 'test', [string]$Scenario = '', [string]$Measure = '', [string]$Language = '', [switch]$NoShots, [switch]$NoCapture, [int]$Seconds = 10, [int]$Timeout = 480, [string]$Fixture = '')
 $Repo = Split-Path $PSScriptRoot -Parent
 $Out = Join-Path $Repo "logs\$Tag"
 if (Test-Path $Out) { Remove-Item $Out -Recurse -Force }
@@ -10,6 +10,7 @@ $args2 = (Test-WindowArgs $Width $Height) + @('--', '--autotest', '--profile', $
 if ($Join -ne '') { $args2 += @('--join', $Join) }
 if ($HostPort -ne '') { $args2 += @('--host', $HostPort) }
 if ($Scenario -ne '') { $args2 += @('--scenario', $Scenario) }
+if ($Fixture -ne '') { $args2 += @('--fixture', "`"$Fixture`"") }
 if ($Measure -ne '') { $args2 += @('--measure', $Measure) }
 if ($Language -ne '') { $args2 += @('--language', $Language) }
 if ($NoShots) { $args2 += '--no-shots' }

@@ -117,6 +117,8 @@ public sealed class RailNode
     public int Id;
     public int Planet;
     public int X, Z; // esquinas de celda
+    /// <summary>Señal: divide las rutas en bloques en este punto. Vale para los dos sentidos.</summary>
+    public bool Signal;
 }
 
 public sealed class RailSegment
@@ -138,7 +140,7 @@ public sealed class Shipment
     public readonly Inventory Cargo = new();
 }
 
-public enum TrainState : byte { Loading, Moving, Unloading, Waiting }
+public enum TrainState : byte { Loading, Moving, Unloading, Waiting, AtSignal }
 
 public sealed class Train
 {
@@ -155,6 +157,10 @@ public sealed class Train
     public bool Forward = true; // sentido A→B en el tramo actual
     public long PosMm;
     public int Timer;
+    /// <summary>Tramos de la ruta ya concedidos: el tren se detiene al final del último si no obtiene el siguiente bloque.</summary>
+    public int GrantEnd;
+    /// <summary>Tiempo detenido ante la señal actual.</summary>
+    public int HoldTicks;
 }
 
 public enum Role : byte { Visitor, Builder, Admin, Owner }
@@ -178,7 +184,7 @@ public enum CommandType : byte
 {
     CutDebris, Place, Remove, Move, Link, Unlink, Insert, Extract, Sell, SetAutoSell,
     FulfillContract, BuyUpgrade, SetRole, Kick,
-    PlaceRail, RemoveRail, StationMode, CreateTrain, RemoveTrain, Travel, SetEvent, SetCosmetic, InsertJunction,
+    PlaceRail, RemoveRail, StationMode, CreateTrain, RemoveTrain, Travel, SetEvent, SetCosmetic, InsertJunction, ToggleSignal,
 }
 
 /// <summary>Intención de un jugador. Todo lo que contiene se valida antes de aplicarse.</summary>

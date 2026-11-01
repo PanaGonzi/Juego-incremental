@@ -330,6 +330,7 @@ public sealed partial class World
             CommandType.SetRole => SetRole(p, c.Text, (Role)c.A),
             CommandType.PlaceRail => PlaceRail(p, c.A, c.B, c.C, c.D, c.Amount),
             CommandType.RemoveRail => RemoveRail(p, c.A),
+            CommandType.ToggleSignal => ToggleSignal(p, c.A, c.B),
             CommandType.StationMode => StationMode(p, c.A, c.B != 0),
             CommandType.CreateTrain => CreateTrain(p, c.A, c.B),
             CommandType.RemoveTrain => RemoveTrain(p, c.A),

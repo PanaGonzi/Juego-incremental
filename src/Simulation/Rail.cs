@@ -46,6 +46,29 @@ public static class RailMath
         }
         return cells;
     }
+
+    /// <summary>
+    /// Lo que pisa un trazado, para detectar cruces: celdas y esquinas, en coordenadas dobles (celda impar, esquina par). Dos diagonales
+    /// que se cortan justo en una esquina no comparten ninguna celda.
+    /// </summary>
+    public static HashSet<(int x, int z)> Footprint(RailNode a, RailNode b, byte shape)
+    {
+        var points = new HashSet<(int, int)>();
+        foreach (var c in Cells(a, b, shape)) points.Add((c.x * 2 + 1, c.z * 2 + 1));
+        if (shape == 0)
+        {
+            var n = Math.Max(Math.Abs(a.X - b.X), Math.Abs(a.Z - b.Z));
+            var sx = Math.Sign(b.X - a.X);
+            var sz = Math.Sign(b.Z - a.Z);
+            for (var i = 0; i <= n; i++) points.Add(((a.X + sx * i) * 2, (a.Z + sz * i) * 2));
+        }
+        else
+        {
+            points.Add((a.X * 2, a.Z * 2));
+            points.Add((b.X * 2, b.Z * 2));
+        }
+        return points;
+    }
 }
 
 public sealed partial class World
@@ -69,7 +92,6 @@ public sealed partial class World
     private readonly Dictionary<(int planet, int x, int z), int> _nodeAt = new();
     private readonly Dictionary<int, List<RailSegment>> _adjacency = new();
     private Train[] _trainList = Array.Empty<Train>();
-    private readonly Dictionary<int, int> _reservedSegments = new();
 
     private RailDef R => Content.Balance.Rail;
 
@@ -78,26 +100,19 @@ public sealed partial class World
         _railCells.Clear();
         _nodeAt.Clear();
         _adjacency.Clear();
+        _crossings.Clear();
+        _footprints.Clear();
         foreach (var n in RailNodes.Values) _nodeAt[(n.Planet, n.X, n.Z)] = n.Id;
         foreach (var s in RailSegments.Values)
         {
             AddAdjacent(s);
             foreach (var c in RailMath.Cells(RailNodes[s.A], RailNodes[s.B], s.Shape))
                 _railCells[(s.Planet, c.x, c.z)] = _railCells.GetValueOrDefault((s.Planet, c.x, c.z)) + 1;
+            IndexCrossings(s);
         }
         _trainList = Trains.Values.ToArray();
-        _reservedSegments.Clear();
-        foreach (var t in _trainList)
-        {
-            if (t.State != TrainState.Moving) continue;
-            for (var i = t.PathIndex; i < t.Path.Count; i++) _reservedSegments[t.Path[i]] = t.Id;
-        }
-    }
-
-    private void ReleaseReservations(Train t)
-    {
-        foreach (var id in t.Path)
-            if (_reservedSegments.TryGetValue(id, out var owner) && owner == t.Id) _reservedSegments.Remove(id);
+        _holds.Clear();
+        foreach (var t in _trainList) RestoreHolds(t);
     }
 
     private void AddAdjacent(RailSegment s)
@@ -136,14 +151,16 @@ public sealed partial class World
         AddAdjacent(s);
         foreach (var c in RailMath.Cells(a, b, shape))
             _railCells[(planet, c.x, c.z)] = _railCells.GetValueOrDefault((planet, c.x, c.z)) + 1;
+        IndexCrossings(s);
         DirtyRailSegments.Add(s.Id);
         return s;
     }
 
     private void RemoveSegment(RailSegment s)
     {
+        UnindexCrossings(s, RailNodes[s.A], RailNodes[s.B]);
         RailSegments.Remove(s.Id);
-        _reservedSegments.Remove(s.Id);
+        _holds.Remove(s.Id);
         DirtyRailSegments.Remove(s.Id);
         RemovedRailSegments.Add(s.Id);
         _adjacency[s.A].Remove(s);
@@ -165,6 +182,9 @@ public sealed partial class World
         foreach (var t in _trainList)
             if (t.CurrentNode == id) return;
         if (!RailNodes.Remove(id, out var node)) return;
+        _holds.Remove(id);
+        // La señal se va con su nodo: se devuelve como el resto de la vía.
+        if (node.Signal) AddCredits(R.SignalCredits);
         _nodeAt.Remove((node.Planet, node.X, node.Z));
         _adjacency.Remove(id);
         DirtyRailNodes.Remove(id);
@@ -190,6 +210,8 @@ public sealed partial class World
         }
         var half = Content.Planets.First(pl => pl.Id == planet).HalfSizeCells;
         if (Math.Abs(x1) >= half || Math.Abs(z1) >= half || Math.Abs(x2) >= half || Math.Abs(z2) >= half) return "err_bounds";
+        var splitError = SplitError(planet, x1, z1) ?? SplitError(planet, x2, z2);
+        if (splitError != null) return splitError;
 
         var a = new RailNode { X = x1, Z = z1 };
         var b = new RailNode { X = x2, Z = z2 };
@@ -212,6 +234,9 @@ public sealed partial class World
             !InRange(p, x2 * (long)B.CellSizeMm, z2 * (long)B.CellSizeMm, B.BuildRangeMm)) return CommandResult.Fail("err_range");
         if (!Pay(p, credits, new Dictionary<string, long>())) return CommandResult.Fail("err_cost");
 
+        // Un extremo en mitad de un tramo recto crea ahí un desvío.
+        SplitAt(p.Planet, x1, z1);
+        SplitAt(p.Planet, x2, z2);
         var a = NodeAt(p.Planet, x1, z1);
         var b = NodeAt(p.Planet, x2, z2);
         foreach (var s in RailSegments.Values)
@@ -223,13 +248,6 @@ public sealed partial class World
         AddSegment(p.Planet, a, b, (byte)shape, -1);
         Bump("built.rail");
         return CommandResult.Success;
-    }
-
-    private bool SegmentInUse(int segmentId)
-    {
-        foreach (var t in _trainList)
-            if (t.State == TrainState.Moving && t.PathIndex < t.Path.Count && t.Path[t.PathIndex] == segmentId) return true;
-        return false;
     }
 
     private CommandResult RemoveRail(PlayerState p, int id)
@@ -248,7 +266,7 @@ public sealed partial class World
     {
         if (!RailSegments.TryGetValue(id, out var s) || s.Planet != p.Planet) return "err_gone";
         if (s.OwnerStation >= 0) return "err_builtin";
-        if (SegmentInUse(id)) return "err_rail_occupied";
+        if (SegmentOccupied(id)) return "err_rail_occupied";
         var a = RailNodes[s.A];
         return InRange(p, a.X * (long)B.CellSizeMm, a.Z * (long)B.CellSizeMm, B.BuildRangeMm + 40000) ? null : "err_range";
     }
@@ -308,6 +326,7 @@ public sealed partial class World
         foreach (var (item, qty) in R.TrainCost) depot.In.Add(item, qty * B.RefundPermille / 1000);
         AddCredits(R.TrainCredits * B.RefundPermille / 1000);
         DirtyMachines.Add(depot.Id);
+        ReleaseAll(t);
         Trains.Remove(id);
         _trainList = Trains.Values.ToArray();
         DirtyTrains.Remove(id);
@@ -315,42 +334,6 @@ public sealed partial class World
         DirtyTrainPaths.Remove(id);
         RemovedTrains.Add(id);
         return CommandResult.Success;
-    }
-
-    /// <summary>Camino más corto. Solo se recalcula al salir o si la ruta se corta, nunca cada tick.</summary>
-    public List<int>? FindPath(int fromNode, int station)
-    {
-        if (!Machines.TryGetValue(station, out var st)) return null;
-        var dist = new Dictionary<int, long> { [fromNode] = 0 };
-        var via = new Dictionary<int, RailSegment>();
-        var queue = new PriorityQueue<int, long>();
-        queue.Enqueue(fromNode, 0);
-        var target = -1;
-        while (queue.TryDequeue(out var node, out var d))
-        {
-            if (d > dist[node]) continue;
-            if (node == st.RailA || node == st.RailB) { target = node; break; }
-            if (!_adjacency.TryGetValue(node, out var list)) continue;
-            foreach (var s in list)
-            {
-                var other = s.A == node ? s.B : s.A;
-                var nd = d + s.LengthMm;
-                if (dist.TryGetValue(other, out var old) && old <= nd) continue;
-                dist[other] = nd;
-                via[other] = s;
-                queue.Enqueue(other, nd);
-            }
-        }
-        if (target < 0) return null;
-        var path = new List<int>();
-        for (var n = target; n != fromNode;)
-        {
-            var s = via[n];
-            path.Add(s.Id);
-            n = s.A == n ? s.B : s.A;
-        }
-        path.Reverse();
-        return path;
     }
 
     private void SetWait(Train t, string reason)
@@ -362,39 +345,28 @@ public sealed partial class World
 
     private void Depart(Train t)
     {
-        var target = t.HeadingToB ? t.StationB : t.StationA;
-        var path = FindPath(t.CurrentNode, target);
-        if (path == null)
+        var plan = Plan(t, t.CurrentNode, out var path, out var end);
+        if (plan != PlanResult.Granted)
         {
+            // Quien espera aquí no retiene vía: los que están en ruta pueden terminar y dejar paso.
             if (t.State != TrainState.Waiting)
             {
                 t.State = TrainState.Waiting;
                 DirtyTrains.Add(t.Id);
             }
-            SetWait(t, "wait_no_route");
-            t.Timer = 10;
+            SetWait(t, plan == PlanResult.NoRoute ? "wait_no_route" : "wait_block");
+            t.Timer = plan == PlanResult.NoRoute ? 10 : 5;
             return;
         }
-        // Se reserva el trayecto completo o no se sale: nadie espera con vía retenida, así que no hay interbloqueos.
-        foreach (var id in path)
-        {
-            if (!_reservedSegments.TryGetValue(id, out var owner) || owner == t.Id) continue;
-            if (t.State != TrainState.Waiting)
-            {
-                t.State = TrainState.Waiting;
-                DirtyTrains.Add(t.Id);
-            }
-            SetWait(t, "wait_block");
-            t.Timer = 5;
-            return;
-        }
-        ReleaseReservations(t);
-        foreach (var id in path) _reservedSegments[id] = t.Id;
+        ReleaseAll(t);
         t.Path.Clear();
         t.Path.AddRange(path);
         DirtyTrainPaths.Add(t.Id);
         t.PathIndex = 0;
         t.PosMm = 0;
+        t.GrantEnd = end;
+        t.HoldTicks = 0;
+        HoldRange(t, 0, end);
         t.State = TrainState.Moving;
         t.WaitReason = "";
         t.Timer = 0;
@@ -412,6 +384,7 @@ public sealed partial class World
     private void Arrive(Train t)
     {
         var station = Machines[t.HeadingToB ? t.StationB : t.StationA];
+        ReleaseAll(t);
         t.HeadingToB = !t.HeadingToB;
         t.State = station.StationUnload ? TrainState.Unloading : TrainState.Loading;
         t.Timer = 0;
@@ -437,7 +410,7 @@ public sealed partial class World
         foreach (var other in Trains.Values)
         {
             if (other.Id >= t.Id) break;
-            if (other.CurrentNode == t.CurrentNode && other.State != TrainState.Moving) slot++;
+            if (other.CurrentNode == t.CurrentNode && !OnTrack(other.State)) slot++;
         }
         return slot;
     }
@@ -447,7 +420,7 @@ public sealed partial class World
     {
         var count = 0;
         foreach (var t in Trains.Values)
-            if (t.CurrentNode == node && t.State != TrainState.Moving) count++;
+            if (t.CurrentNode == node && !OnTrack(t.State)) count++;
         return count;
     }
 
@@ -497,6 +470,7 @@ public sealed partial class World
                 case TrainState.Moving: StepMoving(t); break;
                 case TrainState.Loading: StepLoading(t); break;
                 case TrainState.Unloading: StepUnloading(t); break;
+                case TrainState.AtSignal: StepAtSignal(t); break;
                 case TrainState.Waiting:
                     t.Timer -= TimeScale;
                     if (t.Timer <= 0) Depart(t);
@@ -517,14 +491,32 @@ public sealed partial class World
                 t.PosMm = 0;
                 t.State = TrainState.Waiting;
                 t.Timer = 10;
-                ReleaseReservations(t);
+                ReleaseAll(t);
                 SetWait(t, "wait_no_route");
                 DirtyTrains.Add(t.Id);
                 return;
             }
-            if (t.PosMm < s.LengthMm) return;
+            if (StopLimit(t) is { } limit && t.PosMm >= limit)
+            {
+                // Señal por delante: sigue sin frenar si obtiene el siguiente bloque.
+                if (!TryExtend(t))
+                {
+                    t.PosMm = limit;
+                    t.State = TrainState.AtSignal;
+                    t.Timer = 5;
+                    t.HoldTicks = 0;
+                    DirtyTrains.Add(t.Id);
+                    ReleaseBehind(t);
+                    return;
+                }
+                continue;
+            }
+            if (t.PosMm < s.LengthMm)
+            {
+                ReleaseBehind(t);
+                return;
+            }
             t.PosMm -= s.LengthMm;
-            if (_reservedSegments.TryGetValue(s.Id, out var holder) && holder == t.Id) _reservedSegments.Remove(s.Id);
             t.CurrentNode = t.Forward ? s.B : s.A;
             t.PathIndex++;
             DirtyTrains.Add(t.Id);
