@@ -781,10 +781,14 @@ public static partial class Models
         var p0 = at - dir * len * 0.6f + Vector3.Up * r.Range(0.06f, 0.2f);
         var p1 = at + side * kink * 0.5f + Vector3.Up * lift;
         var p2 = at + dir * len * 0.6f + side * kink + Vector3.Up * (lift * 0.2f + 0.08f);
+        // Dos tramos rectos con arista viva: una viga doblada se quiebra en el pliegue, no se curva como una rama.
         var offset = side * 0.075f;
-        b.Tube(mat, 0.07f, 4, p0 + offset, p1 + offset, p2 + offset);
-        b.Tube(mat, 0.07f, 4, p0 - offset, p1 - offset, p2 - offset);
-        b.Tube(mat, 0.04f, 4, p0, p1, p2);
+        foreach (var (s, e) in new[] { (p0, p1), (p1, p2) })
+        {
+            b.Beam(mat, s + offset, e + offset, 0.13f, 0.03f);
+            b.Beam(mat, s - offset, e - offset, 0.13f, 0.03f);
+            b.Beam(mat, s, e, 0.03f, 0.13f);
+        }
     }
 
     /// <summary>Variantes de escombros: varias formas compartidas entre instancias.</summary>
@@ -801,11 +805,17 @@ public static partial class Models
             case "shadow_scrap":
             {
                 var dark = def == "shadow_scrap";
-                // Base de tierra removida para que el montón apoye en el suelo.
-                b.Rock(dark ? "rock" : "regolith", 0, 0, 0, 1.05f, 0.22f, 0.95f, variant + 3, 1);
+                // Tierra removida del color del suelo, medio enterrada y con terrones: el montón apoya sin un disco claro debajo.
+                b.Rock(dark ? "rock" : "soil", 0, -0.03f, 0, 1.0f, 0.16f, 0.9f, variant + 3, 2);
+                for (var i = 0; i < 7; i++)
+                {
+                    var clod = r.Range(0, Mathf.Tau);
+                    var far = r.Range(0.72f, 1.12f);
+                    b.Rock(dark ? "rock" : "soil", Mathf.Cos(clod) * far, 0, Mathf.Sin(clod) * far, r.Range(0.06f, 0.15f), r.Range(0.05f, 0.1f), r.Range(0.06f, 0.15f), variant * 11 + i + 5, 0);
+                }
                 // Mucho metal oxidado, poca pintura: el naranja queda como resto reconocible, no como masa.
                 for (var i = 0; i < 6; i++)
-                    ScrapSheet(b, r, i == 0 ? (dark ? "dark" : "signal") : i == 3 ? "hull" : i % 2 == 0 ? "rust" : "rustlight", Near(0.55f), i == 0 ? 0.55f : r.Range(0.6f, 1f));
+                    ScrapSheet(b, r, i == 0 ? (dark ? "dark" : "signal") : i == 3 ? "steel_dark" : i % 2 == 0 ? "rust" : "rustlight", Near(0.55f), i == 0 ? 0.55f : r.Range(0.6f, 1f));
                 BentBeam(b, r, dark ? "steel_dark" : "rust", Near(0.25f));
                 BentBeam(b, r, dark ? "rust" : "steel_dark", Near(0.4f));
                 if (variant != 1) BentBeam(b, r, "rustlight", Near(0.5f));
@@ -825,7 +835,7 @@ public static partial class Models
                         var squash = 0.72f + 0.28f * Mathf.Sin(Mathf.Atan2(q.Z, q.X) * 2 + phase);
                         return c + new Vector3(q.X * squash, q.Y, q.Z * (2 - squash));
                     };
-                    b.Lathe(variant == 0 ? "navy" : "rustlight", c.X, 0.34f, c.Z, new[] { (0f, -0.3f), (0.26f, -0.3f), (0.28f, -0.26f), (0.28f, 0.26f), (0.26f, 0.3f), (0f, 0.3f) }, 12, roll: 12);
+                    b.Lathe(variant == 0 ? "dark" : "rustlight", c.X, 0.34f, c.Z, new[] { (0f, -0.3f), (0.26f, -0.3f), (0.28f, -0.26f), (0.28f, 0.26f), (0.26f, 0.3f), (0f, 0.3f) }, 12, roll: 12);
                     b.Warp = null;
                 }
                 if (dark) b.Ball("spectral", r.Range(-0.3f, 0.3f), 0.72f, r.Range(-0.3f, 0.3f), 0.22f, 8, 5);
@@ -866,7 +876,7 @@ public static partial class Models
         var b = new Builder();
         var mat = item == "ore" ? "ore" : item == "silicon_ore" ? "silicon" : "ice";
         // Yacimiento: suelo removido y vetas que asoman, reconocibles por forma además de color.
-        b.Rock(item == "silicon_ore" ? "redrock" : "regolith", 0, 0.01f, 0, 2.15f, 0.12f, 2.15f, StableHash(item) & 255, 2);
+        b.Rock(item == "silicon_ore" ? "redrock" : "soil", 0, 0.01f, 0, 2.15f, 0.12f, 2.15f, StableHash(item) & 255, 2);
         for (var i = 0; i < 14; i++)
         {
             var a = r.Range(0, Mathf.Tau);
@@ -1163,8 +1173,11 @@ public static partial class Models
         {
             b.Tube("suit", 0.085f, 8, new Vector3(side * 0.13f, 0.82f, 0), new Vector3(side * 0.15f, 0.44f, 0.03f), new Vector3(side * 0.15f, 0.08f, 0));
             b.Box("rubber", side * 0.15f, 0.05f, 0.05f, 0.14f, 0.1f, 0.27f);
-            b.Tube("suit", 0.065f, 8, new Vector3(side * 0.29f, 1.3f, 0), new Vector3(side * 0.36f, 1f, 0.02f), new Vector3(side * 0.34f, 0.76f, 0.1f));
-            b.Ball("hull", side * 0.34f, 0.72f, 0.1f, 0.07f, 8, 4);
+            // Brazo derecho (−X) con el codo doblado hasta la mano de la herramienta de RemoteToolView; el izquierdo, en postura de marcha.
+            var hand = side < 0 ? new Vector3(-0.3f, 1.0f, 0.36f) : new Vector3(0.34f, 0.84f, 0.16f);
+            var elbow = side < 0 ? new Vector3(-0.35f, 1.03f, 0.03f) : new Vector3(0.37f, 1.02f, 0.0f);
+            b.Tube("suit", 0.065f, 8, new Vector3(side * 0.29f, 1.3f, 0), elbow, hand);
+            b.Ball("hull", hand.X, hand.Y, hand.Z, 0.07f, 8, 4);
         }
         b.Box("amber", 0, 1.26f, 0.25f, 0.14f, 0.05f, 0.02f, bevel: 0);
         mesh = b.Commit();

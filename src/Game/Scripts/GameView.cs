@@ -23,8 +23,12 @@ public partial class GameView : Node3D
         public Vector3 PistonRest;
         public MeshInstance3D Warn = null!;
         public string Key = "";
+        public string Def = "";
+        public float Height;
         public MachineStatus Status;
         public float Phase;
+        public OmniLight3D? Glow;
+        public bool Running => Status is MachineStatus.Working or MachineStatus.LowPower or MachineStatus.Overheated;
     }
 
     private sealed class RemotePlayer
@@ -193,6 +197,10 @@ public partial class GameView : Node3D
         var layer = new CanvasLayer();
         _uiLayer = layer;
         AddChild(layer);
+        _feedback = new ActionFeedback(_impacts, layer);
+        AddChild(_feedback);
+        Belts.BeltAdded += _feedback.BeltLinked;
+        Belts.BeltRemoved += _feedback.BeltRemoved;
         _hud = new Hud(this);
         layer.AddChild(_hud);
         _hud.SetTool(0);
@@ -300,6 +308,8 @@ public partial class GameView : Node3D
         _camera.AddChild(_rig);
         _impacts = new ImpactEffects();
         AddChild(_impacts);
+        _activity = new FactoryActivity();
+        AddChild(_activity);
     }
 
     private void OnWorldReady()
@@ -343,6 +353,7 @@ public partial class GameView : Node3D
     /// <summary>Retira la representación del planeta anterior; su simulación sigue en el servidor.</summary>
     private void ClearWorldView()
     {
+        _viewSynced = false;
         foreach (var id in _machines.Keys.ToList()) FreeMachine(id);
         _highlighted = null;
         foreach (var mesh in _debris.Values) mesh.QueueFree();
@@ -483,18 +494,27 @@ public partial class GameView : Node3D
             var key = $"{m.Def}|{m.X}|{m.Z}|{m.Rot}";
             if (!_machines.TryGetValue(m.Id, out var node) || node.Key != key)
             {
+                var isNew = node == null;
                 if (node != null) FreeMachine(m.Id);
                 node = CreateMachine(m, key);
                 _machines[m.Id] = node;
+                // Solo lo que aparece con la partida ya en marcha: cargar el mundo no es construir.
+                if (isNew && _viewSynced) _feedback.Placed(node.Root, w.Content.Machines[m.Def].W * Cell);
             }
             if (node.Status != m.Status)
             {
                 node.Status = m.Status;
                 node.Warn.Mesh = Models.StatusIcon(m.Status);
                 node.Lamp.MaterialOverride = Models.LampState(m.Status);
+                // La luz de trabajo dice de lejos si la máquina produce: encendida en marcha, en piloto si no.
+                if (node.Glow != null) node.Glow.LightEnergy = FactoryActivity.GlowEnergy(node.Running);
             }
         }
-        foreach (var id in _machines.Keys.Where(k => !seen.Contains(k)).ToList()) FreeMachine(id);
+        foreach (var id in _machines.Keys.Where(k => !seen.Contains(k)).ToList())
+        {
+            if (_viewSynced && _machines.TryGetValue(id, out var gone)) _feedback.Removed(gone.Root.GlobalPosition);
+            FreeMachine(id);
+        }
 
         seen.Clear();
         foreach (var d in w.DebrisById.Values)
@@ -567,14 +587,40 @@ public partial class GameView : Node3D
 
         UpdateEvent(w);
 
-        if (w.ObjectiveIndex != _objectiveSeen)
+        var objectiveDone = w.ObjectiveIndex != _objectiveSeen;
+        if (objectiveDone)
         {
             _objectiveSeen = w.ObjectiveIndex;
             Sfx.Play("objective");
+            _feedback.ObjectiveDone();
         }
-        if (w.Credits > _lastCredits + 5) Sfx.Play("sell");
+        if (w.Upgrades.Count != _upgradesSeen)
+        {
+            if (w.Upgrades.Count > _upgradesSeen && _viewSynced) _feedback.UpgradeBought();
+            _upgradesSeen = w.Upgrades.Count;
+        }
+        var sold = w.Stats.GetValueOrDefault("sold_credits");
+        if (sold > _soldSeen)
+        {
+            // La cifra sube desde la terminal de exportación más cercana, si está a la vista.
+            var player = _body.GlobalPosition;
+            var terminal = _machines.Values.Where(n => n.Def == "export_terminal").OrderBy(n => n.Root.GlobalPosition.DistanceSquaredTo(player)).FirstOrDefault();
+            if (_viewSynced) _feedback.Sold(sold - _soldSeen, terminal?.Root.GlobalPosition + Vector3.Up * ((terminal?.Height ?? 0) + 0.5f), player);
+        }
+        _soldSeen = sold;
+        if (w.Credits > _lastCredits + 5 && !objectiveDone) Sfx.Play("sell");
         _lastCredits = w.Credits;
+        _viewSynced = true;
     }
+
+    private ActionFeedback _feedback = null!;
+    private FactoryActivity _activity = null!;
+    private bool _viewSynced;
+    private int _upgradesSeen;
+    private long _soldSeen;
+    public ActionFeedback Feedback => _feedback;
+    public FactoryActivity Activity => _activity;
+    public ImpactEffects Impacts => _impacts;
 
     private MeshInstance3D? _objectiveBeam;
     public bool ObjectiveMarkerVisible => _objectiveBeam is { Visible: true };
@@ -692,7 +738,7 @@ public partial class GameView : Node3D
         {
             Loco = new Node3D(),
             Wagon = new Node3D(),
-            Cargo = new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(2.0f, 1f, 5.7f), Material = Models.Mat("rust") } },
+            Cargo = new MeshInstance3D { Mesh = Models.WagonLoad() },
             Label = new Label3D { Billboard = BaseMaterial3D.BillboardModeEnum.Enabled, FontSize = 36, PixelSize = 0.007f, OutlineSize = 8, Position = new Vector3(0, 4.3f, 0), VisibilityRangeEnd = 60 },
         };
         node.Loco.AddChild(new MeshInstance3D { Mesh = Models.Locomotive() });
@@ -806,7 +852,7 @@ public partial class GameView : Node3D
         var def = w.Content.Machines[m.Def];
         var root = new Node3D { Position = CenterOf(w, m), RotationDegrees = new Vector3(0, ModelYawDegrees(w.Content.Machines[m.Def], m.Rot), 0) };
         root.AddChild(new MeshInstance3D { Mesh = model.Body });
-        var node = new MachineNode { Root = root, Key = key, Status = MachineStatus.Idle, Phase = GD.Randf() * 6f };
+        var node = new MachineNode { Root = root, Key = key, Def = m.Def, Height = model.Height, Status = MachineStatus.Idle, Phase = GD.Randf() * 6f };
 
         if (model.Rotor != null)
         {
@@ -840,7 +886,10 @@ public partial class GameView : Node3D
         node.Lamp = new MeshInstance3D { Mesh = Models.Lamp(), Position = model.LampPos, MaterialOverride = Models.LampState(m.Status), VisibilityRangeEnd = 70, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         root.AddChild(node.Lamp);
         if (model.GlowPos is { } glow)
-            root.AddChild(new OmniLight3D { Position = glow, LightColor = model.GlowColor, LightEnergy = 0.7f, OmniRange = 7f, DistanceFadeEnabled = true, DistanceFadeBegin = 34, DistanceFadeLength = 12 });
+        {
+            node.Glow = new OmniLight3D { Position = glow, LightColor = model.GlowColor, LightEnergy = FactoryActivity.GlowEnergy(false), LightSpecular = 0.3f, OmniRange = 7f, DistanceFadeEnabled = true, DistanceFadeBegin = 34, DistanceFadeLength = 12 };
+            root.AddChild(node.Glow);
+        }
         AddChild(root);
         return node;
     }
@@ -1271,7 +1320,7 @@ public partial class GameView : Node3D
                     client.Send(new Command { Type = CommandType.CutDebris, A = _aim.id });
                     _toolAudio.Hit(_debrisKinds.GetValueOrDefault(_aim.id));
                     _rig.OnHit();
-                    if (_main.Prefs.CameraBob) _kick = 0.0032f * _main.Prefs.BobIntensity;
+                    if (_main.Prefs.CameraBob && !Scenery.Calm) _kick = 0.0032f * _main.Prefs.BobIntensity;
                 }
                 break;
             case Tool.Build:
@@ -1448,6 +1497,7 @@ public partial class GameView : Node3D
             Working = _working,
             BobOn = _main.Prefs.CameraBob,
             BobScale = _main.Prefs.BobIntensity,
+            Calm = Scenery.Calm,
             WallDistance = _wallDistance,
             Look = _lookAccum / Mathf.Max(dt, 0.001f) * 0.016f,
             Target = _working ? _aimPoint : null,
@@ -1525,22 +1575,66 @@ public partial class GameView : Node3D
         if (_humTimer > 0) return;
         _humTimer = 0.5;
         var pos = _body.GlobalPosition;
-        var nearest = _machines.Values
-            .Where(n => n.Status is MachineStatus.Working or MachineStatus.LowPower or MachineStatus.Overheated)
+        var running = _machines.Values.Where(n => n.Running).ToList();
+        var nearest = running
             .OrderBy(n => n.Root.GlobalPosition.DistanceSquaredTo(pos))
-            .Take(_hums.Count)
+            .Take(FactoryActivity.MaxSites)
             .ToList();
+        // Mezcla limitada: la potencia conjunta se reparte entre las voces activas, sin sumar hasta saturar.
+        var voices = Mathf.Min(nearest.Count, _hums.Count);
+        var voiceDb = Sfx.MachineDb - 10f * Mathf.Log(Mathf.Max(voices, 1)) / Mathf.Log(10f) * 0.8f;
         for (var i = 0; i < _hums.Count; i++)
         {
             if (i < nearest.Count)
             {
                 _hums[i].GlobalPosition = nearest[i].Root.GlobalPosition + Vector3.Up;
-                _hums[i].VolumeDb = Sfx.MachineDb;
+                _hums[i].VolumeDb = voiceDb;
+                var loop = Sfx.LoopOf(nearest[i].Def);
+                if (_hums[i].Stream != loop)
+                {
+                    _hums[i].Stop();
+                    _hums[i].Stream = loop;
+                }
                 if (!_hums[i].Playing) _hums[i].Play();
             }
             else if (_hums[i].Playing)
             {
                 _hums[i].Stop();
+            }
+        }
+        var sites = new List<FactoryActivity.Site>(nearest.Count);
+        foreach (var n in nearest) sites.Add(new FactoryActivity.Site(n.Root, n.Def, n.Height));
+        _activity.Refresh(sites, Belts.NearestMoving(pos), pos, running.Count);
+        UpdateVisibleStock(pos);
+    }
+
+    /// <summary>
+    /// Lo que espera en cada boca, a la vista sobre la zapata de las máquinas de producción cercanas: entrada a un lado y salida al otro.
+    /// Crece con la cantidad real en escala logarítmica, y como máximo seis piezas por boca.
+    /// </summary>
+    private void UpdateVisibleStock(Vector3 pos)
+    {
+        var stock = Belts.VisibleStock;
+        stock.Clear();
+        var w = Session.Client.World!;
+        foreach (var (id, node) in _machines)
+        {
+            if (node.Root.GlobalPosition.DistanceSquaredTo(pos) > 26f * 26f || !w.Machines.TryGetValue(id, out var m)) continue;
+            var def = w.Content.Machines[m.Def];
+            if (def.Recipe == null || def.W < 2 || def.D < 2) continue;
+            var halfW = def.W * Cell / 2;
+            var halfD = def.D * Cell / 2;
+            foreach (var (items, x, z) in new[] { (m.Out.Items, halfW - 0.62f, halfD - 0.22f), (m.In.Items, -(halfW - 0.62f), -(halfD - 0.22f)) })
+            {
+                var first = items.FirstOrDefault(kv => kv.Value > 0);
+                if (first.Value <= 0) continue;
+                var pieces = Mathf.Min(6, 1 + Mathf.FloorToInt(Mathf.Log(first.Value) / Mathf.Log(2f)));
+                for (var i = 0; i < pieces; i++)
+                {
+                    // Tres en la fila y el resto encima, hacia la boca desde la esquina.
+                    var along = (i % 3) * 0.36f * (x > 0 ? -1f : 1f);
+                    stock.Add((first.Key, node.Root.GlobalTransform * new Vector3(x + along, 0.235f + (i / 3) * 0.13f, z)));
+                }
             }
         }
     }

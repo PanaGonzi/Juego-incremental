@@ -215,6 +215,8 @@ public sealed class Settings
     public int WindowHeight { get; set; }
     public bool CameraBob { get; set; } = true;
     public float BobIntensity { get; set; } = 1f;
+    /// <summary>Confort: limita partículas, sacudidas y destellos en toda la representación.</summary>
+    public bool ReduceEffects { get; set; }
     public List<string> Hotbar { get; set; } = new();
     public int ControlsVersion { get; set; }
     public bool Shadows { get; set; } = true;

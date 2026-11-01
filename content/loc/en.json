@@ -382,6 +382,8 @@
   "action_hotbar_7": "Hotbar 7",
   "action_hotbar_8": "Hotbar 8",
   "action_hotbar_9": "Hotbar 9",
+  "settings_reduce_effects": "Reduce effects",
+  "settings_reduce_effects_hint": "Limits particles, shake and flashes: less steam and dust, dull sparks, a steady beacon and no screen flashes.",
   "settings_bob_intensity": "Bobbing intensity",
   "prompt_too_far": "Move closer to reach it",
   "prompt_stowed": "[{hotbar_1}] Draw the multitool",

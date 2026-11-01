@@ -347,6 +347,8 @@ public static class SettingsForm
         Slider(input, "settings_sensitivity", 0.2f, 3f, 0.05f, prefs.Sensitivity, v => $"{v:0.00}", v => prefs.Sensitivity = v);
         Toggle(input, "settings_bob", prefs.CameraBob, v => prefs.CameraBob = v);
         Slider(input, "settings_bob_intensity", 0, 1.5f, 0.05f, prefs.BobIntensity, percent, v => prefs.BobIntensity = v);
+        Toggle(input, "settings_reduce_effects", prefs.ReduceEffects, v => prefs.ReduceEffects = v);
+        input.AddChild(Ui.Para(Loc.T("settings_reduce_effects_hint"), UiTheme.Caption, Ui.Dim));
         input.AddChild(Ui.Btn(Loc.T("settings_controls"), () =>
         {
             foreach (var c in box.GetChildren()) { box.RemoveChild(c); c.QueueFree(); }
