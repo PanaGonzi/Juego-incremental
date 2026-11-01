@@ -4,7 +4,7 @@ namespace Pluton.Networking;
 
 public static class Protocol
 {
-    public const int Version = 7;
+    public const int Version = 8;
     public const string GameVersion = "0.5.0-qa4";
     public const int MaxPlayers = 12;
     public const int MaxClientPacket = 8192; // una ruta ocupa ~1 byte por tramo recto: miles de curvas caben

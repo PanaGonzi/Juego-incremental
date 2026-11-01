@@ -1297,6 +1297,7 @@ public partial class GameView : Node3D
 
     public void SetTool(Tool t)
     {
+        _movingMachine = -1;
         if (_tool == Tool.Cutter && t != Tool.Cutter) _stowedBeforeTool = _stowed;
         if (t == Tool.Remove && _tool != Tool.Remove)
         {
@@ -1317,8 +1318,22 @@ public partial class GameView : Node3D
     public void SelectBuild(string def)
     {
         _buildDef = def;
+        _movingMachine = -1;
         SetTool(Tool.Build);
     }
+
+    /// <summary>Recoloca una máquina con el mismo fantasma de construir. Un solo movimiento: al confirmarlo se vuelve a la herramienta.</summary>
+    public void StartMove(int machine)
+    {
+        var m = Session.Client.World!.Machines[machine];
+        _buildDef = m.Def;
+        _buildRot = m.Rot;
+        SetTool(Tool.Build);
+        _movingMachine = machine;
+    }
+
+    private int _movingMachine = -1;
+    public bool MovingForTest => _movingMachine >= 0;
 
     private void AimedMachine(CommandType type)
     {
@@ -1352,6 +1367,32 @@ public partial class GameView : Node3D
                     break;
                 }
                 var buildDef = client.World!.Content.Machines[_buildDef];
+                if (_movingMachine >= 0)
+                {
+                    var moveError = client.World.MoveMachineError(client.LocalPlayer!, _movingMachine, x, z, _buildRot);
+                    if (moveError != null)
+                    {
+                        Notify(Loc.T(moveError));
+                        break;
+                    }
+                    client.Send(new Command { Type = CommandType.Move, A = _movingMachine, B = x, C = z, D = _buildRot });
+                    Sfx.Play("build");
+                    SetTool(Tool.Cutter);
+                    break;
+                }
+                if (OverBelt(client.World, client.LocalPlayer!, buildDef, x, z))
+                {
+                    var insertError = client.World.JunctionOnBeltError(client.LocalPlayer!, _buildDef, x, z, out _, out _);
+                    if (insertError == null && !client.World.CanAfford(client.LocalPlayer!, buildDef.Credits, buildDef.Cost)) insertError = "err_cost";
+                    if (insertError != null)
+                    {
+                        Notify(Loc.T(insertError));
+                        break;
+                    }
+                    client.Send(new Command { Type = CommandType.InsertJunction, Text = _buildDef, A = x, B = z });
+                    Sfx.Play("build");
+                    break;
+                }
                 var buildError = client.World.PlacementSiteError(client.LocalPlayer!, _buildDef, x, z, _buildRot, out _);
                 if (buildError == null && !client.World.CanAfford(client.LocalPlayer!, buildDef.Credits, buildDef.Cost)) buildError = "err_cost";
                 if (buildError != null)
@@ -1992,6 +2033,10 @@ public partial class GameView : Node3D
     public int PlacementMarkCount { get; private set; }
     public string StatusText => _hud.StatusText;
 
+    /// <summary>Un divisor o unificador apuntado sobre una cinta se inserta en ella en lugar de colocarse aparte.</summary>
+    private static bool OverBelt(World w, PlayerState me, MachineDef def, int x, int z) =>
+        World.IsJunction(def.Kind) && w.BeltAt(me.Planet, x, z) >= 0;
+
     private void UpdateGhost(World w, PlayerState me, ref string status, ref Color color, ref string prompt)
     {
         var def = w.Content.Machines[_buildDef];
@@ -2003,7 +2048,9 @@ public partial class GameView : Node3D
             _ghost.AddChild(new MeshInstance3D { Mesh = Models.Machine(_buildDef).Body, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
             AddChild(_ghost);
         }
-        status = $"{Loc.T("machine_" + _buildDef)} — {Ui.Cost(def.Credits, def.Cost)}";
+        var moving = _movingMachine >= 0 && w.Machines.ContainsKey(_movingMachine);
+        status = moving ? Loc.T("move_status", Loc.T("machine_" + _buildDef)) : $"{Loc.T("machine_" + _buildDef)} — {Ui.Cost(def.Credits, def.Cost)}";
+        if (moving) prompt = Loc.T("prompt_move");
         color = Ui.Ink;
         if (!TryGhostCell(out var x, out var z))
         {
@@ -2012,13 +2059,20 @@ public partial class GameView : Node3D
             status += "\n" + Loc.T("build_aim_ground");
             return;
         }
-        var (fw, fd) = _buildRot % 2 == 0 ? (def.W, def.D) : (def.D, def.W);
+        var onBelt = !moving && OverBelt(w, me, def, x, z);
+        var beltRot = 0;
+        var insertError = onBelt ? w.JunctionOnBeltError(me, _buildDef, x, z, out _, out beltRot) : null;
+        // Sobre una cinta la orientación la dicta la cinta: se muestra la que se va a construir.
+        var shownRot = onBelt && insertError == null ? beltRot : _buildRot;
+        var (fw, fd) = shownRot % 2 == 0 ? (def.W, def.D) : (def.D, def.W);
         _ghost!.Visible = true;
         _ghost.GlobalPosition = new Vector3((x + fw / 2f) * Cell, 0.02f, (z + fd / 2f) * Cell);
-        _ghost.RotationDegrees = new Vector3(0, ModelYawDegrees(def, _buildRot), 0);
+        _ghost.RotationDegrees = new Vector3(0, ModelYawDegrees(def, shownRot), 0);
 
-        var error = w.PlacementSiteError(me, _buildDef, x, z, _buildRot, out _);
-        var afford = w.CanAfford(me, def.Credits, def.Cost);
+        var error = moving ? w.MoveMachineError(me, _movingMachine, x, z, shownRot)
+            : onBelt ? insertError
+            : w.PlacementSiteError(me, _buildDef, x, z, shownRot, out _);
+        var afford = moving || w.CanAfford(me, def.Credits, def.Cost);
         var ghostMaterial = error != null ? _ghostBad : afford ? _ghostOk : _ghostLacking;
         // De cerca la pieza llenaría la pantalla: se aclara al acercarse y, dentro de ella, queda solo la marca del suelo.
         var cam = _camera.GlobalPosition;
@@ -2033,16 +2087,18 @@ public partial class GameView : Node3D
         ghostMesh.MaterialOverride = ghostMaterial;
         NearCellMarkFade = 1f - fade;
         if (error != null) status += "\n" + Loc.T(error);
+        else if (onBelt) status += "\n" + Loc.T("build_on_belt");
+        else if (moving && w.Links.Values.Any(l => l.From == _movingMachine || l.To == _movingMachine)) status += "\n" + Loc.T("move_belts_note");
         if (!afford) status += "\n" + EntryInfo.MissingText(w, me, def);
         if (error != null || !afford) color = error != null ? Ui.Bad : Ui.Warn;
 
         // Las celdas exactas que ocuparía y los mismos puertos que tendrá la máquina: lo que se ve es lo que queda.
         var cellColor = error != null ? Ui.Bad : afford ? Ui.Good : Ui.Warn;
-        var ports = PortIndicators.ForPlacement(w.BeltPorts(me.Planet, _buildDef, x, z, _buildRot, true).Concat(w.BeltPorts(me.Planet, _buildDef, x, z, _buildRot, false)));
+        var ports = PortIndicators.ForPlacement(w.BeltPorts(me.Planet, _buildDef, x, z, shownRot, true).Concat(w.BeltPorts(me.Planet, _buildDef, x, z, shownRot, false)));
         // Las marcas se reducen al acercarse: de cerca, una flecha de tamaño fijo ocupa media pantalla.
         var sizeStep = Mathf.Clamp((int)(Mathf.Max(0f, away) / 3f), 0, 3);
         _cellMarkScale = 0.55f + sizeStep * 0.15f;
-        ShowCellMark($"build|{_buildDef}|{x}|{z}|{_buildRot}|{cellColor.ToHtml()}|{sizeStep}|{Session.Client.StructuralDeltas}", w.Footprint(_buildDef, x, z, _buildRot), cellColor, ports);
+        ShowCellMark($"build|{_buildDef}|{x}|{z}|{shownRot}|{cellColor.ToHtml()}|{sizeStep}|{Session.Client.StructuralDeltas}", w.Footprint(_buildDef, x, z, shownRot), cellColor, ports);
         PlacementMarkCount = ports.Count;
         if (w.CanSendByBelt(def) || w.CanReceiveByBelt(def)) prompt += "\n" + Loc.T("build_ports_legend");
     }

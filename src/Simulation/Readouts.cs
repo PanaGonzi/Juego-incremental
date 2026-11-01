@@ -59,6 +59,16 @@ public sealed partial class World
         return InRange(p, x * (long)B.CellSizeMm, z * (long)B.CellSizeMm, B.BuildRangeMm) ? null : "err_range";
     }
 
+    /// <summary>Motivo por el que este jugador no puede mover la máquina ahí, o null. Compartido con el servidor.</summary>
+    public string? MoveMachineError(PlayerState p, int id, int x, int z, int rot)
+    {
+        if (!Machines.TryGetValue(id, out var m) || m.Planet != p.Planet) return "err_gone";
+        if (m.Builtin || Content.Machines[m.Def].Kind == MachineKind.Station) return "err_builtin";
+        var error = CheckPlacement(p.Planet, m.Def, x, z, rot, id, out _);
+        if (error != null) return error;
+        return InRange(p, x * (long)B.CellSizeMm, z * (long)B.CellSizeMm, B.BuildRangeMm) ? null : "err_range";
+    }
+
     /// <summary>Motivo por el que este jugador no puede desmontar la máquina, o null. Compartido con el servidor.</summary>
     public string? RemoveMachineError(PlayerState p, int id)
     {

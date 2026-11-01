@@ -319,6 +319,7 @@ public sealed partial class World
             CommandType.Remove => Remove(p, c.A),
             CommandType.Move => Move(p, c.A, c.B, c.C, c.D),
             CommandType.Link => AddLink(p, c.A, c.B, c.Cells),
+            CommandType.InsertJunction => InsertJunction(p, c.Text, c.A, c.B),
             CommandType.Unlink => RemoveLink(p, c.A),
             CommandType.Insert => Insert(p, c.A, c.Text, c.Amount),
             CommandType.Extract => Extract(p, c.A, c.Text, c.Amount),
@@ -569,12 +570,11 @@ public sealed partial class World
 
     private CommandResult Move(PlayerState p, int id, int x, int z, int rot)
     {
-        if (!Machines.TryGetValue(id, out var m) || m.Planet != p.Planet) return CommandResult.Fail("err_gone");
-        if (m.Builtin || Content.Machines[m.Def].Kind == MachineKind.Station) return CommandResult.Fail("err_builtin");
         rot = ((rot % 4) + 4) % 4;
-        var error = CheckPlacement(p.Planet, m.Def, x, z, rot, id, out var nodeId);
+        var error = MoveMachineError(p, id, x, z, rot);
         if (error != null) return CommandResult.Fail(error);
-        if (!InRange(p, x * (long)B.CellSizeMm, z * (long)B.CellSizeMm, B.BuildRangeMm)) return CommandResult.Fail("err_range");
+        var m = Machines[id];
+        CheckPlacement(p.Planet, m.Def, x, z, rot, id, out var nodeId);
 
         foreach (var cell in Footprint(m.Def, m.X, m.Z, m.Rot)) _occupied.Remove((m.Planet, cell.x, cell.z));
         m.X = x; m.Z = z; m.Rot = rot;

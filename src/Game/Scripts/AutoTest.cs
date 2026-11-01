@@ -1329,6 +1329,53 @@ public partial class AutoTest : Node
         PressAction("chain_trace");
         await Wait(0.2);
         Check(!v.ChainForTest.Active && v.ChainForTest.ChevronCount == 0, "la segunda pulsación apaga el resaltado");
+
+        await BeltEditChecks(crate, splitter);
+    }
+
+    /// <summary>Corrige una fábrica en marcha: divisor insertado en una cinta cargada y máquina movida con el fantasma.</summary>
+    private async Task BeltEditChecks(Machine crate, Machine target)
+    {
+        var v = _view!;
+        var server = v.Session.Runner!.Server.World;
+        var link = W.Links.Values.FirstOrDefault(l => l.To == target.Id && l.Cells.Count >= 5 && Enumerable.Range(1, l.Cells.Count - 2).All(i => W.BridgeAt(l.Planet, l.Cells[i].x, l.Cells[i].z) < 0));
+        Check(link != null, "cinta tendida para corregirla");
+        if (link == null) return;
+        var cell = link.Cells[link.Cells.Count / 2];
+        var center = new Vector3((cell.x + 0.5f) * 2, 0, (cell.z + 0.5f) * 2);
+        await WalkTo(center + new Vector3(5, 0, 7));
+        var itemsBefore = server.ItemsOnBelts();
+        v.SelectBuild("splitter");
+        v.AimAt(center);
+        await Wait(0.5);
+        Check(v.StatusText.Contains(Loc.T("build_on_belt")), $"el fantasma avisa de que se inserta: {v.StatusText}");
+        await Shot("gestion_08_divisor_sobre_cinta");
+        var machines = W.Machines.Count;
+        v.Primary();
+        Check(await Until(() => W.Machines.Count == machines + 1 && W.MachineAt(link.Planet, cell.x, cell.z) >= 0, 3), "divisor insertado con la herramienta de construir");
+        v.SetTool(Tool.Cutter);
+        var inserted = W.MachineAt(link.Planet, cell.x, cell.z);
+        Check(W.Links.Values.Count(l => l.To == inserted || l.From == inserted) == 2, "la cinta queda partida en dos tramos");
+        await Wait(1.5);
+        v.AimAt(center + new Vector3(-1, 0, 0));
+        await Shot("gestion_09_divisor_insertado");
+
+        // Mover una máquina: desde el panel, con el mismo fantasma, y las cintas se trazan de nuevo.
+        var moved = W.Machines[crate.Id];
+        var (ox, oz) = (moved.X, moved.Z);
+        v.StartMove(crate.Id);
+        Check(v.MovingForTest, "mover abre el fantasma");
+        var goal = new Vector3((ox + 1f) * 2, 0, (oz - 3f + 1f) * 2);
+        await WalkTo(goal + new Vector3(4, 0, 8));
+        v.AimAt(goal);
+        await Wait(0.5);
+        Check(v.StatusText.Contains(Loc.T("move_status", Loc.T("machine_" + moved.Def))), $"el aviso dice que se mueve: {v.StatusText}");
+        await Shot("gestion_10_mover_maquina");
+        v.Primary();
+        Check(await Until(() => (W.Machines[crate.Id].X, W.Machines[crate.Id].Z) != (ox, oz), 3), $"máquina movida: {W.Machines[crate.Id].X},{W.Machines[crate.Id].Z}");
+        Check(!v.MovingForTest && v.CurrentTool == Tool.Cutter, "tras mover vuelve a la herramienta");
+        await Wait(0.5);
+        Check(v.Session.Client.HashMismatches == 0, "sin divergencias tras corregir la fábrica");
     }
 
     private static void PressAction(string action)

@@ -809,6 +809,13 @@ public partial class Hud : Control
             if (transfer.GetChildCount() > 0) Add(transfer);
         }
 
+        if (!m.Builtin && w.Content.Machines[m.Def].Kind != MachineKind.Station)
+            Add(Ui.Btn(Loc.T("panel_move"), () =>
+            {
+                ClosePanel();
+                _view.StartMove(id);
+            }));
+
         if (readout.LinksIn + readout.LinksOut > 0)
             Add(Ui.Btn($"{Loc.T(_view.ChainSeed == id ? "panel_chain_off" : "panel_chain_on")} [{Controls.KeyName("chain_trace")}]", () =>
             {
