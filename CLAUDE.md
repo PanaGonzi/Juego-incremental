@@ -2,7 +2,8 @@
 
 Incremental industrial 3D en primera persona para Steam, con cooperativo online real de 1 a 12 jugadores.
 Encargo completo y vigente: [PROMPT_CLAUDE_PLUTON_INCREMENTAL_STEAM.md](PROMPT_CLAUDE_PLUTON_INCREMENTAL_STEAM.md).
-Léelo si vas a tomar una decisión de producto. Comunicación con el titular: español.
+Prioridades visuales y de pruebas vigentes: [PROMPT_CLAUDE_CONTINUAR_QA_CINTAS_GRAFICOS.md](PROMPT_CLAUDE_CONTINUAR_QA_CINTAS_GRAFICOS.md). Sustituyen a la dirección visual provisional.
+Léelos si vas a tomar una decisión de producto. Comunicación con el titular: español. No esperes su evaluación para seguir con mejoras y pruebas concretas.
 
 ## Reglas persistentes
 
@@ -27,6 +28,7 @@ powershell -ExecutionPolicy Bypass -File tools\export.ps1 -Version dev -Force   
 powershell -ExecutionPolicy Bypass -File tools\auto-test.ps1 -Tag prueba            # recorrido del cliente exportado
 powershell -ExecutionPolicy Bypass -File tools\coop-test.ps1 -Mode host             # dos clientes Godot (host|dedicated)
 powershell -ExecutionPolicy Bypass -File tools\net-test.ps1 -Clients 12 -Seconds 60 -Extra 1   # procesos independientes
+dotnet build tools/PlayDriver -c Release -o logs/playdriver-bin -v q   # conductor de QA: jugar con entradas reales de Windows (ver su README)
 ```
 
 ## Mapa

@@ -57,6 +57,25 @@ Estados: pendiente · en curso · bloqueada · implementada (pendiente de prueba
 | A5-3 | A | Halloween activable, recompensas permanentes | verificada | T-005, recorrido `halloween` |
 | A5-4 | M | Equilibrio y duración con personas | **bloqueada: requiere juego humano** | — |
 
+## A0.5.x — Experiencia de fábrica (prioridad actual)
+
+Encargo: [PROMPT_CLAUDE_CONTINUAR_QA_CINTAS_GRAFICOS.md](../PROMPT_CLAUDE_CONTINUAR_QA_CINTAS_GRAFICOS.md). Plan y reparto: [PLAN_0.5](PLAN_0.5.md). Sustituye a B-6 y B-8 como siguiente trabajo. Ya no se espera la evaluación del titular para avanzar.
+
+| ID | P | Tarea | Estado | Evidencia |
+| --- | --- | --- | --- | --- |
+| E-0 | A | Conductor de QA con entradas de Windows y captura limitada a la ventana | verificada: clic, ratón relativo y teclado sobre la 0.4.1 exportada | `artifacts/qa/0.4.1/` |
+| E-1 | A | Cintas con carga real, puertos, ruta, atasco, corte, migración v4 → v5 | en curso | — |
+| E-2 | A | Brazos, multiherramienta y animaciones | en curso | — |
+| E-3 | A | Controles convencionales, barra rápida e inventario con transferencias | en curso | — |
+| E-4 | A | Zona representativa industrial semirrealista: materiales, terreno, luz, máquinas, objetos | en curso | — |
+| E-5 | A | Menús, panel de máquina con cifras reales, objetivos, ajustes | en curso | — |
+| E-6 | A | QA de primera experiencia: de partida nueva a vender, con pantallas y controles normales | pendiente de build integrada | — |
+| E-7 | A | QA de sistemas y dos clientes viendo el mismo transporte; después 12 clientes | pendiente de build integrada | — |
+| E-8 | A | Revisión independiente de calidad y rendimiento con cintas cargadas | pendiente de build integrada | — |
+| E-9 | M | Divisores y combinadores de cintas | pendiente | — |
+| E-10 | M | Extender el acabado a Marte y al resto de máquinas | pendiente | — |
+| E-11 | M | BUG-005: dónde se producen los picos de RTT | pendiente | — |
+
 ## Beta
 
 | ID | P | Tarea | Estado |

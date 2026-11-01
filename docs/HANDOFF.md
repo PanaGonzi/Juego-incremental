@@ -6,7 +6,9 @@
 - **Comandos:** en [CLAUDE.md](../CLAUDE.md); además `tools/net-matrix.ps1`, `tools/host-test.ps1`, y `auto-test.ps1 -Scenario rail|travel|mars|halloween`, `-Measure small|medium|stress`.
 - **Bloqueos exactos:** ver [STATUS](STATUS.md). Todos requieren al titular.
 - **Pruebas pendientes:** «Sin verificar» en [TEST_REPORTS](TEST_REPORTS.md).
-- **Siguiente tarea concreta:** recoger en FEEDBACK la primera partida del titular y ajustar con ella. Sin esa información: B-8, desvíos y señales; después B-6, arte y audio.
+- **Rama de trabajo:** `evolucion-0.5`, con agentes en `agente/cintas`, `agente/primera-persona` y `agente/arte`; el coordinador integra. La estable sigue en `main` y `builds/alpha-0.4.1`.
+- **Siguiente tarea concreta:** integrar las ramas de agentes y someter la build a QA: tareas E-1 a E-8 del [ROADMAP](ROADMAP.md), plan en [PLAN_0.5](PLAN_0.5.md).
+- **Pruebas visuales:** `tools/PlayDriver`. Una sola sesión a la vez; siempre perfil `test*`.
 - **Cuidado:**
   - `auto-test`, `coop-test` y `host-test` abren ventanas y usan GPU: comprobar antes que no haya un `Pluton.exe` del titular abierto.
   - Tras pruebas gráficas, vigilar `LiveKernelEvent` y comparar horas (BUG-001).

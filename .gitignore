@@ -8,3 +8,4 @@ logs/
 .vs/
 .vscode/*.log
 src/Game/.mono/
+.claude/worktrees/
