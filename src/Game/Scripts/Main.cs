@@ -210,6 +210,8 @@ public sealed class Settings
     public bool CameraBob { get; set; } = true;
     public bool Shadows { get; set; } = true;
     public bool Glow { get; set; } = true;
+    /// <summary>Calidad gráfica: 0 bajo, 1 medio, 2 alto.</summary>
+    public int Quality { get; set; } = 1;
     public float EventAmbience { get; set; } = 0.7f;
     public Dictionary<string, long> Bindings { get; set; } = new();
 
