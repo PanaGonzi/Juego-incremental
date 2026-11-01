@@ -418,6 +418,7 @@
   "item_silicon_ore_d": "Mineral marciano que se refina en obleas.",
   "item_wafer_d": "Obleas de silicio para electrónica de precisión.",
   "item_nav_core_d": "Pieza clave del Proyecto Noveno Planeta.",
+  "status_Passing": "Repartiendo",
   "machine_splitter": "Divisor",
   "machine_merger": "Unificador",
   "upgrade_tech_logistics": "Reparto por cintas",

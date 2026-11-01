@@ -518,10 +518,22 @@ public class FactoryManagementTests
 
     // ---------- Red ----------
 
+    /// <summary>Por UDP real: la medición llega al cliente, también al que entra después, sin romper la firma ni pasar por los guardados.</summary>
     [Fact]
-    public void Protocolo_con_mediciones_tiene_version_nueva()
+    public void Medicion_replicada_a_clientes_incluso_a_quien_entra_despues()
     {
-        Assert.True(Protocol.Version >= 7);
-        Assert.True(Enum.IsDefined(typeof(MsgType), (byte)32));
+        var world = World.CreateNew(Fixture.Content);
+        var recycler = Fixture.Find(world, "recycler");
+        recycler.In.Add("scrap", 1000);
+        using var net = new NetHarness(new ServerOptions { CheckEveryTicks = 10 }, world);
+        var first = net.Join("client-identity-rate1");
+        net.Pump(() => first.World!.MeasuredRates.TryGetValue(recycler.Id, out var r) && r.cycles >= 1, 60000);
+
+        var late = net.Join("client-identity-rate2");
+        net.Settle(100);
+        Assert.Equal(world.MeasuredRates[recycler.Id].cycles, late.World!.MeasuredRates[recycler.Id].cycles);
+        Assert.Equal(0, first.HashMismatches);
+        Assert.Equal(0, late.HashMismatches);
+        Assert.Empty(WorldCodec.Deserialize(world.Content, WorldCodec.Serialize(world)).MeasuredRates);
     }
 }

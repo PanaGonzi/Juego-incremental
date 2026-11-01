@@ -1022,7 +1022,7 @@ public partial class AutoTest : Node
         world.Machines.Remove(core.Id);
         var depot = world.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
         depot.In.Clear();
-        depot.In.Add("recovered", 40);
+        depot.In.Add("recovered", 60);
         depot.In.Add("scrap", 500);
         world.Reindex();
         return world;
@@ -1061,7 +1061,7 @@ public partial class AutoTest : Node
         Check(await Until(() => W.Machines[recycler.Id].In.Get("scrap") > 0 && W.Machines[crate.Id].In.Get("scrap") > 0, 60), "el divisor reparte chatarra a las dos salidas");
 
         var c = CenterOf(splitter);
-        await WalkTo(new Vector3(c.X + 7, 0, c.Z + 6));
+        await WalkTo(new Vector3(c.X + 1.2f, 0, c.Z + 3.4f));
         v.AimAt(c);
         await Wait(0.5);
         Check(W.Links.Values.Sum(l => l.Load) > 0, "cintas cargadas alrededor del divisor");
@@ -1089,8 +1089,8 @@ public partial class AutoTest : Node
         PressAction("chain_trace");
         await Wait(1.2);
         Check(v.ChainForTest.Active && v.ChainForTest.ChevronCount > 0, $"cadena con {v.ChainForTest.ChevronCount} flechas: {v.ChainForTest.Summary}");
-        await WalkTo(new Vector3(c.X + 11, 0, c.Z + 9));
-        v.AimAt(c);
+        await WalkTo(new Vector3(c.X + 3, 0, c.Z + 4));
+        v.AimAt(c + new Vector3(0, -0.8f, -2));
         await Wait(0.6);
         await Shot("gestion_05_cadena_resaltada");
 
@@ -1106,6 +1106,7 @@ public partial class AutoTest : Node
         await Shot("gestion_06_sin_energia_y_motivo");
 
         // Con energía de nuevo y sin salida conectada, acaba con la salida bloqueada.
+        Check(await UseOn(crate, () => client.Send(new Command { Type = CommandType.Extract, A = crate.Id, Text = "recovered" })), "material para reponer el generador");
         Check(await Build("rtg_generator", 2, -12), "generador repuesto");
         await WalkTo(near);
         v.AimAt(CenterOf(recycler));

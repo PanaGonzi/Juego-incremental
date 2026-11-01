@@ -420,6 +420,7 @@
   "item_silicon_ore_d": "Martian ore refined into wafers.",
   "item_wafer_d": "Silicon wafers for precision electronics.",
   "item_nav_core_d": "Key piece of the Ninth Planet Project.",
+  "status_Passing": "Passing items",
   "machine_splitter": "Splitter",
   "machine_merger": "Merger",
   "upgrade_tech_logistics": "Belt logistics",

@@ -1098,7 +1098,7 @@ public static partial class Models
     /// <summary>Material del piloto según estado: verde en marcha, ámbar a la espera, rojo parada.</summary>
     public static StandardMaterial3D LampState(Pluton.Simulation.MachineStatus status) => status switch
     {
-        Pluton.Simulation.MachineStatus.Working or Pluton.Simulation.MachineStatus.Generating or Pluton.Simulation.MachineStatus.Cooling or Pluton.Simulation.MachineStatus.Storing or Pluton.Simulation.MachineStatus.Ready => Materials.Lamp("green"),
+        Pluton.Simulation.MachineStatus.Working or Pluton.Simulation.MachineStatus.Generating or Pluton.Simulation.MachineStatus.Cooling or Pluton.Simulation.MachineStatus.Storing or Pluton.Simulation.MachineStatus.Passing or Pluton.Simulation.MachineStatus.Ready => Materials.Lamp("green"),
         Pluton.Simulation.MachineStatus.NoPower or Pluton.Simulation.MachineStatus.Overheated or Pluton.Simulation.MachineStatus.LowPower => Materials.Lamp("red"),
         _ => Materials.Lamp("amber"),
     };

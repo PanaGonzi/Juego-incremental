@@ -84,7 +84,7 @@ public partial class ChainOverlay : Node3D
     private const float ChevronY = 1.02f;
     private const float BridgeLift = 1.0f;
     private const float ElevatedHeight = 4.7f;
-    private static readonly Color Flow = new(1f, 0.74f, 0.2f, 0.9f);
+    private static readonly Color Flow = new(1f, 0.78f, 0.1f, 1f);
     private static readonly Color Limit = new(1f, 0.26f, 0.2f, 1f);
     private static readonly Color MachineMark = new(1f, 0.74f, 0.2f, 0.75f);
 
@@ -249,7 +249,7 @@ public partial class ChainOverlay : Node3D
         if (w.Machines.TryGetValue(limit.Machine, out var m))
         {
             var (x, z) = w.MachineCenterMm(m);
-            position = new Vector3(x / 1000f, Models.Machine(m.Def).Height + 1.4f, z / 1000f);
+            position = new Vector3(x / 1000f, Models.Machine(m.Def).Height + 2.6f, z / 1000f);
             name = Loc.T("machine_" + m.Def);
         }
         if (limit.Link >= 0 && w.Links.TryGetValue(limit.Link, out var l) && l.Cells.Count > 0)

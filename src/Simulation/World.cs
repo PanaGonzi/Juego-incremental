@@ -910,7 +910,7 @@ public sealed partial class World
                 break;
             case MachineKind.Splitter:
             case MachineKind.Merger:
-                m.Status = MachineStatus.Storing;
+                m.Status = MachineStatus.Passing;
                 StepJunction(m);
                 break;
             case MachineKind.Production:

@@ -40,7 +40,7 @@ public sealed class Inventory
     public void Clear() => _items.Clear();
 }
 
-public enum MachineStatus : byte { Idle, Working, NoInput, OutputFull, NoPower, LowPower, Generating, Storing, Ready, Overheated, Cooling }
+public enum MachineStatus : byte { Idle, Working, NoInput, OutputFull, NoPower, LowPower, Generating, Storing, Ready, Overheated, Cooling, Passing }
 
 public sealed class Machine
 {
