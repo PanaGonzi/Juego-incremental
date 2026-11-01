@@ -57,38 +57,40 @@ Estados: pendiente · en curso · bloqueada · implementada (pendiente de prueba
 | A5-3 | A | Halloween activable, recompensas permanentes | verificada | T-005, recorrido `halloween` |
 | A5-4 | M | Equilibrio y duración con personas | **bloqueada: requiere juego humano** | — |
 
-## A0.5.x — Experiencia de fábrica (prioridad actual)
+## A0.5.x — Experiencia de fábrica
 
-Encargo: [PROMPT_CLAUDE_CONTINUAR_QA_CINTAS_GRAFICOS.md](../PROMPT_CLAUDE_CONTINUAR_QA_CINTAS_GRAFICOS.md). Plan y reparto: [PLAN_0.5](PLAN_0.5.md). Sustituye a B-6 y B-8 como siguiente trabajo. Ya no se espera la evaluación del titular para avanzar.
+Encargo: [PROMPT_CLAUDE_CONTINUAR_QA_CINTAS_GRAFICOS.md](../PROMPT_CLAUDE_CONTINUAR_QA_CINTAS_GRAFICOS.md). Plan y reparto: [PLAN_0.5](PLAN_0.5.md). Reconciliado con el código, los commits y las evidencias el 01-11-2026.
 
-| ID | P | Tarea | Estado | Evidencia |
-| --- | --- | --- | --- | --- |
-| E-0 | A | Conductor de QA con entradas de Windows y captura limitada a la ventana | verificada: clic, ratón relativo y teclado sobre la 0.4.1 exportada | `artifacts/qa/0.4.1/` |
-| E-1 | A | Cintas con carga real, puertos, ruta, atasco, corte, migración v4 → v5 | en curso | — |
-| E-2 | A | Brazos, multiherramienta y animaciones | en curso | — |
-| E-3 | A | Controles convencionales, barra rápida e inventario con transferencias | en curso | — |
-| E-4 | A | Zona representativa industrial semirrealista: materiales, terreno, luz, máquinas, objetos | en curso | — |
-| E-5 | A | Menús, panel de máquina con cifras reales, objetivos, ajustes | en curso | — |
-| E-6 | A | QA de primera experiencia: de partida nueva a vender, con pantallas y controles normales | pendiente de build integrada | — |
-| E-7 | A | QA de sistemas y dos clientes viendo el mismo transporte; después 12 clientes | verificada en un solo PC con comandos de la interfaz; con personas o varios PC, NO VERIFICADO | T-018, T-019, `artifacts/qa/0.5-coop/` |
-| E-8 | A | Revisión independiente de calidad y rendimiento con cintas cargadas | pendiente de build integrada | — |
-| E-9 | M | Divisores y combinadores de cintas | pendiente | — |
-| E-10 | M | Extender el acabado a Marte y al resto de máquinas | en curso: terreno y cielo de Marte revisados, plataforma de carga rehecha | `artifacts/qa/0.5-marte/` |
-| E-11 | M | BUG-005: dónde se producen los picos de RTT | lectura explicada y reducida; pico real con pérdida abierto | T-021 |
+Cómo leer las columnas: **Implementado** es que el código existe. **Comprobado** indica con qué: *auto* es un recorrido del cliente exportado con entrada inyectada o comandos de la interfaz; *real* es `PlayDriver` con entradas de Windows, siempre sobre la versión indicada. Nada de esto equivale a una persona jugando. Lo que queda por probar con teclado y ratón está en [PENDIENTE_CONTROLES_REALES](PENDIENTE_CONTROLES_REALES.md).
 
-## A0.6 — Construcción, gestión y primeros 30 minutos (en cola tras integrar E-1 a E-5)
+| ID | P | Tarea | Implementado | Comprobado | Pendiente |
+| --- | --- | --- | --- | --- | --- |
+| E-0 | A | Conductor de QA con entradas de Windows | sí | real sobre 0.4.1, `artifacts/qa/0.4.1/` | — |
+| E-1 | A | Cintas con carga real, puertos, ruta, atasco, corte, migración v4 → v5 | sí | xUnit; auto `belts`, `beltsv4`; dos clientes T-018; real en parte, informe de qa2 | Repetir con entradas reales en la versión actual |
+| E-2 | A | Brazos, multiherramienta y animaciones | sí | auto `artifacts/qa/0.5-fp`; real en qa2: la herramienta reacciona | 1080p, 3440×1440 y otros FOV; partículas de hielo y roca; sonido |
+| E-3 | A | Controles, barra rápida e inventario con transferencias | sí | real en qa2: 1-9, L, clic derecho con selector, arrastrar | Mayús+clic, Ctrl+clic, fijar a la barra rápida |
+| E-4 | A | Zona representativa industrial | sí | `artifacts/qa/0.5-zona`, real y auto | Montículo gris junto al pecio; vapor en movimiento; existencias en los puertos |
+| E-5 | A | Menús, panel de máquina, objetivos, ajustes | sí | `artifacts/qa/0.5-arte`; correcciones INC-08 e INC-09 | Calidad baja y alta; escala de interfaz distinta de 100; panel con cooperativo real |
+| E-6 | A | QA de primera experiencia con controles normales | sí, hecha sobre qa1 y qa2 | real: hasta el objetivo 10 de 23 | Repetir en la versión actual; fallo de energía; cerrar y reabrir; Retroceso y N |
+| E-7 | A | Dos clientes viendo el mismo transporte; 12 clientes | sí | T-018, T-019, un solo PC y comandos de la interfaz | Dos personas o dos PC: NO VERIFICADO |
+| E-8 | A | Revisión independiente de calidad y rendimiento con cintas cargadas | no | medidas parciales en PERFORMANCE y T-019 | La revisión independiente no se ha hecho |
+| E-9 | M | Divisores y combinadores | sustituida por C-3 | — | — |
+| E-10 | M | Acabado de Marte y del resto de máquinas | en parte: terreno y cielo de Marte, plataforma de carga | `artifacts/qa/0.5-marte/` | El resto de máquinas |
+| E-11 | M | BUG-005: picos de respuesta | lectura de RTT explicada y reducida | T-021 | Causa del pico real: sin medir |
+
+## A0.6 — Construcción, gestión y primeros 30 minutos
 
 Encargo: [PROMPT_CLAUDE_CONSTRUCCION_PRIMEROS_30_MIN.md](../PROMPT_CLAUDE_CONSTRUCCION_PRIMEROS_30_MIN.md). Máximo dos subagentes a la vez, sin delegación en cascada.
 
-| ID | P | Tarea | Estado | Evidencia |
-| --- | --- | --- | --- | --- |
-| C-1 | A | Cintas sin límite arbitrario, trazado automático comprensible, puntos intermedios, rutas alternativas, confirmación exacta y validación en servidor | pendiente, primera de este bloque | — |
-| C-2 | A | Colocación consecutiva, previsualización con coste y motivo, desmontaje preciso con lo que se recupera | pendiente | — |
-| C-3 | A | Divisores y unificadores | pendiente (sustituye a E-9) | — |
-| C-4 | A | Lectura de un vistazo: receta, progreso, estado, capacidad frente a producción real, seguir cadena hasta el cuello de botella | pendiente | — |
-| C-5 | A | Progresión de los primeros 30 min con tiempos de recorridos reproducibles | pendiente | — |
-| C-6 | A | Zona inicial terminada, respuesta sonora y visual, ajustes para reducir movimiento y efectos | pendiente | — |
-| C-7 | A | Pruebas con controles normales: dos jugadores sobre la misma construcción, rendimiento antes y después, regresión de 12 jugadores | pendiente | — |
+| ID | P | Tarea | Implementado | Comprobado | Pendiente |
+| --- | --- | --- | --- | --- | --- |
+| C-1 | A | Cintas sin límite arbitrario, trazado automático, puntos intermedios, rutas alternativas, confirmación exacta, validación en servidor | sí: b0ff255, 50de932, 3229fa5, a657005, d8353f9 | xUnit; auto `beltslong`; real en qa2: R, M, clic de punto, Z | Pendientes reales: cuestas (el terreno es llano: solo simuladas); Retroceso y N con entradas reales |
+| C-2 | A | Colocación consecutiva, previsualización con coste y motivo, desmontaje con lo que se recupera | sí: ed60e1e | auto `artifacts/qa/0.5-construccion`; real en parte, qa2 | Repetir con entradas reales |
+| C-3 | A | Divisores y unificadores | sí como máquina: 1d1b828, 137d2b6 | xUnit; auto `manage`; unificador en el cliente, solo pruebas unitarias | Insertarlos en una cinta ya tendida: no existía, ver tarea 3 del encargo vigente |
+| C-4 | A | Lectura de un vistazo, capacidad y producción real, seguir cadena | sí | `artifacts/qa/0.5-gestion`, real con H, C y Esc | Botón «Seguir cadena» con ratón real |
+| C-5 | A | Progresión de los primeros 30 min | sí | `docs/TIEMPOS_30_MIN.md`, recorridos con guion, no con personas | 36 acarreos manuales todavía; duración con personas |
+| C-6 | A | Zona inicial, respuesta sonora y visual, ajustes para reducir movimiento y efectos | sí | `artifacts/qa/0.5-zona` | El sonido no lo ha oído nadie |
+| C-7 | A | Controles normales, dos jugadores sobre la misma construcción, rendimiento, regresión de 12 | en parte | T-018, T-019 con comandos de la interfaz | Controles reales; dos personas; antes y después de rendimiento completo |
 
 ## Beta
 
@@ -101,7 +103,7 @@ Encargo: [PROMPT_CLAUDE_CONSTRUCCION_PRIMEROS_30_MIN.md](../PROMPT_CLAUDE_CONSTR
 | B-5 | M | Exportar y comprobar servidor Linux | pendiente; sin entorno Linux aquí, no se anuncia |
 | B-6 | M | Arte: variedad, animación de jugadores, audio ambiente | pendiente |
 | B-7 | B | Prestigio opcional | pendiente |
-| B-8 | A | Desvíos y señales | pendiente |
+| B-8 | A | Desvíos y señales | pendiente; siguiente en cola tras lo anterior |
 
 ## RC
 
