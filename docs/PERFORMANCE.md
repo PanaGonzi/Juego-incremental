@@ -66,6 +66,17 @@ Los mundos de medición llevan cintas rectas con carga y una línea saturada de 
 
 **Cliente con cintas (`--measure medium`): NO VERIFICADO.** Cada cinta es una malla propia con dos superficies, y la carga, un `MultiMesh` por objeto.
 
+## Medición de producción por máquina (0.5, en desarrollo)
+
+`tools/net-test.ps1 -Clients 12 -Seconds 60`, mismo equipo, misma mañana, con otros procesos de desarrollo a la vez. Enviado total del servidor con los 12 conectados (11 muestras).
+
+| | Media kbps | Máx. kbps | Tick p99 máx. ms |
+| --- | --- | --- | --- |
+| Antes (`evolucion-0.5`, f16ca71) | 289,8 | 341,8 | 14,9 |
+| Después (protocolo 7, `MsgType.Rates`) | 285,2 | 337,8 | 16,8 |
+
+Sin diferencia distinguible del ruido de la prueba. Los bots construyen pocas máquinas de producción: una fábrica grande **NO VERIFICADO**. Cota por cálculo: como mucho 6 bytes por máquina y segundo y por cliente, y solo si su cifra cambia. Coste en cliente de `TraceChain` (una vez por segundo con la cadena activa) y de la lectura al mirar: **NO VERIFICADO**, sin medir por separado.
+
 ## Ensayo sostenido
 
 60 min, 12 clientes, 100 ms/2 %, medio, sobre 0.4.0: memoria 63→66 MB, tick 0,23-0,33 ms, p99 máx. 38 ms, 0 tardíos, envío medio 449-743 kbit/s, picos de hasta 10310 kbit/s al repartir instantáneas. Ver T-015. Ensayo anterior sobre 0.2.0: T-012.

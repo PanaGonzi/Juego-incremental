@@ -254,6 +254,14 @@ public partial class AutoTest : Node
                 world.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0).In.TryRemove("ingot", 95); // no alcanza para la ensambladora
                 _main.StartSession(GameSession.Local(_main, world, "autotest-build", null, _main.Prefs));
             }
+            else if (_args.GetValueOrDefault("scenario") == "managestage")
+            {
+                // Solo prepara una partida para jugarla con entradas reales.
+                _main.Store.Save("manage-real", ManageStage());
+                Log("RESULTADO: CORRECTO");
+                GetTree().Quit(0);
+                return;
+            }
             else if (_args.GetValueOrDefault("scenario") == "beltsv4")
             {
                 // Guardado real de la 0.4.1 cargado por la ruta normal: migra a cintas con copia .v4.bak.
@@ -1032,6 +1040,37 @@ public partial class AutoTest : Node
         depot.In.Add("recovered", 60);
         depot.In.Add("scrap", 500);
         world.Reindex();
+        return world;
+    }
+
+    /// <summary>La misma fábrica del escenario de gestión, ya construida con los comandos normales, junto a la zona de aparición.</summary>
+    private World ManageStage()
+    {
+        var world = ManageWorld();
+        var builder = new PlayerState { Key = "stage", Name = "stage", Role = Role.Owner };
+        world.Players[builder.Key] = builder;
+        Machine Place(string def, int x, int z)
+        {
+            builder.X = x * 2f;
+            builder.Z = z * 2f;
+            var result = world.Apply(builder, new Command { Type = CommandType.Place, Text = def, A = x, B = z });
+            if (!result.Ok) throw new InvalidOperationException($"{def}: {result.Error}");
+            return world.Machines.Values.Last();
+        }
+        void Link(Machine a, Machine b)
+        {
+            var result = world.Apply(builder, World.LinkCommand(a.Id, b.Id, world.RouteBelt(a.Id, b.Id, 200000).Cells));
+            if (!result.Ok) throw new InvalidOperationException($"{a.Def} → {b.Def}: {result.Error}");
+        }
+        var depot = world.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
+        Place("rtg_generator", 2, -12);
+        var splitter = Place("splitter", 8, -8);
+        var recycler = Place("recycler", 7, -14);
+        var crate = Place("storage_crate", 13, -9);
+        Link(depot, splitter);
+        Link(splitter, recycler);
+        Link(splitter, crate);
+        world.Players.Remove(builder.Key);
         return world;
     }
 
