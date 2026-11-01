@@ -134,7 +134,6 @@ public partial class GameView : Node3D
     private string _ghostDef = "";
     private readonly StandardMaterial3D _ghostOk = GhostMat(new Color(0.3f, 1f, 0.55f, 0.42f));
     private readonly StandardMaterial3D _ghostBad = GhostMat(new Color(1f, 0.3f, 0.2f, 0.42f));
-    private int _linkFrom = -1;
     private int _objectiveSeen = -1;
     private long _lastCredits;
     private (string kind, int id) _aim = ("", -1);
@@ -1073,10 +1072,14 @@ public partial class GameView : Node3D
         else if (e.IsActionPressed("tool_rail")) SetTool(Tool.Rail);
         else if (e.IsActionPressed("rotate"))
         {
-            if (_tool == Tool.Rail) _railShape = (byte)((_railShape + 1) % 3);
+            if (_tool == Tool.Link) Belts.ToolNextRoute();
+            else if (_tool == Tool.Rail) _railShape = (byte)((_railShape + 1) % 3);
             else _buildRot = (_buildRot + 1) % 4;
             if (_tool is Tool.Rail or Tool.Build) _rig.OnTap();
         }
+        else if (_tool == Tool.Link && e.IsActionPressed("belt_undo")) Belts.ToolUndoPoint();
+        else if (_tool == Tool.Link && e.IsActionPressed("belt_snap")) _hud.Toast(Loc.T(Belts.ToolToggleSnap()), Ui.Ink);
+        else if (_tool == Tool.Link && e.IsActionPressed("belt_port")) Belts.ToolNextPort(Session.Client.World!, _aim.kind, _aim.id);
         else if (e.IsActionPressed("cancel")) Cancel();
         else if (e.IsActionPressed("interact")) Interact();
         else if (e.IsActionPressed("interact_insert")) AimedMachine(CommandType.Insert);
@@ -1095,7 +1098,7 @@ public partial class GameView : Node3D
     /// <summary>Clic derecho: primero anula el paso en curso; si no lo hay, vuelve a la multiherramienta.</summary>
     private void Cancel()
     {
-        if (_tool == Tool.Link && _linkFrom >= 0) _linkFrom = -1;
+        if (_tool == Tool.Link && Belts.ToolCancel()) { }
         else if (_tool == Tool.Rail && _railPlacing) _railPlacing = false;
         else if (_tool != Tool.Cutter) SetTool(Tool.Cutter);
     }
@@ -1292,7 +1295,6 @@ public partial class GameView : Node3D
     {
         _tool = t;
         _stowed = false;
-        _linkFrom = -1;
         _hud.SetTool((int)t);
         _railPlacing = false;
         Belts.HidePreview();
@@ -1339,13 +1341,11 @@ public partial class GameView : Node3D
                 }
                 break;
             case Tool.Link:
-                if (_aim.kind != "machine") break;
-                if (_linkFrom < 0) _linkFrom = _aim.id;
-                else
+                var beltHint = Belts.ToolClick(client, _aim.kind, _aim.id, TryGroundPoint(out var beltGround) ? beltGround : null);
+                if (beltHint != null)
                 {
-                    client.Send(new Command { Type = CommandType.Link, A = _linkFrom, B = _aim.id });
-                    _linkFrom = -1;
-                    Sfx.Play("deposit");
+                    _hud.Toast(Loc.T(beltHint));
+                    Sfx.Play("error");
                 }
                 break;
             case Tool.Remove:
@@ -1387,6 +1387,7 @@ public partial class GameView : Node3D
 
     private void OnResult(uint id, CommandResult result)
     {
+        Belts.ToolResult(id, result);
         if (result.Ok) return;
         if (result.Error == "err_cooldown") return;
         _hud.Toast(Loc.T(result.Error));
@@ -1878,8 +1879,7 @@ public partial class GameView : Node3D
                 UpdateGhost(w, me, ref status, ref statusColor);
                 break;
             case Tool.Link:
-                prompt = $"{Loc.T(_linkFrom < 0 ? "prompt_link_from" : "prompt_link_to")}   {Loc.T("belt_port_hint")}";
-                UpdateBeltPreview(w, me, ref status, ref statusColor);
+                prompt = Belts.ToolFrame(w, me, _aim.kind, _aim.id, _aimPoint, TryGroundPoint(out var beltAim) ? beltAim : null, client.StructuralDeltas, (float)delta, ref status, ref statusColor);
                 break;
             case Tool.Remove:
                 prompt = Loc.T("prompt_remove");
@@ -1897,21 +1897,6 @@ public partial class GameView : Node3D
         _targetBar.Set(blocked || _tool != Tool.Cutter ? null : progress, progressColor);
         _hud.SetPrompt(blocked ? "" : status, statusColor, blocked ? "" : prompt);
     }
-
-    /// <summary>Ruta prevista desde el origen elegido hasta la máquina apuntada y puertos de esta. La lógica está en BeltView.</summary>
-    private void UpdateBeltPreview(World w, PlayerState me, ref string status, ref Color color)
-    {
-        var aimedMachine = _aim.kind == "machine" ? w.Machines.GetValueOrDefault(_aim.id) : null;
-        Belts.ShowPorts(w, aimedMachine ?? (_linkFrom >= 0 ? w.Machines.GetValueOrDefault(_linkFrom) : null), Session.Client.StructuralDeltas);
-        if (_linkFrom < 0 || aimedMachine == null || aimedMachine.Id == _linkFrom)
-        {
-            Belts.HideRoute();
-            return;
-        }
-        var error = Belts.UpdatePreview(w, me, _linkFrom, aimedMachine.Id, Session.Client.StructuralDeltas, ref status);
-        color = error == null ? Ui.Good : Ui.Bad;
-    }
-
 
     private void UpdateGhost(World w, PlayerState me, ref string status, ref Color color)
     {
@@ -2009,6 +1994,9 @@ public static class Controls
         ["tool_remove"] = new[] { Godot.Key.X },
         ["tool_rail"] = new[] { Godot.Key.T },
         ["rotate"] = new[] { Godot.Key.R },
+        ["belt_undo"] = new[] { Godot.Key.Backspace },
+        ["belt_snap"] = new[] { Godot.Key.N },
+        ["belt_port"] = new[] { Godot.Key.M },
         ["cancel"] = new[] { Godot.Key.Z },
         ["interact_insert"] = new[] { Godot.Key.F },
         ["interact_take"] = new[] { Godot.Key.G },

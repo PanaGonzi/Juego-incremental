@@ -17,6 +17,7 @@ public partial class BeltView : Node3D
     private const float HalfWidth = 0.5f;
     private const float SlotLength = Cell / 4f;
     private const float MaxItemSize = 0.42f;
+    private const int ChunkSlots = 64;       // 16 celdas por malla
 
     /// <summary>A partir de aquí la carga se omite: el estado económico sigue en el mundo y al apuntar se informa igual.</summary>
     private const float ItemRange = 120f;
@@ -63,7 +64,7 @@ public partial class BeltView : Node3D
     {
         public int Id;
         public string Key = "";
-        public MeshInstance3D Mesh = null!;
+        public readonly List<(MeshInstance3D node, Vector3 center, float radius)> Chunks = new(); // tramos internos: la cinta sigue siendo una sola
         public Vector3[] Points = Array.Empty<Vector3>();
         public Vector3 Center;
         public float Radius;
@@ -96,6 +97,9 @@ public partial class BeltView : Node3D
     public int DrawnItems { get; private set; }
     public int DrawnBelts => _belts.Count;
 
+    /// <summary>Altura del suelo bajo un punto (x, z en metros). Único punto de enlace con el terreno; hoy, plano.</summary>
+    public static Func<float, float, float> GroundHeight = (_, _) => 0f;
+
     // ---------- Sincronización de estructura ----------
 
     /// <summary>Se llama al cambiar la estructura o el planeta. Solo rehace las mallas de cintas que cambiaron.</summary>
@@ -114,19 +118,19 @@ public partial class BeltView : Node3D
             if (l.Elevated) _elevated.Add(l.Id);
             var key = KeyOf(w, l);
             if (_belts.TryGetValue(l.Id, out var v) && v.Key == key) continue;
-            if (v != null) v.Mesh.QueueFree();
+            if (v != null) FreeChunks(v);
             _belts[l.Id] = Build(w, l, key);
         }
         foreach (var id in _belts.Keys.Where(k => !seen.Contains(k)).ToList())
         {
-            _belts[id].Mesh.QueueFree();
+            FreeChunks(_belts[id]);
             _belts.Remove(id);
         }
     }
 
     public void Clear()
     {
-        foreach (var v in _belts.Values) v.Mesh.QueueFree();
+        foreach (var v in _belts.Values) FreeChunks(v);
         _belts.Clear();
         _elevated.Clear();
         foreach (var b in _batches.Values)
@@ -138,6 +142,12 @@ public partial class BeltView : Node3D
         _planet = -1;
         _stamp = int.MinValue;
         HidePreview();
+    }
+
+    private static void FreeChunks(BeltVisual v)
+    {
+        foreach (var c in v.Chunks) c.node.QueueFree();
+        v.Chunks.Clear();
     }
 
     private static string KeyOf(World w, Link l)
@@ -154,14 +164,14 @@ public partial class BeltView : Node3D
     private BeltVisual Build(World w, Link l, string key)
     {
         var points = l.Elevated ? ElevatedPath(w, l) : RoutePath(w, l.From, l.To, l.Cells, i => w.IsBridge(l, i));
-        var mesh = BuildMesh(points, l.Elevated, l, w);
-        var node = new MeshInstance3D
+        var visual = new BeltVisual
         {
-            Mesh = mesh,
-            VisibilityRangeEnd = 190f,
-            CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+            Id = l.Id,
+            Key = key,
+            Points = points,
+            Elevated = l.Elevated,
+            Items = new VisualItem[l.Slots.Length],
         };
-        AddChild(node);
         var min = points[0];
         var max = points[0];
         foreach (var p in points)
@@ -169,17 +179,26 @@ public partial class BeltView : Node3D
             min = new Vector3(Mathf.Min(min.X, p.X), 0, Mathf.Min(min.Z, p.Z));
             max = new Vector3(Mathf.Max(max.X, p.X), 0, Mathf.Max(max.Z, p.Z));
         }
-        return new BeltVisual
+        visual.Center = (min + max) / 2;
+        visual.Radius = (max - min).Length() / 2;
+
+        // Una malla por tramo: la distancia de dibujo se mide desde cada uno y una cinta larga no desaparece entera.
+        var along = 0f;
+        for (var start = 0; start < points.Length - 1; start += ChunkSlots)
         {
-            Id = l.Id,
-            Key = key,
-            Mesh = node,
-            Points = points,
-            Center = (min + max) / 2,
-            Radius = (max - min).Length() / 2,
-            Elevated = l.Elevated,
-            Items = new VisualItem[l.Slots.Length],
-        };
+            var end = Mathf.Min(start + ChunkSlots, points.Length - 1);
+            var node = new MeshInstance3D
+            {
+                Mesh = BuildMesh(points, start, end, ref along, l.Elevated, l, w),
+                VisibilityRangeEnd = 190f,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+            };
+            AddChild(node);
+            var a = points[start];
+            var b = points[end];
+            visual.Chunks.Add((node, (a + b) / 2, a.DistanceTo(b) / 2 + 4f));
+        }
+        return visual;
     }
 
     // ---------- Trayectoria ----------
@@ -190,9 +209,11 @@ public partial class BeltView : Node3D
         var slotsPerCell = w.Content.Balance.BeltSlotsPerCell;
         var points = new Vector3[cells.Count * slotsPerCell + 1];
         var a = w.Machines[from];
-        var b = w.Machines[to];
         var entry = PortSide(w.BeltPorts(a, true), cells[0], cells.Count > 1 ? cells[1] : null);
-        var exit = PortSide(w.BeltPorts(b, false), cells[^1], cells.Count > 1 ? cells[^2] : null);
+        // Sin máquina de destino (previsualización hasta el suelo) sigue en la misma dirección.
+        (int dx, int dz) exit = to >= 0
+            ? PortSide(w.BeltPorts(w.Machines[to], false), cells[^1], cells.Count > 1 ? cells[^2] : null)
+            : cells.Count > 1 ? (cells[^1].x - cells[^2].x, cells[^1].z - cells[^2].z) : (-entry.dx, -entry.dz);
 
         // Puente plano sobre la celda cruzada, con rampa en toda la celda vecina.
         bool High(int i) => i >= 0 && i < cells.Count && bridge(i);
@@ -218,7 +239,33 @@ public partial class BeltView : Node3D
                 points[k * slotsPerCell + s] = new Vector3(xz.X, y, xz.Y);
             }
         }
+        ApplyGround(points);
         return points;
+    }
+
+    /// <summary>Sigue el suelo con pendiente suave: media móvil de dos celdas, sin quedar nunca por debajo de él.</summary>
+    private static void ApplyGround(Vector3[] points)
+    {
+        var raw = new float[points.Length];
+        var flat = true;
+        for (var i = 0; i < points.Length; i++)
+        {
+            raw[i] = GroundHeight(points[i].X, points[i].Z);
+            flat &= raw[i] == 0f;
+        }
+        if (flat) return;
+        const int window = 8;
+        for (var i = 0; i < points.Length; i++)
+        {
+            var sum = 0f;
+            var count = 0;
+            for (var k = Mathf.Max(0, i - window); k <= Mathf.Min(points.Length - 1, i + window); k++)
+            {
+                sum += raw[k];
+                count++;
+            }
+            points[i].Y += Mathf.Max(sum / count, raw[i]);
+        }
     }
 
     /// <summary>Lado de la celda que da a la máquina. Con varias caras posibles, la que deja seguir recto.</summary>
@@ -332,12 +379,11 @@ public partial class BeltView : Node3D
         return false;
     }
 
-    private static ArrayMesh BuildMesh(Vector3[] p, bool elevated, Link? link, World w)
+    private static ArrayMesh BuildMesh(Vector3[] p, int start, int end, ref float along, bool elevated, Link? link, World w)
     {
         var band = new Geometry();
         var frame = new Geometry();
-        var along = 0f;
-        for (var i = 0; i < p.Length - 1; i++)
+        for (var i = start; i < end; i++)
         {
             var t0 = Tangent(p, i);
             var t1 = Tangent(p, i + 1);
@@ -368,7 +414,7 @@ public partial class BeltView : Node3D
         }
 
         // Rodillos cada dos huecos, tambores en los extremos y soportes reutilizables.
-        for (var i = 0; i < p.Length; i += 2)
+        for (var i = start + start % 2; i <= end; i += 2)
         {
             var t = Tangent(p, i);
             var s = Side(t);
@@ -376,7 +422,7 @@ public partial class BeltView : Node3D
             if (up.Y < 0) up = -up;
             frame.Box(p[i] + Vector3.Down * 0.19f, new Vector3(HalfWidth + 0.05f, 0.05f, 0.05f), s, up, t, DarkSteel);
         }
-        foreach (var i in new[] { 0, p.Length - 1 })
+        foreach (var i in new[] { 0, p.Length - 1 }.Where(i => i >= start && i <= end))
         {
             var t = Tangent(p, i);
             var s = Side(t);
@@ -385,32 +431,35 @@ public partial class BeltView : Node3D
         if (elevated)
         {
             // Postes que apoyan los extremos sobre el techo de cada máquina.
-            foreach (var i in new[] { 0, p.Length - 1 })
+            foreach (var i in new[] { 0, p.Length - 1 }.Where(i => i >= start && i <= end))
                 frame.Box(p[i] + Vector3.Down * (ElevatedClearance / 2 + 0.1f), new Vector3(0.1f, ElevatedClearance / 2 + 0.05f, 0.1f), Vector3.Right, Vector3.Up, Vector3.Back, Support);
         }
         var step = elevated ? 16 : 4;
-        for (var i = elevated ? 8 : 2; i < p.Length - 1; i += step)
+        var firstLeg = elevated ? 8 : 2;
+        while (firstLeg < start) firstLeg += step;
+        for (var i = firstLeg; i < end && i < p.Length - 1; i += step)
         {
             var t = Tangent(p, i);
             var s = Side(t);
             // Las elevadas pasan sobre máquinas: ahí no hay pata que atraviese nada.
             if (elevated && link != null && MachineUnder(w, link.Planet, p[i], s)) continue;
             var top = p[i].Y - 0.16f;
-            var legHalf = top / 2;
-            var bridgeLeg = p[i].Y > BandY + 0.3f;
+            var groundUnder = GroundHeight(p[i].X, p[i].Z);
+            var legHalf = (top - groundUnder) / 2;
+            var bridgeLeg = p[i].Y - groundUnder > BandY + 0.3f;
             var spread = HalfWidth + 0.02f + (elevated ? 0.12f : 0f);
             var width = elevated ? 0.11f : 0.05f;
             foreach (var sign in new[] { -1f, 1f })
             {
                 var foot = p[i] + s * sign * spread;
-                foot.Y = 0;
+                foot.Y = GroundHeight(foot.X, foot.Z);
                 frame.Box(foot + Vector3.Up * legHalf, new Vector3(width, legHalf, width), s, Vector3.Up, t, bridgeLeg || elevated ? Support : Steel);
                 frame.Box(foot + Vector3.Up * 0.02f, new Vector3(width + 0.09f, 0.02f, width + 0.09f), s, Vector3.Up, t, DarkSteel);
             }
             if (bridgeLeg || elevated)
             {
                 var cross = p[i];
-                cross.Y = top * 0.55f;
+                cross.Y = groundUnder + (top - groundUnder) * 0.55f;
                 frame.Box(cross, new Vector3(spread, 0.035f, 0.035f), s, Vector3.Up, t, Support);
             }
         }
@@ -520,21 +569,19 @@ public partial class BeltView : Node3D
                 continue;
             }
             if (!v.Blocked) v.Offset += hops * SlotLength * delta;
-            if (distance < AnimRange)
+            var jam = v.Blocked ? 1f : 0f;
+            var jamChanged = jam != v.ShownJam;
+            v.ShownJam = jam;
+            foreach (var (node, center, radius) in v.Chunks)
             {
-                v.Mesh.SetInstanceShaderParameter("offset", v.Offset);
-                var jam = v.Blocked ? 1f : 0f;
-                if (jam != v.ShownJam)
-                {
-                    v.ShownJam = jam;
-                    v.Mesh.SetInstanceShaderParameter("jam", jam);
-                }
+                if (jamChanged) node.SetInstanceShaderParameter("jam", jam);
+                if (center.DistanceSquaredTo(player with { Y = center.Y }) < (AnimRange + radius) * (AnimRange + radius))
+                    node.SetInstanceShaderParameter("offset", v.Offset);
             }
             Predict(v, hops, delta, l.Slots.Length);
             for (var i = 0; i < v.Count; i++)
             {
-                Place(v, ref v.Items[i]);
-                drawn++;
+                if (Place(v, ref v.Items[i], player)) drawn++;
             }
         }
         DrawnItems = drawn;
@@ -547,8 +594,12 @@ public partial class BeltView : Node3D
         }
     }
 
-    private void Place(BeltVisual v, ref VisualItem item)
+    private bool Place(BeltVisual v, ref VisualItem item, Vector3 player)
     {
+        var at = v.Points[Mathf.Clamp((int)item.Pos, 0, v.Points.Length - 1)];
+        var ax = at.X - player.X;
+        var az = at.Z - player.Z;
+        if (ax * ax + az * az > ItemRange * ItemRange) return false; // cinta larga: solo se dibuja la parte cercana
         var b = BatchOf(item.Item);
         if (b.Count >= b.Multi.InstanceCount)
         {
@@ -577,6 +628,7 @@ public partial class BeltView : Node3D
         buffer[o + 4] = 0; buffer[o + 5] = scale; buffer[o + 6] = 0; buffer[o + 7] = p.Y + b.Lift;
         buffer[o + 8] = -zx * scale; buffer[o + 9] = 0; buffer[o + 10] = zz * scale; buffer[o + 11] = p.Z;
         b.Count++;
+        return true;
     }
 
     // ---------- Apuntado e inspección ----------
@@ -590,6 +642,8 @@ public partial class BeltView : Node3D
         {
             if (dir.Y >= -0.01f) return;
             var t = (y - from.Y) / dir.Y;
+            var guess = from + dir * t;
+            t = (y + GroundHeight(guess.X, guess.Z) - from.Y) / dir.Y;
             if (t < 0 || t > maxDistance || t >= nearest) return;
             var p = from + dir * t;
             var x = Mathf.FloorToInt(p.X / Cell);
@@ -630,153 +684,5 @@ public partial class BeltView : Node3D
         var items = info.Items.Count == 0 ? "" : string.Join(", ", info.Items.Select(kv => $"{Loc.T("item_" + kv.Key)} ×{kv.Value}")) + " · ";
         var load = Loc.T("belt_load", info.Load.ToString()).Replace("{1}", info.Capacity.ToString()).Replace("{2}", info.ItemsPerMinute.ToString());
         return $"{title}: {from} → {to} — {Loc.T("belt_status_" + info.Status)} · {items}{load}";
-    }
-
-    // ---------- Previsualización y puertos ----------
-
-    private MeshInstance3D? _preview;
-    private MeshInstance3D? _ports;
-    private string _previewKey = "";
-    private string _portsKey = "";
-    private BeltRoute? _route;
-    private Vector3[]? _previewPoints;
-
-    private static readonly StandardMaterial3D PreviewOk = PreviewMaterial(new Color(0.3f, 1f, 0.55f, 0.55f));
-    private static readonly StandardMaterial3D PreviewBad = PreviewMaterial(new Color(1f, 0.3f, 0.2f, 0.55f));
-
-    private static StandardMaterial3D PreviewMaterial(Color c) => new()
-    {
-        AlbedoColor = c,
-        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-        CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-    };
-
-    private static readonly StandardMaterial3D PortMaterial = new()
-    {
-        VertexColorUseAsAlbedo = true,
-        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-        CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-        NoDepthTest = false,
-    };
-
-    /// <summary>
-    /// Ruta entre el origen elegido y la máquina apuntada, calculada con la misma función que usa el servidor.
-    /// Solo se recalcula si cambia el mundo o el destino. Devuelve la clave del error, o null si se puede tender.
-    /// </summary>
-    public string? UpdatePreview(World w, PlayerState me, int from, int to, int structuralStamp, ref string status)
-    {
-        var key = $"{from}>{to}#{structuralStamp}";
-        if (key != _previewKey)
-        {
-            _previewKey = key;
-            _route = w.RouteBelt(from, to);
-            _preview?.QueueFree();
-            _preview = null;
-            _previewPoints = null;
-            if (_route.Error == null && _route.Cells.Count > 0)
-                _previewPoints = RoutePath(w, from, to, _route.Cells, _ => false);
-            else if (w.Machines.TryGetValue(from, out var a) && w.Machines.TryGetValue(to, out var b))
-                _previewPoints = StraightPreview(w, a, b);
-            if (_previewPoints != null)
-            {
-                _preview = new MeshInstance3D { Mesh = PreviewMesh(_previewPoints), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
-                AddChild(_preview);
-            }
-        }
-        var error = _route!.Error;
-        if (error == null && !w.CanAfford(me, _route.Credits, new Dictionary<string, long>())) error = "err_cost";
-        if (_preview != null) _preview.MaterialOverride = error == null ? PreviewOk : PreviewBad;
-        if (_route.Error == null)
-            status = Loc.T("belt_preview", _route.Cells.Count.ToString()).Replace("{1}", _route.Credits.ToString());
-        if (error != null) status = Loc.T(error);
-        return error;
-    }
-
-    private static Vector3[] StraightPreview(World w, Machine a, Machine b)
-    {
-        var (ax, az) = w.MachineCenterMm(a);
-        var (bx, bz) = w.MachineCenterMm(b);
-        return new[] { new Vector3(ax / 1000f, 1.1f, az / 1000f), new Vector3(bx / 1000f, 1.1f, bz / 1000f) };
-    }
-
-    private static ArrayMesh PreviewMesh(Vector3[] p)
-    {
-        var g = new Geometry();
-        for (var i = 0; i < p.Length - 1; i++)
-        {
-            var s0 = Side(Tangent(p, i));
-            var s1 = Side(Tangent(p, i + 1));
-            g.Quad(p[i] - s0 * HalfWidth, p[i] + s0 * HalfWidth, p[i + 1] + s1 * HalfWidth, p[i + 1] - s1 * HalfWidth, Vector3.Up, Colors.White);
-        }
-        // Flechas de sentido sobre la ruta.
-        for (var i = 2; i + 2 < p.Length; i += 4)
-        {
-            var t = (p[i + 1] - p[i]).Normalized();
-            var s = Side(t);
-            var tip = p[i] + t * 0.42f + Vector3.Up * 0.03f;
-            var back = p[i] - t * 0.1f + Vector3.Up * 0.03f;
-            g.Quad(back - s * 0.3f, tip, tip, back + s * 0.3f, Vector3.Up, Colors.White);
-        }
-        var mesh = new ArrayMesh();
-        g.Commit(mesh, PreviewOk);
-        return mesh;
-    }
-
-    /// <summary>Marca los puertos de una máquina: salida ámbar, entrada azul; atenuados si están ocupados.</summary>
-    public void ShowPorts(World w, Machine? m, int structuralStamp)
-    {
-        var key = m == null ? "" : $"{m.Id}|{m.X}|{m.Z}|{m.Rot}#{structuralStamp}";
-        if (key == _portsKey) return;
-        _portsKey = key;
-        _ports?.QueueFree();
-        _ports = null;
-        if (m == null) return;
-        var g = new Geometry();
-        foreach (var output in new[] { true, false })
-            foreach (var p in w.BeltPorts(m, output))
-                PortArrow(g, p);
-        if (g.V.Count == 0) return;
-        var mesh = new ArrayMesh();
-        g.Commit(mesh, PortMaterial);
-        _ports = new MeshInstance3D { Mesh = mesh, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
-        AddChild(_ports);
-    }
-
-    private static void PortArrow(Geometry g, BeltPort p)
-    {
-        var (dx, dz) = World.BeltDirs[p.Dir];
-        var outward = new Vector3(dx, 0, dz);
-        var dir = p.Output ? outward : -outward;
-        var side = dir.Cross(Vector3.Up);
-        var center = new Vector3((p.X + 0.5f) * Cell, 0.07f + (p.Output ? 0.01f : 0f), (p.Z + 0.5f) * Cell) - outward * (p.Output ? 0.45f : 0.2f);
-        var color = p.Output ? new Color(1f, 0.66f, 0.15f, 0.9f) : new Color(0.25f, 0.7f, 1f, p.Side ? 0.55f : 0.9f);
-        if (!p.Free) color = new Color(0.45f, 0.45f, 0.45f, 0.45f);
-        var tip = center + dir * 0.45f;
-        var tail = center - dir * 0.3f;
-        g.Quad(tail - side * 0.16f, tail + side * 0.16f, center + side * 0.16f, center - side * 0.16f, Vector3.Up, color);
-        g.Quad(center - side * 0.42f, center + side * 0.42f, tip, tip, Vector3.Up, color);
-    }
-
-    public void HidePreview()
-    {
-        _preview?.QueueFree();
-        _preview = null;
-        _previewKey = "";
-        _route = null;
-        _previewPoints = null;
-        _ports?.QueueFree();
-        _ports = null;
-        _portsKey = "";
-    }
-
-    /// <summary>Oculta solo la ruta (al dejar de apuntar a un destino), sin perder las marcas de puertos.</summary>
-    public void HideRoute()
-    {
-        _preview?.QueueFree();
-        _preview = null;
-        _previewKey = "";
-        _route = null;
     }
 }

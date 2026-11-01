@@ -725,7 +725,7 @@ public class BeltTests
         {
             using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, lang + ".json")));
             var keys = doc.RootElement.EnumerateObject().Select(e => e.Name).ToHashSet();
-            foreach (var key in new[] { "err_belt_route", "err_belt_long", "err_belt_port_out", "err_belt_port_in", "err_link_kind", "err_link_exists", "belt_title", "belt_elevated", "belt_load", "belt_preview", "belt_port_hint" })
+            foreach (var key in new[] { "err_belt_route", "err_belt_stale", "err_belt_path", "err_belt_waypoint", "err_belt_waypoint_path", "err_belt_complex", "err_belt_port_out", "err_belt_port_in", "err_link_kind", "err_link_exists", "belt_title", "belt_elevated", "belt_load", "belt_preview", "belt_missing", "belt_alternative", "belt_tracing", "belt_sending", "belt_reconfirm", "belt_points", "belt_snap_on", "belt_snap_off", "action_belt_undo", "action_belt_snap", "action_belt_port", "prompt_link_way" })
                 Assert.Contains(key, keys);
             foreach (var status in Enum.GetNames<BeltStatus>())
                 Assert.Contains("belt_status_" + status, keys);

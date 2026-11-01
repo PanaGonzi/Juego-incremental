@@ -145,7 +145,12 @@ public sealed partial class World
             _open.Enqueue(key, Priority(cost + StepCost + Heuristic(x, z), key));
         }
 
-        private static long Priority(int f, int key) => ((long)f << 32) | (uint)key;
+        // f, luego lo que falta (prefiere lo más avanzado: en campo abierto evita explorar todas las rutas iguales) y la celda como desempate total.
+        private long Priority(int f, int key)
+        {
+            var (x, z, _) = Decode(key);
+            return ((long)f << 34) | ((long)Math.Min(Heuristic(x, z), 16383) << 20) | (uint)key;
+        }
 
         /// <summary>Penalización de ocupar esta celda: rodear puertos, máquinas y la zona de aparición da recorridos comprensibles.</summary>
         private int CellCost(int x, int z)
@@ -189,7 +194,7 @@ public sealed partial class World
                     FinishLeg();
                     continue;
                 }
-                var f = (int)(priority >> 32);
+                var f = (int)(priority >> 34);
                 if (f >= _goalCost)
                 {
                     FinishLeg();

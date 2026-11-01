@@ -113,6 +113,9 @@ public sealed class BeltPlanner
         return null;
     }
 
+    /// <summary>Descarta lo calculado y vuelve a trazar con lo mismo elegido: tras un rechazo del servidor.</summary>
+    public void Refresh() => Invalidate();
+
     /// <summary>Retira el último punto. Devuelve false si no había ninguno.</summary>
     public bool RemoveLastWaypoint()
     {

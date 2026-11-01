@@ -232,6 +232,23 @@ public partial class AutoTest : Node
             {
                 _main.StartSession(GameSession.Local(_main, BeltWorld(), "autotest-belts", null, _main.Prefs));
             }
+            else if (_args.GetValueOrDefault("scenario") == "beltstage")
+            {
+                // Solo prepara una partida para jugarla con entradas reales: almacén junto al inicio y otro a unos 150 m.
+                var world = BeltWorld();
+                var near = new Machine { Id = world.NextId++, Def = "storage_crate", Planet = 0, X = 6, Z = 8 };
+                near.In.Add("ore", 150);
+                near.In.Add("ingot", 150);
+                world.Machines[near.Id] = near;
+                var far = new Machine { Id = world.NextId++, Def = "storage_crate", Planet = 0, X = -34, Z = -24 };
+                world.Machines[far.Id] = far;
+                foreach (var d in world.DebrisById.Values.Where(d => d.CoversNode < 0 && Math.Abs(d.X - near.X) < 5 && Math.Abs(d.Z - near.Z) < 5).ToList()) world.DebrisById.Remove(d.Id);
+                world.Reindex();
+                _main.Store.Save("belts-real", world);
+                Log("RESULTADO: CORRECTO");
+                GetTree().Quit(0);
+                return;
+            }
             else if (_args.GetValueOrDefault("scenario") == "beltsv4")
             {
                 // Guardado real de la 0.4.1 cargado por la ruta normal: migra a cintas con copia .v4.bak.
