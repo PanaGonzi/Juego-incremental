@@ -33,6 +33,7 @@ var total = Stopwatch.StartNew();
 long ok = 0, failed = 0, chats = 0, moves = 0, reconnects = 0, connectMsSum = 0, connects = 0;
 int mismatches = 0, checks = 0;
 long maxRtt = 0;
+var commandMs = new List<long>();
 string closeReason = "";
 var rng = new Random(index * 7919 + 13);
 var plan0 = new BotPlan();
@@ -42,8 +43,12 @@ while (total.Elapsed.TotalSeconds < seconds)
 {
     var connectStart = total.ElapsedMilliseconds;
     var client = new GameClient(content, LiteNetTransport.Dial(host, port), key, protocolLabel);
-    client.ResultReceived += (_, r) =>
+    // Respuesta de la aplicación, medida aparte del RTT que informa el transporte.
+    var sentAt = new Dictionary<uint, long>();
+    client.CommandSent += id => sentAt[id] = total.ElapsedMilliseconds;
+    client.ResultReceived += (id, r) =>
     {
+        if (sentAt.Remove(id, out var at)) commandMs.Add(total.ElapsedMilliseconds - at);
         if (r.Ok) ok++;
         else
         {
@@ -131,8 +136,15 @@ while (total.Elapsed.TotalSeconds < seconds)
 Report();
 Environment.Exit(mismatches == 0 ? 0 : 5);
 
+long CommandPercentile(int p)
+{
+    if (commandMs.Count == 0) return 0;
+    commandMs.Sort();
+    return commandMs[Math.Min(commandMs.Count - 1, commandMs.Count * p / 100)];
+}
+
 void Report() => Console.WriteLine(
-    $"{protocolLabel} connects={connects} avgConnectMs={(connects == 0 ? 0 : connectMsSum / connects)} ok={ok} failed={failed} moves={moves} chats={chats} " +
+    $"{protocolLabel} cmdN={commandMs.Count} cmdP50={CommandPercentile(50)} cmdP99={CommandPercentile(99)} cmdMax={CommandPercentile(100)} connects={connects} avgConnectMs={(connects == 0 ? 0 : connectMsSum / connects)} ok={ok} failed={failed} moves={moves} chats={chats} " +
     $"reconnects={reconnects} hashChecks={checks} hashMismatch={mismatches} maxRttMs={maxRtt} relayDropped={relay?.Dropped ?? 0} relayForwarded={relay?.Forwarded ?? 0} travels={plan0.Travels} closeReason={closeReason} errores=[{string.Join(",", errors.OrderByDescending(e => e.Value).Take(4).Select(e => e.Key + ":" + e.Value))}]");
 
 static void Act(GameClient client, string behaviour, Random rng, float x, float z, BotPlan plan)

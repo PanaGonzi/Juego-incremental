@@ -1,0 +1,41 @@
+﻿[    0,3] OK    entrada en el mundo
+[    0,3] Renderizador forward_plus GPU AMD Radeon RX 7800 XT ventana (960, 540)
+[    4,0] OK    2 jugadores conectados
+[    4,0] Modo: anfitrión, rol A
+[   11,5] OK    el almacén se construye
+[   13,0] OK    colocar a la vez construye una sola pieza
+[   13,0] OK    un solo almacén en la celda: 1
+[   13,0] OK    los créditos se cobran una vez: 5000 → 4975
+[   13,0] OK    el material se cobra una vez: 600 → 594
+[   20,5] OK    se saca lo que había, ni más ni menos: 100 de 100
+[   21,5] OK    sacar a la vez conserva los lingotes: 100 → 100
+[   21,5] OK    el depósito queda con la diferencia exacta
+[   21,7] OK    devolver vacía la mochila
+[   22,7] OK    devolver a la vez conserva los lingotes: 100
+[   22,7] OK    los lingotes vuelven al depósito
+[   22,7] OK    hay ruta del depósito al almacén: 26 celdas
+[   22,9] OK    la cinta se construye
+[   24,4] OK    una sola cinta entre las mismas piezas: 1
+[   24,4] OK    enlazar a la vez construye una sola cinta
+[   46,5] OK    la cinta lleva carga real en este cliente
+[   47,5] OK    objetos dibujados en este cliente: 82, carga lógica 82
+[   47,8] OK    la cinta se retira
+[   49,3] OK    retirar a la vez conserva la carga: 594 → 594
+[   49,3] OK    la devolución no se duplica: 78 de 78 pagados
+[   49,4] OK    cinta reconstruida para la reconexión
+[   49,6] OK    A ve salir a B
+[   51,6] OK    la fábrica sigue y conserva la carga sin B
+[   52,7] OK    A ve volver a B
+[   52,7] OK    la reconexión no crea otro jugador: 2
+[   54,3] OK    la cinta sigue en el estado recibido tras reconectar
+[   54,3] OK    la carga se ve en el estado recibido: 14
+[   58,3] OK    sin divergencias (5 comprobaciones)
+[   58,3] OK    ha habido comprobaciones de hash
+[   58,4] OK    el invitado ha terminado
+[   58,5] OK    la partida se guarda con la orden normal
+[   62,8] OK    la partida guardada vuelve a abrirse
+[   64,3] OK    las cintas conservan su trazado al cargar
+[   64,3] OK    las máquinas siguen al cargar
+[   64,3] OK    la carga se conserva al cargar: 594 → 594
+[   64,3] OK    los lingotes se conservan al cargar: 100 → 100
+[   64,3] RESULTADO: CORRECTO

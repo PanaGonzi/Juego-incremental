@@ -30,6 +30,7 @@ public sealed class GameClient : IDisposable
     public int StructuralDeltas { get; private set; }
     public int SlotDeltas { get; private set; }
 
+    public event Action<uint>? CommandSent;
     public event Action<uint, CommandResult>? ResultReceived;
     public event Action<string, string>? ChatReceived;
     public event Action<string, string>? NoticeReceived;
@@ -83,6 +84,7 @@ public sealed class GameClient : IDisposable
     {
         var id = _nextRequest++;
         _pending[id] = command;
+        CommandSent?.Invoke(id);
         Transmit(id, command);
         return id;
     }

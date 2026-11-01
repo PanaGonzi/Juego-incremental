@@ -45,6 +45,10 @@ public sealed class LiteNetTransport : ITransport
             ChannelsCount = 2,
             AutoRecycle = true,
             DisconnectTimeout = 8000,
+            // Un ping perdido cuenta como una muestra de RTT igual a este intervalo, y el retardo de reenvío
+            // sale del RTT medio: con el valor por omisión (1000 ms), cada pérdida retrasaba los reenvíos reales.
+            // Debe superar el RTT real: si no, ningún pong coincide y la medida se queda en el intervalo.
+            PingInterval = 500,
             EnableStatistics = true,
             IPv6Enabled = false,
         };

@@ -171,6 +171,10 @@ public partial class AutoTest : Node
                 int? measurePort = _args.TryGetValue("host", out var mp) ? int.Parse(mp) : null;
                 _main.StartSession(GameSession.Local(_main, Scenarios.Build(_main.Content, measured), "autotest-" + measured, measurePort, _main.Prefs));
             }
+            else if (_args.GetValueOrDefault("scenario") == "coopfactory" && _args.TryGetValue("host", out var coopPort))
+            {
+                _main.StartSession(GameSession.Local(_main, BeltWorld(), "autotest-coop", int.Parse(coopPort), _main.Prefs));
+            }
             else if (_args.TryGetValue("host", out var hostPort))
             {
                 _main.StartHost("autotest-host", true, int.Parse(hostPort));
@@ -258,6 +262,17 @@ public partial class AutoTest : Node
                 world.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0).In.TryRemove("ingot", 95); // no alcanza para la ensambladora
                 _main.StartSession(GameSession.Local(_main, world, "autotest-build", null, _main.Prefs));
             }
+            else if (_args.GetValueOrDefault("scenario") == "coopstage")
+            {
+                // Partida con material para que un servidor dedicado sirva el escenario de fábrica compartida.
+                _main.Store.Save("coop", BeltWorld());
+                Directory.CreateDirectory(_args["stage-out"]);
+                var saved = _main.Store.PathOf("coop");
+                File.Copy(saved, Path.Combine(_args["stage-out"], Path.GetFileName(saved)), true);
+                Log("RESULTADO: CORRECTO");
+                GetTree().Quit(0);
+                return;
+            }
             else if (_args.GetValueOrDefault("scenario") == "managestage")
             {
                 // Solo prepara una partida para jugarla con entradas reales.
@@ -291,6 +306,7 @@ public partial class AutoTest : Node
             await Shot("01_inicio");
 
             if (_args.ContainsKey("measure")) await MeasureScenario();
+            else if (_args.GetValueOrDefault("scenario") == "coopfactory") await CoopFactoryScenario();
             else if (_args.GetValueOrDefault("scenario") == "rail") await RailScenario();
             else if (_args.GetValueOrDefault("scenario") == "belts") await BeltScenario();
             else if (_args.GetValueOrDefault("scenario") == "build") await BuildScenario();
@@ -528,7 +544,7 @@ public partial class AutoTest : Node
     /// <summary>Bucle jugable de A0.1 con las herramientas reales del jugador.</summary>
     private async Task FullLoop()
     {
-        await InputPaths();
+        if (!_args.ContainsKey("no-capture")) await InputPaths();
         var w = W;
         var spawn = _view!.PlayerPosition;
 
@@ -1509,7 +1525,7 @@ public partial class AutoTest : Node
     {
         var v = _view!;
         var client = v.Session.Client;
-        v.TestCapture = true;
+        v.TestCapture = !_args.ContainsKey("no-capture");
         v.UpdateMouseMode();
         var smelter = W.Content.Machines["smelter"];
 

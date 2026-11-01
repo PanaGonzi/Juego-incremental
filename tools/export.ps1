@@ -7,6 +7,13 @@ $Tools = Join-Path $env:LOCALAPPDATA 'PlutonTools'
 $env:PATH = "$Tools\dotnet;$env:PATH"
 $env:DOTNET_ROOT = "$Tools\dotnet"
 $env:DOTNET_NOLOGO = '1'
+# Algunos lanzadores heredan un entorno sin estas variables; NuGet las combina para su configuración
+# de máquina y falla con «Value cannot be null (path1)». Se rellenan desde el sistema si faltan.
+foreach ($v in @(@('ProgramData', 'CommonApplicationData'), @('ProgramFiles(x86)', 'ProgramFilesX86'), @('ProgramFiles', 'ProgramFiles'))) {
+    if (-not [Environment]::GetEnvironmentVariable($v[0])) {
+        [Environment]::SetEnvironmentVariable($v[0], [Environment]::GetFolderPath($v[1]))
+    }
+}
 $Godot = "$Tools\godot-4.7.2\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe"
 
 $Out = Join-Path $Repo "builds\alpha-$Version"

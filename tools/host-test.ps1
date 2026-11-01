@@ -10,7 +10,8 @@ if ($LASTEXITCODE -ne 0) { $log | Select-Object -Last 10; throw 'Falló la compi
 $Out = Join-Path $Repo "logs\host-$Bots"
 if (Test-Path $Out) { Remove-Item $Out -Recurse -Force }
 New-Item -ItemType Directory -Force $Out | Out-Null
-$a = @('--', '--autotest', '--profile', 'test-host', '--outdir', "`"$Out`"", '--width', '1920', '--height', '1080', '--seconds', $Seconds, '--host', $Port, '--measure', $Measure, '--expect-players', ($Bots + 1))
+. "$PSScriptRoot\lib-ventana.ps1"
+$a = (Test-WindowArgs 1920 1000) + @('--', '--autotest', '--profile', 'test-host', '--outdir', "`"$Out`"", '--width', '1920', '--height', '1080', '--seconds', $Seconds, '--host', $Port, '--measure', $Measure, '--expect-players', ($Bots + 1))
 $h = Start-Process (Join-Path $Repo "builds\alpha-$Build\client\Pluton.exe") -PassThru -ArgumentList $a -RedirectStandardOutput "$Out\stdout.txt" -RedirectStandardError "$Out\stderr.txt"
 $null = $h.Handle
 Start-Sleep -Seconds 6

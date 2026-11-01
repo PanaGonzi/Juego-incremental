@@ -1,0 +1,34 @@
+﻿[    0,3] OK    entrada en el mundo
+[    0,3] Renderizador forward_plus GPU AMD Radeon RX 7800 XT ventana (960, 540)
+[    1,8] OK    2 jugadores conectados
+[    1,8] Modo: cliente remoto, rol A
+[    8,3] OK    el almacén se construye
+[    9,8] OK    colocar a la vez construye una sola pieza
+[    9,8] OK    un solo almacén en la celda: 1
+[    9,8] OK    los créditos se cobran una vez: 5000 → 4975
+[    9,8] OK    el material se cobra una vez: 600 → 594
+[   17,3] OK    se saca lo que había, ni más ni menos: 100 de 100
+[   18,3] OK    sacar a la vez conserva los lingotes: 100 → 100
+[   18,3] OK    el depósito queda con la diferencia exacta
+[   18,5] OK    devolver vacía la mochila
+[   19,5] OK    devolver a la vez conserva los lingotes: 100
+[   19,5] OK    los lingotes vuelven al depósito
+[   19,5] OK    hay ruta del depósito al almacén: 26 celdas
+[   19,7] OK    la cinta se construye
+[   21,2] OK    una sola cinta entre las mismas piezas: 1
+[   21,2] OK    enlazar a la vez construye una sola cinta
+[   43,1] OK    la cinta lleva carga real en este cliente
+[   44,1] OK    objetos dibujados en este cliente: 82, carga lógica 82
+[   44,4] OK    la cinta se retira
+[   45,9] OK    retirar a la vez conserva la carga: 594 → 594
+[   45,9] OK    la devolución no se duplica: 78 de 78 pagados
+[   46,0] OK    cinta reconstruida para la reconexión
+[   46,2] OK    A ve salir a B
+[   48,2] OK    la fábrica sigue y conserva la carga sin B
+[   49,4] OK    A ve volver a B
+[   49,4] OK    la reconexión no crea otro jugador: 2
+[   51,0] OK    la cinta sigue en el estado recibido tras reconectar
+[   51,0] OK    la carga se ve en el estado recibido: 13
+[   55,0] OK    sin divergencias (5 comprobaciones)
+[   55,0] OK    ha habido comprobaciones de hash
+[   55,0] RESULTADO: CORRECTO

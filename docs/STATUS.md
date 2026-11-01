@@ -2,7 +2,11 @@
 
 **Última build estable:** `builds/alpha-0.4.1` (commit babc91c, etiqueta `alpha-0.4.1`, protocolo 4, guardado 4). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`.
 
-**Hitos:** M0, A0.1, A0.2, A0.4 y evento/offline de A0.5 implementados, con verificación en una sola máquina. A0.3 completo salvo Steam en el menú. Siguiente trabajo: Beta (ver [ROADMAP](ROADMAP.md)).
+**Última build de prueba:** `builds/alpha-0.5.0-qa3` (a757f90, protocolo 7, guardado 5). `builds/alpha-dev` lleva además los cambios de este bloque.
+
+**Hitos:** M0, A0.1, A0.2, A0.4 y evento/offline de A0.5 implementados, con verificación en una sola máquina. A0.3 completo salvo Steam en el menú. Experiencia de fábrica y construcción (E y C del [ROADMAP](ROADMAP.md)) integradas en `evolucion-0.5`. Cooperativo de fábrica con dos clientes reales y regresión de 12 clientes correctos en un solo PC (T-018, T-019).
+
+**Pendiente con controles reales:** repetir sobre la build final la QA con `PlayDriver`, que toma el foco y el ratón: solo cuando el titular no esté usando el equipo.
 
 **El titular prueba:** nada registrado. Comentarios en [FEEDBACK](FEEDBACK.md).
 
