@@ -19,6 +19,18 @@ Commit posterior a 057afc5. Cerca del jugador se dibuja todo el planeta: sin LOD
 
 **Cumple el objetivo en este equipo.** Los 6626 dibujos en vías son el primer punto a optimizar (cada tramo es una malla propia); no urge con estos tiempos. Equipos de gama menor: **NO VERIFICADO**.
 
+## Arte de la 0.5, escenario medio a 1080p sin VSync, 15 s por vista
+
+Rama `agente/arte`, preset medio, un solo cliente. Otros agentes usaban el equipo a la vez: las cifras pueden empeorar por ello, no mejorar.
+
+| Vista | Media | p99 | Máx. | >33 ms | Objetos | Dibujos | Memoria | VRAM |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Densa | 1,96 ms | 2,78 | 12,91 | 0 | 1194 | 362 | 626 MB | 362 MB |
+| Vías | 3,79 ms | 6,16 | 12,05 | 0 | 4073 | 3545 | 620 MB | 362 MB |
+| Panorámica | 2,52 ms | 5,19 | 14,48 | 0 | 3048 | 1203 | 620 MB | 362 MB |
+
+**Cumple el objetivo en este equipo.** Dibujos frente a la tabla anterior: densa 838 → 362, vías 6626 → 3545, panorámica 1990 → 1203, con una superficie opaca compartida por malla. La vista densa sube de 1,45 a 1,96 ms; vías baja de 5,69 a 3,79 ms. Una tirada anterior de la misma rama dio 7,80 ms de media y un pico aislado de 112 ms en vías, con el escritorio ocupado; no se reprodujo en las dos siguientes. Equipos de gama menor, presets bajo y alto, y anfitrión con 11 clientes: **NO VERIFICADO**.
+
 ## Servidor dedicado + 12 clientes
 
 | Escenario | Tick medio | p99 máx. | Tardíos | Envío total antes → después | Por cliente | Memoria |

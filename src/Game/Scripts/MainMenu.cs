@@ -19,69 +19,81 @@ public partial class MainMenu : Control
     {
         Theme = Ui.Theme;
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        var bg = new ColorRect { Color = new Color(0.025f, 0.035f, 0.06f) };
-        bg.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        AddChild(bg);
 
-        // Plutón de fondo: un disco sencillo y su terminador, sin recursos externos.
-        var shader = new Shader { Code = PlanetShader };
-        var planet = new ColorRect { Material = new ShaderMaterial { Shader = shader } };
-        planet.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        AddChild(planet);
+        // Fondo: la base inicial viva, con los mismos modelos y entorno que la partida.
+        var scene = new MenuScene(_main.Prefs);
+        AddChild(scene);
+
+        // Velo lateral: el texto se lee con cualquier encuadre, sin tapar la escena.
+        var veil = new TextureRect
+        {
+            Texture = VeilTexture(),
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.Scale,
+            MouseFilter = MouseFilterEnum.Ignore,
+        };
+        veil.SetAnchorsAndOffsetsPreset(LayoutPreset.LeftWide);
+        veil.OffsetRight = 880;
+        AddChild(veil);
 
         var margin = new MarginContainer();
         margin.SetAnchorsAndOffsetsPreset(LayoutPreset.LeftWide);
-        margin.OffsetLeft = 90;
-        margin.OffsetRight = 640;
+        margin.OffsetLeft = 96;
+        margin.OffsetRight = 720;
+        margin.OffsetTop = 48;
+        margin.OffsetBottom = -56;
         AddChild(margin);
         var col = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-        col.AddThemeConstantOverride("separation", 10);
+        col.AddThemeConstantOverride("separation", UiTheme.M);
         margin.AddChild(col);
-        col.AddChild(Ui.Text(Loc.T("game_title"), 84, Ui.Ink));
-        col.AddChild(Ui.Text(Loc.T("game_subtitle"), 26, Ui.Amber));
-        col.AddChild(new Control { CustomMinimumSize = new Vector2(0, 30) });
+        var title = Ui.Text(Loc.T("game_title"), 92, Ui.Ink);
+        title.AddThemeFontOverride("font", UiTheme.Display);
+        col.AddChild(title);
+        var sub = Ui.Text(Loc.T("game_subtitle").ToUpperInvariant(), UiTheme.Heading, Ui.Amber);
+        col.AddChild(sub);
+        var rule = new ColorRect { Color = Ui.Amber, CustomMinimumSize = new Vector2(64, 3), SizeFlagsHorizontal = SizeFlags.ShrinkBegin };
+        col.AddChild(new Control { CustomMinimumSize = new Vector2(0, UiTheme.S) });
+        col.AddChild(rule);
+        col.AddChild(new Control { CustomMinimumSize = new Vector2(0, UiTheme.XL) });
         _box = new VBoxContainer();
-        _box.AddThemeConstantOverride("separation", 8);
+        _box.AddThemeConstantOverride("separation", UiTheme.M);
         col.AddChild(_box);
         if (_message.Length > 0)
         {
-            var label = Ui.Text(_message, 18, Ui.Bad);
+            var label = Ui.Text(_message, UiTheme.Body, Ui.Bad);
             label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
             col.AddChild(label);
         }
 
-        var version = Ui.Text($"Alpha {Protocol.GameVersion} · protocol {Protocol.Version} · data {_main.Content.Revision[..8]}", 14, Ui.Dim);
+        var version = Ui.Text($"Alpha {Protocol.GameVersion} · protocol {Protocol.Version} · data {_main.Content.Revision[..8]}", UiTheme.Caption, Ui.Dim);
         version.SetAnchorsAndOffsetsPreset(LayoutPreset.BottomLeft);
-        version.OffsetLeft = 16;
-        version.OffsetTop = -30;
+        version.OffsetLeft = 96;
+        version.OffsetTop = -36;
         AddChild(version);
 
         ShowRoot();
     }
 
-    private const string PlanetShader = """
-        shader_type canvas_item;
-        float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
-        float noise(vec2 p){ vec2 i=floor(p); vec2 f=fract(p); f=f*f*(3.0-2.0*f);
-          return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }
-        float fbm(vec2 p){ float v=0.0; float a=0.5; for(int i=0;i<5;i++){ v+=a*noise(p); p*=2.1; a*=0.5; } return v; }
-        void fragment(){
-          vec2 uv = UV; float aspect = 16.0/9.0; vec2 p = vec2((uv.x-0.92)*aspect, uv.y-0.62);
-          float r = length(p)/0.72;
-          vec3 col = vec3(0.0); float alpha = 0.0;
-          float star = step(0.9975, hash(floor(uv*vec2(900.0,520.0))));
-          col += vec3(star)*0.8; alpha = star;
-          if (r < 1.0) {
-            float z = sqrt(1.0-r*r); vec3 n = vec3(p/0.72, z);
-            vec2 q = n.xy/(1.0+n.z)*3.0 + TIME*0.003;
-            float t = fbm(q*3.0);
-            vec3 surf = mix(vec3(0.27,0.17,0.13), vec3(0.72,0.66,0.6), smoothstep(0.35,0.72,t));
-            float d = max(dot(n, normalize(vec3(-0.75,-0.35,0.55))),0.0);
-            col = surf*(d*1.15+0.012); alpha = 1.0;
-          } else if (r < 1.02) { col = vec3(0.28,0.42,0.68)*(1.02-r)*30.0*0.25; alpha = (1.02-r)*50.0*0.5; }
-          COLOR = vec4(col, alpha);
-        }
-        """;
+    /// <summary>Degradado de izquierda a derecha en memoria; no depende de un recurso.</summary>
+    private static Texture2D VeilTexture()
+    {
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(0.012f, 0.018f, 0.03f, 0.94f));
+        gradient.SetColor(1, new Color(0.012f, 0.018f, 0.03f, 0f));
+        gradient.AddPoint(0.55f, new Color(0.012f, 0.018f, 0.03f, 0.72f));
+        return new GradientTexture2D { Gradient = gradient, Width = 256, Height = 4, FillFrom = Vector2.Zero, FillTo = Vector2.Right };
+    }
+
+    /// <summary>Botón principal: texto a la izquierda y altura cómoda.</summary>
+    private static Button MainButton(string text, Action action)
+    {
+        var b = Ui.Btn(text, action, 420);
+        b.Alignment = HorizontalAlignment.Left;
+        b.AddThemeFontSizeOverride("font_size", UiTheme.Heading);
+        b.CustomMinimumSize = new Vector2(420, 46);
+        b.SizeFlagsHorizontal = SizeFlags.ShrinkBegin;
+        return b;
+    }
 
     private void Clear()
     {
@@ -92,13 +104,22 @@ public partial class MainMenu : Control
     {
         Clear();
         var saves = _main.Store.List();
-        if (saves.Count > 0) _box.AddChild(Ui.Btn(Loc.T("menu_continue"), () => Safe(() => _main.StartSolo(saves[0].Slot, false)), 400));
-        _box.AddChild(Ui.Btn(Loc.T("menu_new"), () => _main.StartSolo(_main.NewSlotName(), true), 400));
-        if (saves.Count > 0) _box.AddChild(Ui.Btn(Loc.T("menu_load"), ShowLoad));
-        _box.AddChild(Ui.Btn(Loc.T("menu_host"), ShowHost));
-        _box.AddChild(Ui.Btn(Loc.T("menu_join"), ShowJoin));
-        _box.AddChild(Ui.Btn(Loc.T("menu_settings"), () => { Clear(); SettingsForm.Build(_box, _main.Prefs, ShowRoot); }));
-        _box.AddChild(Ui.Btn(Loc.T("menu_quit"), () => GetTree().Quit()));
+        Button? first = null;
+        Button Add(Button b)
+        {
+            _box.AddChild(b);
+            first ??= b;
+            return b;
+        }
+        if (saves.Count > 0) Add(MainButton($"{Loc.T("menu_continue")}  ·  {saves[0].SavedUtc.ToLocalTime():dd/MM HH:mm}", () => Safe(() => _main.StartSolo(saves[0].Slot, false))));
+        Add(MainButton(Loc.T("menu_new"), () => _main.StartSolo(_main.NewSlotName(), true)));
+        if (saves.Count > 0) Add(MainButton(Loc.T("menu_load"), ShowLoad));
+        Add(MainButton(Loc.T("menu_host"), ShowHost));
+        Add(MainButton(Loc.T("menu_join"), ShowJoin));
+        Add(MainButton(Loc.T("menu_settings"), () => { Clear(); SettingsForm.Build(_box, _main.Prefs, ShowRoot); }));
+        Add(MainButton(Loc.T("menu_quit"), () => GetTree().Quit()));
+        // Navegación por teclado desde el primer momento.
+        first?.CallDeferred(Control.MethodName.GrabFocus);
     }
 
     private void Safe(Action action)
@@ -117,7 +138,7 @@ public partial class MainMenu : Control
     private void ShowLoad()
     {
         Clear();
-        _box.AddChild(Ui.Text(Loc.T("load_title"), 24, Ui.Amber));
+        _box.AddChild(Ui.Heading(Loc.T("load_title"), UiTheme.Heading));
         foreach (var s in _main.Store.List().Take(8))
         {
             var slot = s.Slot;
@@ -133,7 +154,7 @@ public partial class MainMenu : Control
     private void ShowHost()
     {
         Clear();
-        _box.AddChild(Ui.Text(Loc.T("host_title"), 22, Ui.Amber));
+        _box.AddChild(Ui.Heading(Loc.T("host_title"), UiTheme.Heading));
         var note = Ui.Text(Loc.T("host_note"), 15, Ui.Dim);
         note.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _box.AddChild(note);
@@ -159,7 +180,7 @@ public partial class MainMenu : Control
     private void ShowJoin()
     {
         Clear();
-        _box.AddChild(Ui.Text(Loc.T("join_title"), 22, Ui.Amber));
+        _box.AddChild(Ui.Heading(Loc.T("join_title"), UiTheme.Heading));
         var name = new LineEdit { Text = _main.Prefs.PlayerName, MaxLength = Protocol.MaxNameLength };
         var address = new LineEdit { Text = "127.0.0.1" };
         var port = new LineEdit { Text = Main.DefaultPort.ToString() };
@@ -186,72 +207,128 @@ public static class SettingsForm
 {
     public static void Build(Container box, Settings prefs, Action back)
     {
-        void Slider(string key, float min, float max, float step, float value, Action<float> set)
+        box.AddChild(Ui.Heading(Loc.T("settings_title")));
+        var tabs = new TabContainer { CustomMinimumSize = new Vector2(600, 430), TabAlignment = TabBar.AlignmentMode.Left };
+        box.AddChild(tabs);
+
+        VBoxContainer Section(string key)
         {
-            var label = Ui.Text($"{Loc.T(key)}: {value:0.##}", 15, Ui.Dim);
-            box.AddChild(label);
-            var s = new HSlider { MinValue = min, MaxValue = max, Step = step, Value = value, CustomMinimumSize = new Vector2(380, 20) };
+            var section = new VBoxContainer { Name = Loc.T(key) };
+            section.AddThemeConstantOverride("separation", UiTheme.M);
+            tabs.AddChild(section);
+            return section;
+        }
+
+        void Slider(VBoxContainer to, string key, float min, float max, float step, float value, Func<float, string> show, Action<float> set)
+        {
+            var label = Ui.Text(Loc.T(key), UiTheme.Small, Ui.Ink);
+            label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            var amount = Ui.Text(show(value), UiTheme.Small, Ui.Amber);
+            to.AddChild(Ui.Row(UiTheme.M, label, amount));
+            var s = new HSlider { MinValue = min, MaxValue = max, Step = step, Value = value, CustomMinimumSize = new Vector2(380, 22), FocusMode = Control.FocusModeEnum.All };
             s.ValueChanged += v =>
             {
                 set((float)v);
-                label.Text = $"{Loc.T(key)}: {v:0.##}";
+                amount.Text = show((float)v);
                 prefs.Save();
             };
-            box.AddChild(s);
+            to.AddChild(s);
         }
-        void Toggle(string key, bool value, Action<bool> set)
+
+        void Toggle(VBoxContainer to, string key, bool value, Action<bool> set)
         {
             var c = new CheckButton { Text = Loc.T(key), ButtonPressed = value };
             c.Toggled += v =>
             {
                 set(v);
                 prefs.Save();
+                Scenery.Current?.ApplyPrefs(prefs);
             };
-            box.AddChild(c);
+            to.AddChild(c);
         }
 
-        box.AddChild(Ui.Text(Loc.T("settings_title"), 24, Ui.Amber));
-        Slider("settings_sensitivity", 0.2f, 3f, 0.05f, prefs.Sensitivity, v => prefs.Sensitivity = v);
-        Slider("settings_fov", 60, 110, 1, prefs.Fov, v => prefs.Fov = v);
-        Slider("settings_master", 0, 1, 0.05f, prefs.MasterVolume, v => prefs.MasterVolume = v);
-        Slider("settings_sfx", 0, 1, 0.05f, prefs.SfxVolume, v => prefs.SfxVolume = v);
-        Slider("settings_machines", 0, 1, 0.05f, prefs.MachineVolume, v => prefs.MachineVolume = v);
-        Slider("settings_ui_scale", 0.75f, 1.5f, 0.05f, prefs.UiScale, v =>
+        // Elección entre valores cerrados: lo activo se marca con relleno y borde, y aplica al momento.
+        void Segments(VBoxContainer to, string key, string hintKey, (string label, Func<bool> active, Action choose)[] options)
         {
-            prefs.UiScale = v;
-            ((SceneTree)Engine.GetMainLoop()).Root.ContentScaleFactor = v;
+            to.AddChild(Ui.Text(Loc.T(key), UiTheme.Small, Ui.Ink));
+            var row = Ui.Row(UiTheme.S);
+            var group = new ButtonGroup();
+            foreach (var (label, active, choose) in options)
+            {
+                var b = new Button { Text = label, ToggleMode = true, ButtonGroup = group, ButtonPressed = active(), CustomMinimumSize = new Vector2(92, UiTheme.ButtonHeight), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+                b.Pressed += () =>
+                {
+                    choose();
+                    prefs.Save();
+                };
+                row.AddChild(b);
+            }
+            to.AddChild(row);
+            if (hintKey.Length > 0) to.AddChild(Ui.Para(Loc.T(hintKey), UiTheme.Caption, Ui.Dim));
+        }
+
+        var percent = (float v) => $"{v * 100:0} %";
+
+        var display = Section("settings_tab_display");
+        Segments(display, "settings_quality", "settings_quality_hint", new (string, Func<bool>, Action)[]
+        {
+            (Loc.T("quality_low"), () => prefs.Quality == 0, () => { prefs.Quality = 0; Scenery.Current?.ApplyPrefs(prefs); }),
+            (Loc.T("quality_medium"), () => prefs.Quality == 1, () => { prefs.Quality = 1; Scenery.Current?.ApplyPrefs(prefs); }),
+            (Loc.T("quality_high"), () => prefs.Quality == 2, () => { prefs.Quality = 2; Scenery.Current?.ApplyPrefs(prefs); }),
         });
-        Slider("settings_event_ambience", 0, 1, 0.05f, prefs.EventAmbience, v => prefs.EventAmbience = v);
-        Toggle("settings_fullscreen", prefs.Fullscreen, v => { prefs.Fullscreen = v; prefs.ApplyDisplay(); });
-        Toggle("settings_bob", prefs.CameraBob, v => prefs.CameraBob = v);
-        Slider("settings_bob_intensity", 0, 1.5f, 0.05f, prefs.BobIntensity, v => prefs.BobIntensity = v);
-        Toggle("settings_shadows", prefs.Shadows, v => prefs.Shadows = v);
-        Toggle("settings_glow", prefs.Glow, v => prefs.Glow = v);
-        var languages = new HBoxContainer();
-        languages.AddChild(Ui.Text(Loc.T("settings_language") + ": ", 15, Ui.Dim));
+        Toggle(display, "settings_shadows", prefs.Shadows, v => prefs.Shadows = v);
+        Toggle(display, "settings_glow", prefs.Glow, v => prefs.Glow = v);
+        Toggle(display, "settings_fullscreen", prefs.Fullscreen, v => { prefs.Fullscreen = v; prefs.ApplyDisplay(); });
+        Slider(display, "settings_fov", 60, 110, 1, prefs.Fov, v => $"{v:0}°", v => prefs.Fov = v);
+
+        var ui = Section("settings_tab_interface");
+        var scales = new[] { 0.75f, 0.9f, 1f, 1.1f, 1.25f, 1.5f };
+        Segments(ui, "settings_ui_scale", "settings_ui_scale_hint", scales.Select(sc => (percent(sc), (Func<bool>)(() => Mathf.Abs(prefs.UiScale - sc) < 0.01f), (Action)(() =>
+        {
+            prefs.UiScale = sc;
+            ((SceneTree)Engine.GetMainLoop()).Root.ContentScaleFactor = sc;
+        }))).ToArray());
+        ui.AddChild(Ui.Text(Loc.T("settings_language"), UiTheme.Small, Ui.Ink));
+        var languages = Ui.Row(UiTheme.S);
         foreach (var code in Loc.Languages)
         {
             var lang = code;
-            languages.AddChild(Ui.Btn(code.ToUpperInvariant(), () =>
+            var b = Ui.Btn(code.ToUpperInvariant(), () =>
             {
                 prefs.Language = lang;
                 prefs.Save();
                 Loc.Load(lang);
                 back();
-            }));
+            }, 92);
+            b.Disabled = lang == prefs.Language;
+            languages.AddChild(b);
         }
-        box.AddChild(languages);
-        box.AddChild(Ui.Btn(Loc.T("settings_controls"), () =>
+        ui.AddChild(languages);
+
+        var sound = Section("settings_tab_audio");
+        Slider(sound, "settings_master", 0, 1, 0.05f, prefs.MasterVolume, percent, v => prefs.MasterVolume = v);
+        Slider(sound, "settings_sfx", 0, 1, 0.05f, prefs.SfxVolume, percent, v => prefs.SfxVolume = v);
+        Slider(sound, "settings_machines", 0, 1, 0.05f, prefs.MachineVolume, percent, v => prefs.MachineVolume = v);
+        Slider(sound, "settings_event_ambience", 0, 1, 0.05f, prefs.EventAmbience, percent, v => prefs.EventAmbience = v);
+
+        var input = Section("settings_tab_controls");
+        Slider(input, "settings_sensitivity", 0.2f, 3f, 0.05f, prefs.Sensitivity, v => $"{v:0.00}", v => prefs.Sensitivity = v);
+        Toggle(input, "settings_bob", prefs.CameraBob, v => prefs.CameraBob = v);
+        Slider(input, "settings_bob_intensity", 0, 1.5f, 0.05f, prefs.BobIntensity, percent, v => prefs.BobIntensity = v);
+        input.AddChild(Ui.Btn(Loc.T("settings_controls"), () =>
         {
             foreach (var c in box.GetChildren()) { box.RemoveChild(c); c.QueueFree(); }
             ControlsForm(box, back);
         }));
-        box.AddChild(Ui.Btn(Loc.T("menu_back"), back));
+
+        var close = Ui.Btn(Loc.T("menu_back"), back);
+        box.AddChild(close);
+        close.CallDeferred(Control.MethodName.GrabFocus);
     }
 
     private static void ControlsForm(Container box, Action back)
     {
-        box.AddChild(Ui.Text(Loc.T("settings_controls"), 24, Ui.Amber));
+        box.AddChild(Ui.Heading(Loc.T("settings_controls")));
         var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(460, 520) };
         var list = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         scroll.AddChild(list);

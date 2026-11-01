@@ -16,6 +16,9 @@ public partial class GameView : Node3D
     {
         public Node3D Root = null!;
         public Node3D? Rotor;
+        public Vector3 RotorAxis = Vector3.Up;
+        public float RotorSpeed = 2.6f;
+        public MeshInstance3D Lamp = null!;
         public Node3D? Piston;
         public Vector3 PistonRest;
         public MeshInstance3D Warn = null!;
@@ -83,6 +86,7 @@ public partial class GameView : Node3D
     private readonly Dictionary<int, ImpactKind> _debrisKinds = new();
     private ShaderMaterial _ground = null!;
     private ShaderMaterial _sky = null!;
+    private Scenery _scenery = null!;
     private int _viewPlanet = -1;
 
     // Trayecto en lanzadera: continuo, sin pantalla de carga. La niebla oculta el relevo de entornos.
@@ -220,40 +224,11 @@ public partial class GameView : Node3D
 
     private void BuildEnvironment()
     {
-        var sky = new ShaderMaterial { Shader = new Shader { Code = SkyShader } };
-        _sky = sky;
-        var env = new Godot.Environment
-        {
-            BackgroundMode = Godot.Environment.BGMode.Sky,
-            Sky = new Sky { SkyMaterial = sky, RadianceSize = Sky.RadianceSizeEnum.Size64 },
-            AmbientLightSource = Godot.Environment.AmbientSource.Sky,
-            AmbientLightEnergy = 1.0f,
-            TonemapMode = Godot.Environment.ToneMapper.Agx,
-            TonemapExposure = 1.1f,
-            SsaoEnabled = true,
-            SsaoRadius = 1.5f,
-            SsaoIntensity = 2f,
-            GlowEnabled = _main.Prefs.Glow,
-            GlowIntensity = 0.7f,
-            GlowBloom = 0.05f,
-            FogEnabled = true,
-            FogLightColor = new Color(0.22f, 0.28f, 0.42f),
-            FogDensity = 0.0022f,
-            FogSkyAffect = 0f,
-        };
-        _env = new WorldEnvironment { Environment = env };
-        AddChild(_env);
-
-        _sun = new DirectionalLight3D
-        {
-            LightColor = new Color(0.86f, 0.9f, 1f),
-            LightEnergy = 1.25f,
-            ShadowEnabled = _main.Prefs.Shadows,
-            DirectionalShadowMaxDistance = 130,
-            DirectionalShadowMode = DirectionalLight3D.ShadowMode.Parallel4Splits,
-        };
-        _sun.RotationDegrees = new Vector3(-28, -55, 0);
-        AddChild(_sun);
+        _scenery = new Scenery(this, _main.Prefs);
+        _env = _scenery.Env;
+        _sun = _scenery.Sun;
+        _ground = _scenery.GroundMat;
+        _sky = _scenery.SkyMat;
 
         BuildTerrain();
         BuildScenery();
@@ -279,44 +254,13 @@ public partial class GameView : Node3D
         AddChild(_sparks);
     }
 
+    /// <summary>El relieve visual está en Terrain; la colisión sigue siendo el plano de la cuadrícula jugable.</summary>
     private void BuildTerrain()
     {
-        const int size = 180;
-        const float span = 1400f;
-        var noise = new FastNoiseLite { Seed = 9, Frequency = 0.0035f, FractalOctaves = 4 };
-        var half = 200f;
-        var st = new SurfaceTool();
-        st.Begin(Mesh.PrimitiveType.Triangles);
-        float Height(float x, float z)
-        {
-            var d = Mathf.Max(Mathf.Abs(x), Mathf.Abs(z));
-            var t = Mathf.Clamp((d - half) / 260f, 0, 1);
-            return (noise.GetNoise2D(x, z) * 0.5f + 0.5f) * 95f * t * t;
-        }
-        var step = span / size;
-        for (var ix = 0; ix < size; ix++)
-        for (var iz = 0; iz < size; iz++)
-        {
-            var x0 = -span / 2 + ix * step;
-            var z0 = -span / 2 + iz * step;
-            var a = new Vector3(x0, Height(x0, z0), z0);
-            var b = new Vector3(x0 + step, Height(x0 + step, z0), z0);
-            var c = new Vector3(x0, Height(x0, z0 + step), z0 + step);
-            var d = new Vector3(x0 + step, Height(x0 + step, z0 + step), z0 + step);
-            st.AddVertex(a); st.AddVertex(b); st.AddVertex(c);
-            st.AddVertex(b); st.AddVertex(d); st.AddVertex(c);
-        }
-        st.GenerateNormals();
-        var mesh = st.Commit();
-        _ground = new ShaderMaterial { Shader = new Shader { Code = GroundShader } };
-        _ground.SetShaderParameter("grid_strength", 0f);
-        var terrain = new MeshInstance3D { Mesh = mesh, MaterialOverride = _ground };
-        AddChild(terrain);
-
         var floor = new StaticBody3D();
         floor.AddChild(new CollisionShape3D { Shape = new WorldBoundaryShape3D { Plane = new Plane(Vector3.Up, 0) } });
         AddChild(floor);
-        foreach (var (normal, distance) in new[] { (Vector3.Right, -188f), (Vector3.Left, -188f), (Vector3.Forward, -188f), (Vector3.Back, -188f) })
+        foreach (var (normal, distance) in new[] { (Vector3.Right, -Terrain.Walkable), (Vector3.Left, -Terrain.Walkable), (Vector3.Forward, -Terrain.Walkable), (Vector3.Back, -Terrain.Walkable) })
         {
             var wall = new StaticBody3D();
             wall.AddChild(new CollisionShape3D { Shape = new WorldBoundaryShape3D { Plane = new Plane(normal, distance) } });
@@ -324,108 +268,10 @@ public partial class GameView : Node3D
         }
     }
 
-    /// <summary>Decoración sin colisión: guijarros instanciados y ruinas industriales fuera de la zona edificable.</summary>
+    /// <summary>La decoración depende del planeta y se crea al mostrarlo: ver Scenery.SetPlanet.</summary>
     private void BuildScenery()
     {
-        var rng = new RandomNumberGenerator { Seed = 1907 };
-        var rock = new Models.Builder().Ball("rock", 0, 0, 0, 1f, 6, 4, 0.6f).Commit();
-        const int count = 2600;
-        var multi = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = rock, InstanceCount = count };
-        for (var i = 0; i < count; i++)
-        {
-            var s = Mathf.Pow(rng.Randf(), 4f) * 0.26f + 0.04f;
-            var basis = Basis.FromEuler(new Vector3(rng.RandfRange(-0.4f, 0.4f), rng.RandfRange(0, 6.28f), rng.RandfRange(-0.4f, 0.4f))).Scaled(new Vector3(s, s, s));
-            multi.SetInstanceTransform(i, new Transform3D(basis, new Vector3(rng.RandfRange(-195, 195), s * 0.15f, rng.RandfRange(-195, 195))));
-        }
-        AddChild(new MultiMeshInstance3D { Multimesh = multi, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
-
-        var ruin = new Models.Builder();
-        ruin.Cyl("rustlight", 0, 14, 0, 7, 28, sides: 14);
-        ruin.Box("rust", 0, 29, 0, 16, 2, 16, roll: 6);
-        ruin.Box("hull", 14, 7, 0, 16, 14, 11);
-        ruin.Box("rust", 14, 15, 0, 18, 1.2f, 13, pitch: -5);
-        ruin.Box("dark", 26, 19, 3, 2, 38, 2, roll: -7);
-        ruin.Box("dark", 8, 22, 5, 32, 1, 1, roll: 18);
-        var ruinMesh = ruin.Commit();
-        foreach (var (x, z, yaw) in new[] { (-235f, -180f, 20f), (240f, -120f, 130f), (250f, 170f, 250f), (-110f, 245f, 80f), (90f, -255f, 310f), (-260f, 90f, 175f) })
-            AddChild(new MeshInstance3D { Mesh = ruinMesh, Position = new Vector3(x, -1, z), RotationDegrees = new Vector3(0, yaw, 0) });
     }
-
-    private const string GroundShader = """
-        shader_type spatial;
-        render_mode cull_back;
-        uniform float grid_strength = 0.0;
-        uniform vec3 low_color = vec3(0.115,0.075,0.062);
-        uniform vec3 high_color = vec3(0.50,0.54,0.61);
-        varying vec3 wp;
-        const mat2 ROT = mat2(vec2(0.8,0.6),vec2(-0.6,0.8));
-        vec2 grad(vec2 i){ vec3 p3 = fract(vec3(i.xyx)*vec3(0.1031,0.1030,0.0973)); p3 += dot(p3,p3.yzx+33.33); float a = fract((p3.x+p3.y)*p3.z)*6.2831853; return vec2(cos(a),sin(a)); }
-        float gnoise(vec2 p){ vec2 i=floor(p); vec2 f=fract(p); vec2 u=f*f*f*(f*(f*6.0-15.0)+10.0);
-          return mix(mix(dot(grad(i),f),dot(grad(i+vec2(1,0)),f-vec2(1,0)),u.x),
-                     mix(dot(grad(i+vec2(0,1)),f-vec2(0,1)),dot(grad(i+vec2(1,1)),f-vec2(1,1)),u.x),u.y)*0.7+0.5; }
-        float fbm(vec2 p, int n){ float v=0.0; float a=0.5; for(int i=0;i<n;i++){ v+=a*gnoise(p); p=ROT*p*2.03+vec2(11.3,7.1); a*=0.5; } return v/(1.0-pow(0.5,float(n))); }
-        void vertex(){ wp = (MODEL_MATRIX * vec4(VERTEX,1.0)).xyz; }
-        void fragment(){
-          float big = fbm(wp.xz*0.016,4);
-          float mid = fbm(wp.xz*0.11,4);
-          float fine = fbm(wp.xz*1.3,3);
-          float ice = smoothstep(0.46,0.60, big*0.58+mid*0.42);
-          vec3 c = mix(low_color, high_color, ice);
-          c *= 0.88 + (fine-0.5)*0.45;
-          ALBEDO = c;
-          ROUGHNESS = mix(0.95,0.5,ice);
-          SPECULAR = 0.3;
-          vec2 g = abs(fract(wp.xz/2.0+0.5)-0.5)*2.0;
-          float line = 1.0-smoothstep(0.0,0.05,min(g.x,g.y));
-          float area = 1.0-smoothstep(170.0,182.0,max(abs(wp.x),abs(wp.z)));
-          EMISSION = vec3(0.25,0.55,0.8)*line*grid_strength*area*0.5;
-        }
-        """;
-
-    private const string SkyShader = """
-        shader_type sky;
-        uniform float moon = 1.0;
-        uniform vec3 horizon = vec3(0.012,0.016,0.034);
-        float hash(vec3 p){ return fract(sin(dot(p, vec3(127.1,311.7,74.7))) * 43758.5453); }
-        float hash2(vec2 p){ return fract(sin(dot(p, vec2(41.3,289.1))) * 43758.5453); }
-        float vnoise(vec2 p){ vec2 i=floor(p); vec2 f=fract(p); f=f*f*(3.0-2.0*f);
-          return mix(mix(hash2(i),hash2(i+vec2(1,0)),f.x),mix(hash2(i+vec2(0,1)),hash2(i+vec2(1,1)),f.x),f.y); }
-        float stars(vec3 d, float scale, float density){
-          vec3 g = d*scale; vec3 cell = floor(g); vec3 f = fract(g)-0.5;
-          float h = hash(cell);
-          if (h < density) return 0.0;
-          vec3 off = vec3(hash(cell+3.1),hash(cell+5.7),hash(cell+7.3))-0.5;
-          float dist = length(f-off*0.7);
-          return smoothstep(0.09,0.0,dist)*(0.35+hash(cell+1.0)*hash(cell+1.0)*2.4);
-        }
-        void sky(){
-          vec3 d = normalize(EYEDIR);
-          vec3 c = mix(vec3(0.0016,0.0022,0.0052), horizon, pow(1.0-clamp(d.y,0.0,1.0),9.0));
-          float band = pow(1.0-abs(dot(d,normalize(vec3(0.3,0.55,-0.75)))),7.0);
-          c += vec3(0.02,0.018,0.034)*band;
-          c += vec3(0.85,0.92,1.0)*(stars(d,170.0,0.975)+stars(d,330.0,0.986)*0.5)*(1.0-pow(1.0-clamp(d.y+0.02,0.0,1.0),12.0));
-          vec3 sunDir = normalize(vec3(0.46,0.47,0.75));
-          float sun = max(dot(d, sunDir),0.0);
-          c += vec3(1.0,0.97,0.9)*(pow(sun,14000.0)*40.0 + pow(sun,900.0)*0.22);
-          // Caronte: disco con terminador coherente con el Sol.
-          vec3 mc = normalize(vec3(-0.34,0.34,-0.88)); float mr = 0.085;
-          float cosd = dot(d,mc);
-          if (cosd > 0.0 && moon > 0.5){
-            vec3 u = normalize(cross(vec3(0,1,0),mc)); vec3 v = cross(mc,u);
-            vec2 q = vec2(dot(d,u),dot(d,v))/mr; float r2 = dot(q,q);
-            if (r2 < 1.0){
-              vec3 n = normalize(q.x*u + q.y*v - sqrt(1.0-r2)*mc);
-              float lit = max(dot(n,sunDir),0.0);
-              float t = vnoise(q*5.0+7.0)*0.6+vnoise(q*13.0)*0.4;
-              vec3 alb = mix(vec3(0.20,0.18,0.17), vec3(0.46,0.44,0.43), t);
-              float cap = smoothstep(0.55,0.95,q.y+t*0.25);
-              alb = mix(alb, vec3(0.36,0.16,0.11), cap);
-              c = alb*(lit*0.75+0.004);
-            }
-          }
-          COLOR = c;
-        }
-        """;
 
     private void BuildPlayer()
     {
@@ -473,13 +319,7 @@ public partial class GameView : Node3D
         var mars = planet == 1;
         _ambience ??= CreateAmbience();
         _ambience.PitchScale = mars ? 1.25f : 0.85f;
-        _ground.SetShaderParameter("low_color", mars ? new Vector3(0.20f, 0.075f, 0.04f) : new Vector3(0.115f, 0.075f, 0.062f));
-        _ground.SetShaderParameter("high_color", mars ? new Vector3(0.50f, 0.26f, 0.13f) : new Vector3(0.50f, 0.54f, 0.61f));
-        _sky.SetShaderParameter("moon", mars ? 0f : 1f);
-        _sky.SetShaderParameter("horizon", mars ? new Vector3(0.11f, 0.05f, 0.03f) : new Vector3(0.012f, 0.016f, 0.034f));
-        _sun.LightColor = mars ? new Color(1f, 0.88f, 0.74f) : new Color(0.86f, 0.9f, 1f);
-        _sun.LightEnergy = mars ? 1.7f : 1.25f;
-        _env.Environment.FogLightColor = mars ? new Color(0.5f, 0.28f, 0.17f) : new Color(0.22f, 0.28f, 0.42f);
+        _scenery.SetPlanet(planet);
     }
 
     private AudioStreamPlayer? _ambience;
@@ -642,6 +482,7 @@ public partial class GameView : Node3D
             {
                 node.Status = m.Status;
                 node.Warn.Mesh = Models.StatusIcon(m.Status);
+                node.Lamp.MaterialOverride = Models.LampState(m.Status);
             }
         }
         foreach (var id in _machines.Keys.Where(k => !seen.Contains(k)).ToList()) FreeMachine(id);
@@ -931,6 +772,8 @@ public partial class GameView : Node3D
         if (model.Rotor != null)
         {
             node.Rotor = new MeshInstance3D { Mesh = model.Rotor, Position = model.RotorPos };
+            node.RotorAxis = model.RotorAxis;
+            node.RotorSpeed = model.RotorSpeed;
             root.AddChild(node.Rotor);
         }
         if (model.Piston != null)
@@ -954,6 +797,11 @@ public partial class GameView : Node3D
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         };
         root.AddChild(node.Warn);
+        // Piloto de estado junto al icono con forma: el color nunca informa solo.
+        node.Lamp = new MeshInstance3D { Mesh = Models.Lamp(), Position = model.LampPos, MaterialOverride = Models.LampState(m.Status), VisibilityRangeEnd = 70, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        root.AddChild(node.Lamp);
+        if (model.GlowPos is { } glow)
+            root.AddChild(new OmniLight3D { Position = glow, LightColor = model.GlowColor, LightEnergy = 0.7f, OmniRange = 7f, DistanceFadeEnabled = true, DistanceFadeBegin = 34, DistanceFadeLength = 12 });
         AddChild(root);
         return node;
     }
@@ -1272,6 +1120,7 @@ public partial class GameView : Node3D
         }
         _camera.Fov = _main.Prefs.Fov;
         _sun.ShadowEnabled = _main.Prefs.Shadows;
+        _scenery.ApplyQuality(_main.Prefs.Quality);
         _env.Environment.GlowEnabled = _main.Prefs.Glow;
     }
 
@@ -1540,7 +1389,7 @@ public partial class GameView : Node3D
         foreach (var node in _machines.Values)
         {
             var running = node.Status is MachineStatus.Working or MachineStatus.LowPower or MachineStatus.Overheated or MachineStatus.Generating or MachineStatus.Storing;
-            if (node.Rotor != null && running) node.Rotor.RotateY(delta * 2.6f);
+            if (node.Rotor != null && running) node.Rotor.RotateObjectLocal(node.RotorAxis, delta * node.RotorSpeed);
             if (node.Piston != null)
             {
                 var offset = node.Status is MachineStatus.Working or MachineStatus.LowPower or MachineStatus.Overheated ? (Mathf.Sin(t * 3.2f + node.Phase) + 1f) * 0.3f : 0.6f;
