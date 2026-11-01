@@ -29,4 +29,6 @@ Datos: `autotest-zona.log` (escenario `zone`: hitos, niveles, respuesta a cada a
 - Los hitos se distinguen por silueta desde la base. La grúa es la menos llamativa de frente a la zona de aparición: queda a contraluz y dependen de ella sus luces.
 - El vapor es tenue a propósito y en una captura fija apenas se aprecia; en movimiento: **NO VERIFICADO**.
 - La mancha blanca sobre la chapa de la ensambladora y el brillo del hielo junto al pecio son reflejo del sol: el primero ya está en la captura de antes.
+- Sigue habiendo un defecto junto al pecio (`despues_hito_sur.png`): una loma gris de borde curvo con un trazo en anillo delante. No era de las rocas retiradas de su malla, que ya no están. Causa sin aclarar; está fuera de los muros.
+- Las existencias en las bocas se cuentan en el registro de medición (8 piezas en la vista densa), pero no se han localizado con claridad en ninguna captura: aspecto **NO VERIFICADO**.
 - Las pistas se distinguen con poca fuerza, mejor al caminar hacia el hito (`despues_hito_oeste.png`).
