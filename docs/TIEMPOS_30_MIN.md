@@ -47,10 +47,10 @@ El guion ya conoce el camino: no se equivoca, no explora y no atraviesa colision
 
 | Antes | | Después | |
 | --- | --- | --- | --- |
-| 155,3 s | dinero y lingotes de la licencia ferroviaria | 45,5 s | lingotes de la Ensambladora |
+| 155,3 s | lingotes de la licencia ferroviaria | 45,5 s | lingotes de la Ensambladora |
 | 90,3 s | piezas del objetivo | 45,2 s | lingotes de la licencia |
-| 63,8 s | piezas del tren | 42,7 s | piezas del objetivo |
-| 52,3 s | lingotes de la Ensambladora | 41,0 s | piezas del tren |
+| 63,8 s | lingotes o piezas del tren | 42,7 s | piezas del objetivo |
+| 52,3 s | lingotes de la Ensambladora | 41,0 s | lingotes o piezas del tren |
 | 38,6 s | lingotes de Ensamblaje | 33,1 s | lingotes de Ensamblaje |
 
 | Total | Antes | Después |
@@ -65,7 +65,7 @@ El guion ya conoce el camino: no se equivoca, no explora y no atraviesa colision
 ## Qué no mejora
 
 - **Los acarreos siguen en 36.** Los lingotes y piezas de los pagos se recogen a mano de la terminal, porque se paga desde mochila y depósito. Un divisor hacia el depósito podría reducirlos; no se ha medido.
-- **La espera acumulada sigue siendo alta (22 % del recorrido)**, repartida en tramos cortos.
+- **La espera acumulada sigue siendo alta (37 % del recorrido)**, repartida en tramos cortos.
 - **Vender chatarra a mano rinde más que la primera línea:** unos 12 ¤ por montón frente a 2 ¤/s de la línea. Es finito y exige ir a la terminal, así que no se ha tocado. Conviene observarlo con jugadores.
 
 ## Sin callejones
