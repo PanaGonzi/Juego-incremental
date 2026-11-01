@@ -191,7 +191,8 @@ public class SimulationTests
         Assert.True(w.Apply(p, new Command { Type = CommandType.Link, A = recycler.Id, B = depot.Id }).Ok);
         Assert.False(w.Apply(p, new Command { Type = CommandType.Link, A = recycler.Id, B = depot.Id }).Ok);
         recycler.Out.Add("recovered", 3);
-        for (var i = 0; i < 30; i++) w.Step();
+        var length = w.Links.Values.Single().Slots.Length;
+        for (var i = 0; i < (length + 3) * 3 + 1; i++) w.Step();
         Assert.Equal(3, depot.In.Get("recovered"));
         Assert.Equal(0, recycler.Out.Get("recovered"));
     }
@@ -526,11 +527,12 @@ public class OfflineTests
             var node = w.Nodes.Values.First(n => n.Item == "ore");
             node.Revealed = true;
             foreach (var d in w.DebrisById.Values.Where(d => d.CoversNode == node.Id).ToList()) w.DebrisById.Remove(d.Id);
-            var ex = new Machine { Id = w.NextId++, Def = "ore_extractor", Planet = 0, X = node.X, Z = node.Z, NodeId = node.Id };
+            var ex = new Machine { Id = w.NextId++, Def = "ore_extractor", Planet = 0, X = node.X, Z = node.Z, NodeId = node.Id, Rot = 1 };
             w.Machines[ex.Id] = ex;
-            var sm = new Machine { Id = w.NextId++, Def = "smelter", Planet = 0, X = node.X - 3, Z = node.Z };
+            var sm = new Machine { Id = w.NextId++, Def = "smelter", Planet = 0, X = node.X - 4, Z = node.Z, Rot = 1 };
             w.Machines[sm.Id] = sm;
-            w.Links[w.NextId] = new Link { Id = w.NextId++, From = ex.Id, To = sm.Id, Planet = 0 };
+            w.Reindex();
+            w.AddBeltDirect(ex, sm, new[] { (node.X - 1, node.Z) });
             var depot = Fixture.Find(w, "depot");
             w.Reindex();
             w.SavedUnix = 1_000_000;
@@ -1011,10 +1013,8 @@ public class RailTests
         var rich = Fixture.Content.Planets[0].Nodes.Where(n => n.YieldPermille > 1000).ToList();
         var near = Fixture.Content.Planets[0].Nodes.Where(n => n.Item == "ore" && n.YieldPermille == 1000).ToList();
         Assert.True(rich.Count >= 3);
-        var cell = Fixture.Content.Balance.CellSizeMm;
-        var linkCells = Fixture.Content.Balance.LinkMaxMm / cell;
-        // Fuera del alcance de los enlaces desde la base: el tren es necesario.
-        Assert.All(rich, n => Assert.True(Math.Max(Math.Abs(n.X), Math.Abs(n.Z)) > linkCells * 3));
+        // Fuera del alcance de una cinta desde la base: el tren es necesario.
+        Assert.All(rich, n => Assert.True(Math.Abs(n.X) + Math.Abs(n.Z) > Fixture.Content.Balance.BeltMaxCells * 2));
         // Con todos los yacimientos ricos, más del doble de mineral que con los cercanos.
         var richRate = rich.Sum(n => n.YieldPermille);
         var nearRate = near.Sum(n => n.YieldPermille);

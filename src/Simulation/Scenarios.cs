@@ -29,17 +29,22 @@ public static class Scenarios
         depot.In.Add("scrap", 100000);
         depot.In.Add("recovered", 100000);
 
-        Machine Add(string def, int x, int z, int node = -1)
+        // Rot 3 mira a +X: las salidas dan al este y las entradas al oeste, y las cintas van rectas entre máquinas.
+        Machine Add(string def, int x, int z, int node = -1, int rot = 0)
         {
-            var m = new Machine { Id = w.NextId++, Def = def, Planet = 0, X = x, Z = z, NodeId = node };
+            var m = new Machine { Id = w.NextId++, Def = def, Planet = 0, X = x, Z = z, NodeId = node, Rot = rot };
             w.Machines[m.Id] = m;
             return m;
         }
 
-        void Link(Machine a, Machine b)
+        // Tramo recto de x0 a x1 en la fila z; se siembra carga para que el mundo mida cintas en uso desde el primer tick.
+        Link Belt(Machine a, Machine b, int x0, int x1, int z, string seed)
         {
-            var l = new Link { Id = w.NextId++, From = a.Id, To = b.Id, Planet = 0 };
-            w.Links[l.Id] = l;
+            var cells = new List<(int, int)>();
+            for (var x = x0; x <= x1; x++) cells.Add((x, z));
+            var l = w.AddBeltDirect(a, b, cells);
+            w.SeedBeltSlot(l, 1, seed);
+            return l;
         }
 
         ResourceNode Node(int x, int z)
@@ -91,8 +96,8 @@ public static class Scenarios
             b.RailA = previous.Id;
             b.RailB = far.Id;
 
-            var feed = Add("ore_extractor", startX - 8, z - 2, Node(startX - 8, z - 2).Id);
-            Link(feed, a);
+            var feed = Add("ore_extractor", startX - 8, z - 2, Node(startX - 8, z - 2).Id, rot: 3);
+            Belt(feed, a, startX - 6, startX - 5, z - 2, "ore");
             machines++;
 
             var train = new Train { Id = w.NextId++, Planet = 0, StationA = a.Id, StationB = b.Id, CurrentNode = a.RailA };
@@ -100,23 +105,40 @@ public static class Scenarios
         }
 
         // Cadenas de producción en una rejilla: extractor → fundición → ensambladora → terminal con venta automática + generador.
-        const int cols = 13;
+        // Una de cada tres añade además una línea saturada: almacén con reservas → cinta llena → terminal.
+        const int cols = 9;
         var group = 0;
+        var fixedCells = new HashSet<(int, int)>();
+        foreach (var m in w.Machines.Values.Where(m => m.Planet == 0))
+            foreach (var c in w.Footprint(m.Def, m.X, m.Z, m.Rot)) fixedCells.Add(c);
         while (machines < size.Machines)
         {
-            var x = -84 + group % cols * 13;
+            var x = -84 + group % cols * 19;
             var z = 8 + group / cols * 7;
-            group++;
-            var ex = Add("ore_extractor", x, z, Node(x, z).Id);
-            var sm = Add("smelter", x + 3, z);
-            var asm = Add("assembler", x + 6, z);
-            var term = Add("export_terminal", x + 9, z);
+            var index = group++;
+            var clash = false;
+            for (var cx = x - 1; cx <= x + 18 && !clash; cx++)
+                for (var cz = z - 1; cz <= z + 5 && !clash; cz++)
+                    clash = fixedCells.Contains((cx, cz));
+            if (clash) continue;
+            var ex = Add("ore_extractor", x, z, Node(x, z).Id, rot: 3);
+            var sm = Add("smelter", x + 4, z, rot: 3);
+            var asm = Add("assembler", x + 9, z, rot: 3);
+            var term = Add("export_terminal", x + 14, z);
             term.AutoSell = true;
             Add("rtg_generator", x, z + 3);
-            Link(ex, sm);
-            Link(sm, asm);
-            Link(asm, term);
+            Belt(ex, sm, x + 2, x + 3, z, "ore");
+            Belt(sm, asm, x + 7, x + 8, z, "ingot");
+            Belt(asm, term, x + 12, x + 13, z, "parts");
             machines += 5;
+            if (index % 3 != 0) continue;
+            var stock = Add("storage_crate", x + 3, z + 3);
+            stock.In.Add("scrap", 1000000);
+            var sink = Add("export_terminal", x + 14, z + 3);
+            sink.AutoSell = true;
+            var line = Belt(stock, sink, x + 5, x + 13, z + 3, "scrap");
+            for (var s = 0; s < line.Slots.Length; s++) w.SeedBeltSlot(line, s, "scrap");
+            machines += 2;
         }
         w.Reindex();
         return w;

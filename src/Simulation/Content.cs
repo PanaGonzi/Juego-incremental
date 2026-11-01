@@ -189,8 +189,10 @@ public sealed class BalanceDef
     public int InteractRangeMm { get; set; }
     public int BuildRangeMm { get; set; }
     public int CutterCooldownTicks { get; set; }
-    public int LinkMaxMm { get; set; }
     public int LinkIntervalTicks { get; set; }
+    public int BeltSlotsPerCell { get; set; } = 4;
+    public int BeltMaxCells { get; set; } = 32;
+    public long BeltCreditsPerCell { get; set; }
     public int RecipeBufferFactor { get; set; }
     public long OutputBuffer { get; set; }
     public int RefundPermille { get; set; }
@@ -226,6 +228,9 @@ public sealed class ContentDb
     public List<PlanetDef> Planets { get; private set; } = new();
     public BalanceDef Balance { get; private set; } = new();
     public Dictionary<string, EventDef> Events { get; private set; } = new();
+    /// <summary>Objetos en orden estable: la red envía la posición, válida porque ambos extremos comparten revisión.</summary>
+    public IReadOnlyList<string> ItemOrder { get; private set; } = Array.Empty<string>();
+    public IReadOnlyDictionary<string, int> ItemIndex { get; private set; } = new Dictionary<string, int>();
 
     /// <summary>Lee y valida un directorio completo. Lanza ContentException sin efectos parciales.</summary>
     public static ContentDb Load(string dir)
@@ -259,6 +264,8 @@ public sealed class ContentDb
                 Events = Parse<List<EventDef>>(raw["events.json"]).ToDictionary(x => x.Id),
             };
             db.Validate();
+            db.ItemOrder = db.Items.Keys.OrderBy(k => k, StringComparer.Ordinal).ToArray();
+            db.ItemIndex = db.ItemOrder.Select((id, i) => (id, i)).ToDictionary(x => x.id, x => x.i);
             return db;
         }
         catch (JsonException e) { throw new ContentException("JSON inválido: " + e.Message); }
@@ -330,6 +337,8 @@ public sealed class ContentDb
         }
         if (Planets.Count == 0) throw new ContentException("No hay planetas");
         if (Balance.TicksPerSecond <= 0 || Balance.CellSizeMm <= 0) throw new ContentException("Balance inválido");
+        if (Balance.LinkIntervalTicks <= 0 || Balance.BeltSlotsPerCell <= 0 || Balance.BeltMaxCells <= 0 || Balance.BeltCreditsPerCell < 0)
+            throw new ContentException("Balance de cintas inválido");
     }
 
     /// <summary>Busca content/ junto al ejecutable o en carpetas superiores (desarrollo).</summary>

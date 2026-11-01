@@ -196,6 +196,8 @@ public sealed partial class World
         var cells = RailMath.Cells(a, b, shape);
         foreach (var c in cells)
             if (_occupied.ContainsKey((planet, c.x, c.z)) || _debrisCells.ContainsKey((planet, c.x, c.z))) return "err_rail_blocked";
+        foreach (var c in cells)
+            if (_beltCells.ContainsKey((planet, c.x, c.z))) return "err_blocked";
         credits = cells.Count * R.CreditsPerCell;
         return null;
     }
