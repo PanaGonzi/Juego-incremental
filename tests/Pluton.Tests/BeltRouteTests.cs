@@ -401,6 +401,18 @@ public class BeltRouteTests
     }
 
     [Fact]
+    public void Long_measurement_scenario_carries_cargo_along_its_whole_length()
+    {
+        var w = Scenarios.Build(Fixture.Content, "long");
+        Assert.Equal(30, w.Links.Count);
+        Assert.All(w.Links.Values, l => Assert.Equal(168, l.Cells.Count));
+        var transit = w.Links.Values.First().Slots.Length * 3;
+        for (var i = 0; i < transit + 400; i++) w.Step();
+        Assert.True(w.ItemsOnBelts() > 30 * 40, $"carga {w.ItemsOnBelts()}");
+        Assert.True(w.Stats.GetValueOrDefault("sold_credits") > 0, "los objetos llegan al final y se venden");
+    }
+
+    [Fact]
     public void Long_belts_replicate_with_acceptable_traffic()
     {
         // 10 cintas de ~170 celdas con carga escasa: el peor caso de tramos distintos por segundo.

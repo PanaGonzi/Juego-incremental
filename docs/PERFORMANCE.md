@@ -40,10 +40,17 @@ Anfitrión + 11 en el medio: tick 0,40 ms, p99 3,45, tardíos 0, subida ~660 kbi
 | Medio, enlaces antiguos (53e1df0) | 0,357 ms | 4,36 | 0 | 702 kbit/s | 58 kbit/s | 58 MB | 0 |
 | Medio, cintas (511 máquinas) | 0,358 ms | 4,61 | 0 | 776 kbit/s | 65 kbit/s | 58 MB | 0 |
 | Estrés, cintas (2011 máquinas) | 1,056 ms | 9,74 | 0 | 2019 kbit/s | 168 kbit/s | 75 MB | 0 |
+| Largo: 30 cintas de 168 celdas, carga escasa (76 máquinas) | 0,201 ms | 2,28 | 0 | 348 kbit/s | 29 kbit/s | 49 MB | 0 |
 
 Los mundos de medición llevan cintas rectas con carga y una línea saturada de cada tres grupos; `Measurement_belts_are_valid_and_carry_real_cargo` comprueba que al menos el 90 % de las cintas mueve carga. Antes y después no son el mismo mundo: el de cintas tiene más máquinas y otra disposición.
 
-Búsqueda de ruta fallida (peor caso probado): unos 15 ms con la batería de pruebas en paralelo. No afecta al juego normal; varios clientes abusando del comando sí podrían notarlo.
+**Trazado, medido en `BeltRouteTests` (Release, con otras pruebas en paralelo):**
+
+- Ruta de 337 celdas en campo abierto: 843 expansiones, 4,5 ms. Antes de añadir la curva inevitable a la heurística eran 51 189 expansiones y 143 ms.
+- Sin ruta posible, recorriendo todo el planeta: unos 151 500 expansiones, 405 ms repartidos en porciones. El juego reparte 2 ms por frame, así que tarda un momento e indica que está trazando; la porción más lenta medida fue de 7 ms con 300 expansiones.
+- El servidor ya no busca al construir: validar una orden es lineal en su longitud. Solo busca en migración y `Move`, con 12 000 expansiones como máximo.
+- Comando: ~1 byte por tramo recto; 300 celdas rectas caben en 16 bytes.
+- 10 cintas de 168 celdas con entrada irregular: 246 B/s comprimidos por cliente, tick 0,025 ms.
 
 **Cliente con cintas (`--measure medium`): NO VERIFICADO.** Cada cinta es una malla propia con dos superficies, y la carga, un `MultiMesh` por objeto.
 
