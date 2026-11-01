@@ -148,7 +148,7 @@ public sealed partial class World
             // Se mantiene libre la zona inicial para no bloquear las primeras máquinas.
             if (Math.Abs(x - planet.Spawn.X) < 4 && Math.Abs(z - planet.Spawn.Z) < 4) continue;
             if (_occupied.ContainsKey((planet.Id, x, z)) || _debrisCells.ContainsKey((planet.Id, x, z))) continue;
-            if (_beltCells.ContainsKey((planet.Id, x, z))) continue;
+            if (_beltCells.ContainsKey((planet.Id, x, z)) || RailBlocksCell(planet.Id, x, z)) continue;
             if (IsOnNode(planet.Id, x, z)) continue;
             var d = new Debris { Id = NextId++, Def = f.Def, Planet = planet.Id, X = x, Z = z, Hp = B.Debris[f.Def].Hp };
             DebrisById[d.Id] = d;
@@ -801,6 +801,8 @@ public sealed partial class World
         StepShipments();
         StepTransit();
         if (Tick / B.TicksPerSecond != previousSecond) StepObjectives();
+        var renewal = B.ScrapRenewal.IntervalTicks;
+        if (renewal > 0 && Tick / renewal != (Tick - TimeScale) / renewal) StepScrapRenewal();
         _inStep = false;
     }
 
@@ -1010,6 +1012,25 @@ public sealed partial class World
             AddCredits(o.Credits);
             ObjectiveIndex++;
             MarkGlobal();
+        }
+    }
+
+    /// <summary>
+    /// Fuente renovable mínima: con menos de minPiles montones de chatarra en un planeta, aparece uno por intervalo
+    /// en su primer campo. Por encima de ese mínimo los campos siguen siendo finitos: no es un regalo, sino el suelo
+    /// que garantiza que siempre se puede volver a reciclar.
+    /// </summary>
+    private void StepScrapRenewal()
+    {
+        foreach (var planet in Content.Planets)
+        {
+            var field = planet.DebrisFields.FirstOrDefault(f => B.Debris[f.Def].Drop == "scrap");
+            if (field == null) continue;
+            var piles = 0;
+            foreach (var d in DebrisById.Values)
+                if (d.Planet == planet.Id && d.Def == field.Def) piles++;
+            if (piles >= B.ScrapRenewal.MinPiles) continue;
+            ScatterDebrisLive(planet, new DebrisFieldDef { Def = field.Def, X = field.X, Z = field.Z, Radius = field.Radius, Count = 1, Seed = unchecked((int)Tick) + planet.Id });
         }
     }
 

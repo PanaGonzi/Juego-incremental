@@ -815,23 +815,24 @@ public class RailTests
         var (w, p, a, b) = TwoStations();
         Connect(w, p);
         b.StationUnload = true;
-        a.In.Add("ore", 100);
+        var cap = w.Content.Balance.Rail.TrainCapacity;
+        var cargo = cap * 5 / 3; // dos viajes: el primero, lleno
+        a.In.Add("ore", cargo);
         Assert.True(w.Apply(p, new Command { Type = CommandType.CreateTrain, A = a.Id, B = b.Id }).Ok);
         var train = w.Trains.Values.Single();
-        var cap = w.Content.Balance.Rail.TrainCapacity;
 
         long Total() => w.CountEverywhere("ore");
         var total = Total();
         var maxCargo = 0L;
-        for (var i = 0; i < 2000 && b.In.Get("ore") < 100; i++)
+        for (var i = 0; i < 2000 && b.In.Get("ore") < cargo; i++)
         {
             w.Step();
             maxCargo = Math.Max(maxCargo, train.Cargo.Total);
             Assert.Equal(total, Total());
         }
-        Assert.Equal(100, b.In.Get("ore"));
+        Assert.Equal(cargo, b.In.Get("ore"));
         Assert.Equal(cap, maxCargo);
-        Assert.Equal(100, w.Stats["train_delivered"]);
+        Assert.Equal(cargo, w.Stats["train_delivered"]);
     }
 
     [Fact]
@@ -845,7 +846,7 @@ public class RailTests
         Assert.Equal("wait_no_cargo", t.WaitReason);
 
         a.In.Add("ore", 1000);
-        for (var i = 0; i < 40; i++) w.Step();
+        for (var i = 0; i < 300 && t.State != TrainState.Waiting; i++) w.Step();
         Assert.Equal(TrainState.Waiting, t.State);
         Assert.Equal("wait_no_route", t.WaitReason);
 

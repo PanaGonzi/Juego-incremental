@@ -177,6 +177,13 @@ public sealed class RailDef
     public int MaxLoadWaitTicks { get; set; }
 }
 
+/// <summary>Fuente mínima de chatarra: sin ella, agotar los campos podría dejar al jugador sin material recuperado.</summary>
+public sealed class ScrapRenewalDef
+{
+    public int MinPiles { get; set; }
+    public int IntervalTicks { get; set; }
+}
+
 public sealed class BalanceDef
 {
     public RailDef Rail { get; set; } = new();
@@ -200,6 +207,7 @@ public sealed class BalanceDef
     public int OfflineCapHours { get; set; }
     public int TravelTicks { get; set; }
     public int ShuttleRangeMm { get; set; }
+    public ScrapRenewalDef ScrapRenewal { get; set; } = new();
     public Dictionary<string, DebrisDef> Debris { get; set; } = new();
 }
 
