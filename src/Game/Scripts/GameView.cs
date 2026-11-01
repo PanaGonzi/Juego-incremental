@@ -36,7 +36,7 @@ public partial class GameView : Node3D
     private readonly Main _main;
     private readonly Dictionary<int, MachineNode> _machines = new();
     private readonly Dictionary<int, MeshInstance3D> _debris = new();
-    private readonly Dictionary<int, MeshInstance3D> _links = new();
+    public readonly BeltView Belts = new();
     private readonly Dictionary<int, MeshInstance3D> _nodes = new();
     private readonly Dictionary<int, RemotePlayer> _remote = new();
     private readonly Dictionary<int, MeshInstance3D> _rails = new();
@@ -147,6 +147,7 @@ public partial class GameView : Node3D
     {
         BuildEnvironment();
         BuildPlayer();
+        AddChild(Belts);
         var layer = new CanvasLayer();
         AddChild(layer);
         _hud = new Hud(this);
@@ -466,8 +467,7 @@ public partial class GameView : Node3D
             body.QueueFree();
         }
         _debrisBodies.Clear();
-        foreach (var mesh in _links.Values) mesh.QueueFree();
-        _links.Clear();
+        Belts.Clear();
         foreach (var mesh in _nodes.Values) mesh.QueueFree();
         _nodes.Clear();
         foreach (var mesh in _rails.Values) mesh.QueueFree();
@@ -642,24 +642,7 @@ public partial class GameView : Node3D
             _nodes[n.Id] = mesh;
         }
 
-        seen.Clear();
-        foreach (var l in w.Links.Values)
-        {
-            if (l.Planet != _viewPlanet) continue;
-            seen.Add(l.Id);
-            if (!w.Machines.TryGetValue(l.From, out var a) || !w.Machines.TryGetValue(l.To, out var b)) continue;
-            if (!_links.TryGetValue(l.Id, out var mesh))
-            {
-                mesh = CreateLink();
-                _links[l.Id] = mesh;
-            }
-            PlaceLink(mesh, CenterOf(w, a) + Vector3.Up * 2.35f, CenterOf(w, b) + Vector3.Up * 2.35f);
-        }
-        foreach (var id in _links.Keys.Where(k => !seen.Contains(k)).ToList())
-        {
-            _links[id].QueueFree();
-            _links.Remove(id);
-        }
+        Belts.Sync(w, _viewPlanet, Session.Client.StructuralDeltas);
 
         seen.Clear();
         foreach (var s in w.RailSegments.Values)
@@ -972,40 +955,6 @@ public partial class GameView : Node3D
         Sfx.Play("break", 0.1f);
     }
 
-    private static readonly ShaderMaterial LinkMaterial = new() { Shader = new Shader { Code = """
-        shader_type spatial;
-        render_mode unshaded;
-        void fragment(){
-          float t = fract(UV.y*14.0 - TIME*1.8);
-          float pulse = smoothstep(0.0,0.06,t)*(1.0-smoothstep(0.1,0.2,t));
-          ALBEDO = mix(vec3(0.05,0.045,0.04), vec3(1.0,0.6,0.15), pulse);
-          EMISSION = vec3(1.0,0.55,0.12)*pulse*2.5;
-        }
-        """ } };
-
-    private MeshInstance3D CreateLink()
-    {
-        var mesh = new MeshInstance3D
-        {
-            Mesh = new CylinderMesh { TopRadius = 0.055f, BottomRadius = 0.055f, Height = 1, RadialSegments = 8, Rings = 1 },
-            MaterialOverride = LinkMaterial,
-            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-        };
-        AddChild(mesh);
-        return mesh;
-    }
-
-    private static void PlaceLink(MeshInstance3D mesh, Vector3 a, Vector3 b)
-    {
-        var mid = (a + b) / 2;
-        var dir = b - a;
-        var length = Mathf.Max(0.01f, dir.Length());
-        var y = dir / length;
-        var x = y.Cross(Mathf.Abs(y.Y) > 0.9f ? Vector3.Right : Vector3.Up).Normalized();
-        var z = x.Cross(y);
-        mesh.GlobalTransform = new Transform3D(new Basis(x, y * length, z), mid);
-    }
-
     // ---------- Entrada ----------
 
     public override void _UnhandledInput(InputEvent e)
@@ -1116,7 +1065,8 @@ public partial class GameView : Node3D
         _linkFrom = -1;
         _hud.SetTool((int)t);
         _railPlacing = false;
-        _ground.SetShaderParameter("grid_strength", t is Tool.Build or Tool.Rail ? 1f : 0f);
+        Belts.HidePreview();
+        _ground.SetShaderParameter("grid_strength", t is Tool.Build or Tool.Rail or Tool.Link ? 1f : 0f);
         if (t != Tool.Build) RemoveGhost();
         if (t != Tool.Rail) RemoveRailGhost();
     }
@@ -1177,6 +1127,11 @@ public partial class GameView : Node3D
                 if (_aim.kind == "machine")
                 {
                     client.Send(new Command { Type = CommandType.Remove, A = _aim.id });
+                    Sfx.Play("remove");
+                }
+                else if (_aim.kind == "belt")
+                {
+                    client.Send(new Command { Type = CommandType.Unlink, A = _aim.id });
                     Sfx.Play("remove");
                 }
                 else if (NearestRail() is { } rail)
@@ -1277,6 +1232,7 @@ public partial class GameView : Node3D
         if (_inFlight) UpdateFlight(delta);
 
         AnimateMachines((float)delta);
+        Belts.Process(client.World!, _body.GlobalPosition, (float)delta);
         UpdateTrains(delta);
         if (local != null) UpdateObjectiveMarker(client.World!, local);
         UpdateRemote(delta);
@@ -1418,6 +1374,13 @@ public partial class GameView : Node3D
             _aimPoint = (Vector3)hit["position"];
             var collider = (GodotObject)hit["collider"];
             if (_pickables.TryGetValue(collider.GetInstanceId(), out var target2)) _aim = target2;
+        }
+        // Las cintas no tienen cuerpo físico: se apuntan por geometría si nada más próximo tapa el rayo.
+        var belt = Belts.Pick(Session.Client.World!, from, (to - from).Normalized(), 34f, out var beltDistance);
+        if (belt >= 0 && beltDistance < from.DistanceTo(_aimPoint))
+        {
+            _aim = ("belt", belt);
+            _aimPoint = from + (to - from).Normalized() * beltDistance;
         }
     }
 
@@ -1573,6 +1536,11 @@ public partial class GameView : Node3D
             status = $"{Loc.T("item_" + w.Content.Balance.Debris[aimedDebris.Def].Drop)} · {aimedDebris.Hp}";
             prompt = Loc.T("prompt_cut");
         }
+        else if (_aim.kind == "belt")
+        {
+            status = BeltView.Describe(w, _aim.id, out var beltStatus);
+            statusColor = beltStatus is BeltStatus.BlockedFull or BeltStatus.BlockedNoPower or BeltStatus.SourceNoPower ? Ui.Bad : beltStatus == BeltStatus.Flowing ? Ui.Good : Ui.Ink;
+        }
 
         var holding = !blocked && (AutoHoldPrimary || Input.IsActionPressed("primary"));
         var cutting = false;
@@ -1604,7 +1572,8 @@ public partial class GameView : Node3D
                 UpdateGhost(w, me, ref status, ref statusColor);
                 break;
             case Tool.Link:
-                prompt = Loc.T(_linkFrom < 0 ? "prompt_link_from" : "prompt_link_to");
+                prompt = $"{Loc.T(_linkFrom < 0 ? "prompt_link_from" : "prompt_link_to")}   {Loc.T("belt_port_hint")}";
+                UpdateBeltPreview(w, me, ref status, ref statusColor);
                 break;
             case Tool.Remove:
                 prompt = Loc.T("prompt_remove");
@@ -1616,6 +1585,20 @@ public partial class GameView : Node3D
         }
         _beam.Visible = cutting;
         _hud.SetPrompt(blocked ? "" : status, statusColor, blocked ? "" : prompt);
+    }
+
+    /// <summary>Ruta prevista desde el origen elegido hasta la máquina apuntada y puertos de esta. La lógica está en BeltView.</summary>
+    private void UpdateBeltPreview(World w, PlayerState me, ref string status, ref Color color)
+    {
+        var aimedMachine = _aim.kind == "machine" ? w.Machines.GetValueOrDefault(_aim.id) : null;
+        Belts.ShowPorts(w, aimedMachine ?? (_linkFrom >= 0 ? w.Machines.GetValueOrDefault(_linkFrom) : null), Session.Client.StructuralDeltas);
+        if (_linkFrom < 0 || aimedMachine == null || aimedMachine.Id == _linkFrom)
+        {
+            Belts.HideRoute();
+            return;
+        }
+        var error = Belts.UpdatePreview(w, me, _linkFrom, aimedMachine.Id, Session.Client.StructuralDeltas, ref status);
+        color = error == null ? Ui.Good : Ui.Bad;
     }
 
     private void ShowBeam(Vector3 to)
