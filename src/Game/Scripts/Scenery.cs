@@ -111,7 +111,7 @@ public static class Terrain
     public static readonly (string id, float x, float z, float yaw)[] Landmarks =
     {
         ("tower", -26f, -236f, 0f),
-        ("crane", 226f, 34f, 200f),
+        ("crane", 238f, 40f, 100f), // la pluma corre paralela al muro: de perfil desde la base y sin entrar en la zona jugable
         ("dome", -240f, 28f, 25f),
         ("wreck", 18f, 232f, 8f),
     };
@@ -813,7 +813,7 @@ public partial class MenuScene : Node3D
                 "scrap" => (new Vector3(9.4f, 1.3f, 10.2f), new Vector3(7, 0.3f, 8)),
                 "items" => (new Vector3(0.2f, 1.25f, 4.5f), new Vector3(0.2f, 0.55f, 3f)),
                 "paint" => (new Vector3(5.6f, 1.75f, 0.2f), new Vector3(3.6f, 1.3f, -1.9f)),
-                "train" => (new Vector3(36f, 2.6f, 8f), new Vector3(30f, 1.4f, 15f)),
+                "train" => (new Vector3(44f, 4.4f, 10.5f), new Vector3(35f, 1.2f, 18f)),
                 "station" => (new Vector3(36f, 3f, -19f), new Vector3(30f, 1.6f, -27f)),
                 "astronaut" => (new Vector3(-23.2f, 1.45f, 7f), new Vector3(-22f, 1.1f, 9f)),
                 _ => null,

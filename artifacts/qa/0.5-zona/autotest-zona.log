@@ -1,0 +1,116 @@
+﻿[    0,3] OK    entrada en el mundo
+[    0,3] Renderizador forward_plus GPU AMD Radeon RX 7800 XT ventana (1600, 900)
+[    1,8] OK    4 hitos en la escena
+[    1,8] Hito hito_tower: a 237 m de la base, alto 67 m, 5556 triángulos
+[    1,8] OK    hito_tower fuera de los muros y sin colisión; punto más cercano a 197 m del centro
+[    1,8] OK    hito_tower dentro del presupuesto de triángulos
+[    1,8] Hito hito_crane: a 241 m de la base, alto 50 m, 7844 triángulos
+[    1,8] OK    hito_crane fuera de los muros y sin colisión; punto más cercano a 214 m del centro
+[    1,8] OK    hito_crane dentro del presupuesto de triángulos
+[    1,8] Hito hito_dome: a 242 m de la base, alto 34 m, 5112 triángulos
+[    1,8] OK    hito_dome fuera de los muros y sin colisión; punto más cercano a 192 m del centro
+[    1,8] OK    hito_dome dentro del presupuesto de triángulos
+[    1,8] Hito hito_wreck: a 233 m de la base, alto 36 m, 2428 triángulos
+[    1,8] OK    hito_wreck fuera de los muros y sin colisión; punto más cercano a 199 m del centro
+[    1,8] OK    hito_wreck dentro del presupuesto de triángulos
+[    1,8] Sonido cut: pico -4,2 dBFS, eficaz -14,9 dBFS, salto de bucle 0,000
+[    1,8] OK    cut sin saturar
+[    1,8] OK    cut con nivel utilizable
+[    1,8] OK    cut sin salto de bucle
+[    1,8] Sonido break: pico -1,6 dBFS, eficaz -13,1 dBFS, salto de bucle 0,000
+[    1,8] OK    break sin saturar
+[    1,8] OK    break con nivel utilizable
+[    1,8] OK    break sin salto de bucle
+[    1,8] Sonido build: pico -1,4 dBFS, eficaz -10,8 dBFS, salto de bucle 0,000
+[    1,8] OK    build sin saturar
+[    1,8] OK    build con nivel utilizable
+[    1,8] OK    build sin salto de bucle
+[    1,8] Sonido remove: pico -6,3 dBFS, eficaz -14,0 dBFS, salto de bucle 0,000
+[    1,8] OK    remove sin saturar
+[    1,8] OK    remove con nivel utilizable
+[    1,8] OK    remove sin salto de bucle
+[    1,8] Sonido deposit: pico -7,2 dBFS, eficaz -14,9 dBFS, salto de bucle 0,000
+[    1,8] OK    deposit sin saturar
+[    1,8] OK    deposit con nivel utilizable
+[    1,8] OK    deposit sin salto de bucle
+[    1,8] Sonido take: pico -7,2 dBFS, eficaz -14,9 dBFS, salto de bucle 0,000
+[    1,8] OK    take sin saturar
+[    1,8] OK    take con nivel utilizable
+[    1,8] OK    take sin salto de bucle
+[    1,8] Sonido sell: pico -4,0 dBFS, eficaz -14,7 dBFS, salto de bucle 0,000
+[    1,8] OK    sell sin saturar
+[    1,8] OK    sell con nivel utilizable
+[    1,8] OK    sell sin salto de bucle
+[    1,8] Sonido error: pico -14,2 dBFS, eficaz -19,0 dBFS, salto de bucle 0,000
+[    1,8] OK    error sin saturar
+[    1,8] OK    error con nivel utilizable
+[    1,8] OK    error sin salto de bucle
+[    1,8] Sonido objective: pico -6,3 dBFS, eficaz -14,7 dBFS, salto de bucle 0,000
+[    1,8] OK    objective sin saturar
+[    1,8] OK    objective con nivel utilizable
+[    1,8] OK    objective sin salto de bucle
+[    1,8] Sonido ghost: pico -12,3 dBFS, eficaz -21,5 dBFS, salto de bucle 0,005
+[    1,8] OK    ghost sin saturar
+[    1,8] OK    ghost con nivel utilizable
+[    1,8] OK    ghost sin salto de bucle
+[    1,8] Sonido wind: pico -11,2 dBFS, eficaz -25,3 dBFS, salto de bucle 0,000
+[    1,8] OK    wind sin saturar
+[    1,8] OK    wind con nivel utilizable
+[    1,8] OK    wind sin salto de bucle
+[    1,8] Sonido hum: pico -9,9 dBFS, eficaz -13,1 dBFS, salto de bucle 0,010
+[    1,8] OK    hum sin saturar
+[    1,8] OK    hum con nivel utilizable
+[    1,8] OK    hum sin salto de bucle
+[    1,8] Sonido place: pico -2,6 dBFS, eficaz -17,2 dBFS, salto de bucle 0,000
+[    1,8] OK    place sin saturar
+[    1,8] OK    place con nivel utilizable
+[    1,8] OK    place sin salto de bucle
+[    1,8] Sonido belt_link: pico -4,3 dBFS, eficaz -20,0 dBFS, salto de bucle 0,000
+[    1,8] OK    belt_link sin saturar
+[    1,8] OK    belt_link con nivel utilizable
+[    1,8] OK    belt_link sin salto de bucle
+[    1,8] Sonido dismantle: pico -9,9 dBFS, eficaz -23,3 dBFS, salto de bucle 0,000
+[    1,8] OK    dismantle sin saturar
+[    1,8] OK    dismantle con nivel utilizable
+[    1,8] OK    dismantle sin salto de bucle
+[    1,8] Sonido upgrade: pico -9,5 dBFS, eficaz -20,8 dBFS, salto de bucle 0,000
+[    1,8] OK    upgrade sin saturar
+[    1,8] OK    upgrade con nivel utilizable
+[    1,8] OK    upgrade sin salto de bucle
+[    1,8] Sonido furnace: pico -5,2 dBFS, eficaz -15,6 dBFS, salto de bucle 0,003
+[    1,8] OK    furnace sin saturar
+[    1,8] OK    furnace con nivel utilizable
+[    1,8] OK    furnace sin salto de bucle
+[    1,8] Sonido press: pico -7,9 dBFS, eficaz -21,1 dBFS, salto de bucle 0,004
+[    1,8] OK    press sin saturar
+[    1,8] OK    press con nivel utilizable
+[    1,8] OK    press sin salto de bucle
+[    1,8] Sonido drill: pico -9,2 dBFS, eficaz -19,3 dBFS, salto de bucle 0,008
+[    1,8] OK    drill sin saturar
+[    1,8] OK    drill con nivel utilizable
+[    1,8] OK    drill sin salto de bucle
+[    1,8] Sonido belt: pico -13,1 dBFS, eficaz -26,1 dBFS, salto de bucle 0,001
+[    1,8] OK    belt sin saturar
+[    1,8] OK    belt con nivel utilizable
+[    1,8] OK    belt sin salto de bucle
+[    1,8] Sonido factory: pico -7,7 dBFS, eficaz -17,5 dBFS, salto de bucle 0,002
+[    1,8] OK    factory sin saturar
+[    1,8] OK    factory con nivel utilizable
+[    1,8] OK    factory sin salto de bucle
+[    1,8] OK    cargar el mundo no dispara la respuesta de construir
+[    7,0] OK    colocar
+[    7,0] OK    respuesta al colocar: 1
+[    7,2] OK    respuesta al conectar la cinta: 1
+[    8,4] OK    respuesta al desmontar: 2
+[   13,4] OK    respuesta al vender: 1
+[   14,0] OK    respuesta al cumplir un objetivo: 1
+[   14,4] OK    respuesta a la mejora: 1
+[   14,4] OK    la mejora da destello con los efectos normales
+[   20,2] Bus maestro con ocho sonidos a la vez: pico -1,0 dB, dispositivo Default
+[   20,2] OK    la suma de voces no pasa de 0 dB tras el limitador
+[   20,2] OK    partículas normales antes del ajuste
+[   20,2] OK    estallido limitado: 7
+[   21,0] OK    vapor limitado: 2 partículas, 0 emisores
+[   21,0] OK    sin destello de pantalla con el ajuste
+[   21,0] OK    sin divergencias (2 comprobaciones)
+[   21,0] RESULTADO: CORRECTO

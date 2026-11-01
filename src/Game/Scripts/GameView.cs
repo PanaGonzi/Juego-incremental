@@ -854,7 +854,7 @@ public partial class GameView : Node3D
         root.AddChild(node.Lamp);
         if (model.GlowPos is { } glow)
         {
-            node.Glow = new OmniLight3D { Position = glow, LightColor = model.GlowColor, LightEnergy = FactoryActivity.GlowEnergy(false), OmniRange = 7f, DistanceFadeEnabled = true, DistanceFadeBegin = 34, DistanceFadeLength = 12 };
+            node.Glow = new OmniLight3D { Position = glow, LightColor = model.GlowColor, LightEnergy = FactoryActivity.GlowEnergy(false), LightSpecular = 0.3f, OmniRange = 7f, DistanceFadeEnabled = true, DistanceFadeBegin = 34, DistanceFadeLength = 12 };
             root.AddChild(node.Glow);
         }
         AddChild(root);
@@ -1549,6 +1549,38 @@ public partial class GameView : Node3D
         var sites = new List<FactoryActivity.Site>(nearest.Count);
         foreach (var n in nearest) sites.Add(new FactoryActivity.Site(n.Root, n.Def, n.Height));
         _activity.Refresh(sites, Belts.NearestMoving(pos), pos, running.Count);
+        UpdateVisibleStock(pos);
+    }
+
+    /// <summary>
+    /// Lo que espera en cada boca, a la vista sobre la zapata de las máquinas de producción cercanas: entrada a un lado y salida al otro.
+    /// Crece con la cantidad real en escala logarítmica, y como máximo seis piezas por boca.
+    /// </summary>
+    private void UpdateVisibleStock(Vector3 pos)
+    {
+        var stock = Belts.VisibleStock;
+        stock.Clear();
+        var w = Session.Client.World!;
+        foreach (var (id, node) in _machines)
+        {
+            if (node.Root.GlobalPosition.DistanceSquaredTo(pos) > 26f * 26f || !w.Machines.TryGetValue(id, out var m)) continue;
+            var def = w.Content.Machines[m.Def];
+            if (def.Recipe == null || def.W < 2 || def.D < 2) continue;
+            var halfW = def.W * Cell / 2;
+            var halfD = def.D * Cell / 2;
+            foreach (var (items, x, z) in new[] { (m.Out.Items, halfW - 0.62f, halfD - 0.22f), (m.In.Items, -(halfW - 0.62f), -(halfD - 0.22f)) })
+            {
+                var first = items.FirstOrDefault(kv => kv.Value > 0);
+                if (first.Value <= 0) continue;
+                var pieces = Mathf.Min(6, 1 + Mathf.FloorToInt(Mathf.Log(first.Value) / Mathf.Log(2f)));
+                for (var i = 0; i < pieces; i++)
+                {
+                    // Tres en la fila y el resto encima, hacia la boca desde la esquina.
+                    var along = (i % 3) * 0.36f * (x > 0 ? -1f : 1f);
+                    stock.Add((first.Key, node.Root.GlobalTransform * new Vector3(x + along, 0.235f + (i / 3) * 0.13f, z)));
+                }
+            }
+        }
     }
 
     public override void _PhysicsProcess(double delta)

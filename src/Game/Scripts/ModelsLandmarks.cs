@@ -77,10 +77,10 @@ public static partial class Models
         var foot = new Vector3(0, -1, 0);
         var head = new Vector3(14f, 38f, -6f);
         // Torre vencida y ya sin arriostrar: es lo que se ve de lejos, una diagonal contra el cielo.
-        Lattice(b, "brass", "stripe", foot, head, 6.5f, 3.6f, 5, 0.55f);
+        Lattice(b, "crane", "stripe", foot, head, 6.5f, 3.6f, 5, 0.6f);
         // Pluma caída: arranca arriba de la torre y clava la punta en el suelo.
         var tip = new Vector3(84f, -2.5f, 26f);
-        Lattice(b, "brass", "steel_dark", head, tip, 4.2f, 1.8f, 8, 0.42f);
+        Lattice(b, "crane", "steel_dark", head, tip, 4.2f, 1.8f, 6, 0.46f);
         // Contrapluma rota y lastre desparramado.
         var back = head + new Vector3(-18f, 7f, -6f);
         Lattice(b, "steel_dark", "rust", head, back, 3.6f, 2.8f, 3, 0.4f);
@@ -89,7 +89,9 @@ public static partial class Models
         // Cabina amarilla enganchada a la cabeza de la torre.
         b.Box("signal", head.X + 4.4f, head.Y - 3.2f, head.Z + 2.4f, 4.6f, 3.8f, 3.6f, yaw: 18, roll: -24, bevel: 0.12f);
         b.Box("glass", head.X + 6.5f, head.Y - 3.6f, head.Z + 3.1f, 0.2f, 2f, 2.8f, yaw: 18, roll: -24, bevel: 0);
-        b.Box("amber", head.X + 2.8f, head.Y + 0.1f, head.Z + 1.6f, 1.1f, 0.5f, 1.1f, bevel: 0);
+        // Luces de obra que siguen encendidas: la grúa queda a contraluz y sin ellas se perdería de noche.
+        foreach (var at in new[] { head + Vector3.Up * 1.4f, head.Lerp(tip, 0.3f) + Vector3.Up * 2.2f, head.Lerp(tip, 0.62f) + Vector3.Up * 1.7f, new Vector3(5f, 13f, -2f) })
+            b.Box("amber", at.X, at.Y, at.Z, 1.5f, 0.9f, 1.5f, bevel: 0);
         // Cable colgando de la pluma, con su gancho sobre el suelo.
         var along = head.Lerp(tip, 0.32f);
         var hook = along + new Vector3(0.6f, -along.Y + 3.4f, 0.4f);
@@ -185,18 +187,13 @@ public static partial class Models
         b.Box("signal", tail.X + 12f, 18f, tail.Z - 3.6f, 15f, 26f, 1.1f, yaw: -18f, bevel: 0.15f);
         b.Box("cream", tail.X + 14f, 26f, tail.Z - 4.2f, 9f, 5f, 1.25f, yaw: -18f, bevel: 0.1f);
         foreach (var z in new[] { -4f, 4f }) b.Cyl("steel_dark", tail.X + 24f, 4f, tail.Z + z - 3f, 3.1f, 6f, roll: -84f, sides: 12);
-        // Chapas del forro y tierra removida por el impacto.
+        // Chapas del forro esparcidas por el impacto.
         var r = new Rng(917);
         for (var i = 0; i < 9; i++)
         {
             var x = r.Range(-14f, 70f);
             var z = r.Range(-22f, 26f);
             b.Box(i % 3 == 0 ? "navy" : "rust", x, 0.9f, z, r.Range(4f, 10f), 0.25f, r.Range(3f, 8f), yaw: r.Range(0, 180), pitch: r.Range(-16, 16), roll: r.Range(-14, 14), bevel: 0.05f);
-        }
-        for (var i = 0; i < 7; i++)
-        {
-            var a = i * 0.7f - 2.2f;
-            b.Rock("regolith", -2f + Mathf.Cos(a) * -10f, 0.4f, Mathf.Sin(a) * 12f, r.Range(7f, 11f), r.Range(2.5f, 4.5f), r.Range(6f, 10f), 90 + i, 1);
         }
         mesh = b.Commit();
         DebrisCache[key] = mesh;

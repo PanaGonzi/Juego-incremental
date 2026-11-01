@@ -45,6 +45,7 @@ public static class Materials
         ["panel"] = P(0.31f, 0.31f, 0.295f),
         ["signal"] = P(0.62f, 0.17f, 0.025f, 0.48f, 0.55f),
         ["cream"] = P(0.38f, 0.36f, 0.31f),
+        ["crane"] = P(0.66f, 0.44f, 0.035f, 0.5f, 0.5f),
         ["navy"] = P(0.13f, 0.18f, 0.25f),
         ["dark"] = P(0.075f, 0.08f, 0.09f, 0.55f, 0.2f),
         ["stripe"] = new(Layer.Hazard, new Color(1, 1, 1), 0f, 0.5f, 0, 0.3f),

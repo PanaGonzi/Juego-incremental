@@ -31,6 +31,21 @@ Rama `agente/arte`, preset medio, un solo cliente. Otros agentes usaban el equip
 
 **Cumple el objetivo en este equipo.** Dibujos frente a la tabla anterior: densa 838 → 362, vías 6626 → 3545, panorámica 1990 → 1203, con una superficie opaca compartida por malla. La vista densa sube de 1,45 a 1,96 ms; vías baja de 5,69 a 3,79 ms. Una tirada anterior de la misma rama dio 7,80 ms de media y un pico aislado de 112 ms en vías, con el escritorio ocupado; no se reprodujo en las dos siguientes. Equipos de gama menor, presets bajo y alto, y anfitrión con 11 clientes: **NO VERIFICADO**.
 
+## Zona inicial de la 0.5, escenario medio a 1080p sin VSync, 15 s por vista
+
+Rama `agente/zona`, preset medio, un solo cliente, `tools\auto-test.ps1 -Measure medium -Width 1920 -Height 1080 -Seconds 15`. Sin otro cliente del juego abierto antes ni después de cada tirada; el mismo equipo seguía con otros procesos de desarrollo. Ms de frame.
+
+| Vista | | Media | p95 | p99 | Máx. | >33 ms | Objetos | Dibujos | Memoria | VRAM |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Densa | Antes | 2,60 | **NO MEDIDO** | 4,38 | 24,67 | 0 | 2399 | 934 | 856 MB | 376 MB |
+| Densa | Después | 2,61 | 3,24 | 4,45 | 17,20 | 0 | 2417 | 944 | 731 MB | 396 MB |
+| Vías | Antes | 4,87 | **NO MEDIDO** | 9,63 | 15,54 | 0 | 4558 | 3719 | 854 MB | 376 MB |
+| Vías | Después | 3,98 | 4,85 | 6,13 | 15,38 | 0 | 4539 | 3704 | 735 MB | 396 MB |
+| Panorámica | Antes | 3,07 | **NO MEDIDO** | 4,62 | 14,93 | 0 | 3907 | 1848 | 855 MB | 376 MB |
+| Panorámica | Después | 2,96 | 3,55 | 4,67 | 15,53 | 0 | 3921 | 1862 | 735 MB | 396 MB |
+
+**Cumple el objetivo en este equipo y no empeora.** El p95 se añadió a la herramienta en esta rama, así que no hay cifra de antes. Las diferencias de tiempo son de una sola tirada por lado y no se afirma una mejora; la de memoria tampoco se atribuye a estos cambios. Coste medido: +10 dibujos en la vista densa, +14 en la panorámica y +20 MB de vídeo. Una tirada anterior con un segundo cliente del juego abierto dio densa 3,06 / p99 6,94 y panorámica 3,93 / p99 8,70; no se usa para comparar. Tras medir solo se retiraron unas rocas de la malla del pecio. Las cintas no añaden dibujos: siguen con dos superficies por tramo. Equipos de gama menor, presets bajo y alto, y anfitrión con 11 clientes: **NO VERIFICADO**.
+
 ## Servidor dedicado + 12 clientes
 
 | Escenario | Tick medio | p99 máx. | Tardíos | Envío total antes → después | Por cliente | Memoria |

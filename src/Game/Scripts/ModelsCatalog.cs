@@ -815,7 +815,7 @@ public static partial class Models
                 }
                 // Mucho metal oxidado, poca pintura: el naranja queda como resto reconocible, no como masa.
                 for (var i = 0; i < 6; i++)
-                    ScrapSheet(b, r, i == 0 ? (dark ? "dark" : "signal") : i == 3 ? "hull" : i % 2 == 0 ? "rust" : "rustlight", Near(0.55f), i == 0 ? 0.55f : r.Range(0.6f, 1f));
+                    ScrapSheet(b, r, i == 0 ? (dark ? "dark" : "signal") : i == 3 ? "steel_dark" : i % 2 == 0 ? "rust" : "rustlight", Near(0.55f), i == 0 ? 0.55f : r.Range(0.6f, 1f));
                 BentBeam(b, r, dark ? "steel_dark" : "rust", Near(0.25f));
                 BentBeam(b, r, dark ? "rust" : "steel_dark", Near(0.4f));
                 if (variant != 1) BentBeam(b, r, "rustlight", Near(0.5f));
@@ -835,7 +835,7 @@ public static partial class Models
                         var squash = 0.72f + 0.28f * Mathf.Sin(Mathf.Atan2(q.Z, q.X) * 2 + phase);
                         return c + new Vector3(q.X * squash, q.Y, q.Z * (2 - squash));
                     };
-                    b.Lathe(variant == 0 ? "hull" : "rustlight", c.X, 0.34f, c.Z, new[] { (0f, -0.3f), (0.26f, -0.3f), (0.28f, -0.26f), (0.28f, 0.26f), (0.26f, 0.3f), (0f, 0.3f) }, 12, roll: 12);
+                    b.Lathe(variant == 0 ? "dark" : "rustlight", c.X, 0.34f, c.Z, new[] { (0f, -0.3f), (0.26f, -0.3f), (0.28f, -0.26f), (0.28f, 0.26f), (0.26f, 0.3f), (0f, 0.3f) }, 12, roll: 12);
                     b.Warp = null;
                 }
                 if (dark) b.Ball("spectral", r.Range(-0.3f, 0.3f), 0.72f, r.Range(-0.3f, 0.3f), 0.22f, 8, 5);

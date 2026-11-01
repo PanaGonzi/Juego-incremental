@@ -36,14 +36,14 @@ public partial class FactoryActivity : Node3D
     public float BedDb => _bed.VolumeDb;
 
     /// <summary>Energía de la luz propia de la máquina: en marcha ilumina su entorno; parada queda en piloto.</summary>
-    public static float GlowEnergy(bool running) => running ? 0.95f : 0.14f;
+    public static float GlowEnergy(bool running) => running ? 0.85f : 0.14f;
 
     public override void _Ready()
     {
         for (var i = 0; i < MaxSites; i++) _vents.Add(MakeVent());
         for (var i = 0; i < MaxLights; i++)
         {
-            var light = new OmniLight3D { LightColor = new Color(1f, 0.72f, 0.42f), LightEnergy = 0.75f, OmniRange = 8f, Visible = false, DistanceFadeEnabled = true, DistanceFadeBegin = 30, DistanceFadeLength = 8 };
+            var light = new OmniLight3D { LightColor = new Color(1f, 0.72f, 0.42f), LightEnergy = 0.6f, LightSpecular = 0.2f, OmniRange = 8f, Visible = false, DistanceFadeEnabled = true, DistanceFadeBegin = 30, DistanceFadeLength = 8 };
             AddChild(light);
             _lights.Add(light);
         }
@@ -98,7 +98,7 @@ public partial class FactoryActivity : Node3D
             },
             DrawPass1 = new QuadMesh
             {
-                Size = new Vector2(1.5f, 1.5f),
+                Size = new Vector2(2f, 2f),
                 Material = new StandardMaterial3D
                 {
                     AlbedoTexture = new GradientTexture2D
@@ -112,7 +112,7 @@ public partial class FactoryActivity : Node3D
                     },
                     VertexColorUseAsAlbedo = true,
                     Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-                    ShadingMode = BaseMaterial3D.ShadingModeEnum.PerVertex,
+                    ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
                     BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,
                     CullMode = BaseMaterial3D.CullModeEnum.Disabled,
                     DistanceFadeMode = BaseMaterial3D.DistanceFadeModeEnum.PixelAlpha,
@@ -138,9 +138,9 @@ public partial class FactoryActivity : Node3D
         var process = (ParticleProcessMaterial)vent.Particles.ProcessMaterial;
         var (color, min, max) = kind switch
         {
-            Puff.Smoke => (new Color(0.2f, 0.19f, 0.19f, 0.34f), 0.7f, 1.3f),
-            Puff.Steam => (new Color(0.72f, 0.78f, 0.84f, 0.2f), 0.5f, 1f),
-            _ => (new Color(0.3f, 0.23f, 0.19f, 0.26f), 0.25f, 0.65f),
+            Puff.Smoke => (new Color(0.42f, 0.4f, 0.4f, 0.62f), 0.7f, 1.3f),
+            Puff.Steam => (new Color(0.78f, 0.84f, 0.9f, 0.46f), 0.5f, 1f),
+            _ => (new Color(0.5f, 0.4f, 0.33f, 0.5f), 0.25f, 0.65f),
         };
         process.Color = color;
         process.InitialVelocityMin = min;
@@ -283,7 +283,7 @@ public partial class ActionFeedback : Node3D
         };
         AddChild(_ring);
 
-        _creditLabel = new Label3D { Billboard = BaseMaterial3D.BillboardModeEnum.Enabled, FontSize = 54, PixelSize = 0.012f, OutlineSize = 12, Modulate = new Color(1f, 0.74f, 0.3f), Visible = false, NoDepthTest = true };
+        _creditLabel = new Label3D { Billboard = BaseMaterial3D.BillboardModeEnum.Enabled, FontSize = 54, PixelSize = 0.007f, OutlineSize = 12, Modulate = new Color(1f, 0.74f, 0.3f), Visible = false, NoDepthTest = true };
         AddChild(_creditLabel);
     }
 
@@ -371,7 +371,8 @@ public partial class ActionFeedback : Node3D
     {
         Sales++;
         if (terminal is not { } at || at.DistanceSquaredTo(player) > 70f * 70f) return;
-        _creditTween?.Kill();
+        // Con venta automática llegan varias por segundo: se deja terminar la cifra anterior.
+        if (_creditTween != null && _creditTween.IsRunning()) return;
         _creditLabel.Text = $"+{credits} ¤";
         _creditLabel.GlobalPosition = at;
         _creditLabel.Modulate = _creditLabel.Modulate with { A = 1f };

@@ -222,6 +222,7 @@ public partial class BeltView : Node3D
         foreach (var v in _belts.Values) FreeChunks(v);
         _belts.Clear();
         _elevated.Clear();
+        _stock.Clear();
         foreach (var b in _batches.Values)
         {
             b.Count = 0;
@@ -729,6 +730,7 @@ public partial class BeltView : Node3D
             }
         }
         DrawnItems = drawn;
+        foreach (var (item, at) in _stock) WriteResting(BatchOf(item), at);
         foreach (var b in _batches.Values)
         {
             if (b.Count == 0 && b.Shown == 0) continue;
@@ -736,6 +738,28 @@ public partial class BeltView : Node3D
             b.Multi.VisibleInstanceCount = b.Count;
             b.Shown = b.Count;
         }
+    }
+
+    private readonly List<(string item, Vector3 at)> _stock = new();
+
+    /// <summary>Existencias a la vista junto a las bocas de las máquinas cercanas. Aprovecha los mismos lotes de la carga: no añade dibujos por máquina.</summary>
+    public List<(string item, Vector3 at)> VisibleStock => _stock;
+
+    private static void WriteResting(ItemBatch b, Vector3 at)
+    {
+        if (b.Count >= b.Multi.InstanceCount)
+        {
+            var capacity = Mathf.Max(64, b.Multi.InstanceCount * 2);
+            b.Multi.InstanceCount = capacity;
+            Array.Resize(ref b.Buffer, capacity * 12);
+        }
+        var o = b.Count * 12;
+        var s = b.Scale;
+        var buffer = b.Buffer;
+        buffer[o] = s; buffer[o + 1] = 0; buffer[o + 2] = 0; buffer[o + 3] = at.X;
+        buffer[o + 4] = 0; buffer[o + 5] = s; buffer[o + 6] = 0; buffer[o + 7] = at.Y + b.Lift;
+        buffer[o + 8] = 0; buffer[o + 9] = 0; buffer[o + 10] = s; buffer[o + 11] = at.Z;
+        b.Count++;
     }
 
     private bool Place(BeltVisual v, ref VisualItem item, Vector3 player)

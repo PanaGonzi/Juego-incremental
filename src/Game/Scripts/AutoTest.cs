@@ -646,7 +646,11 @@ public partial class AutoTest : Node
             var d = Mathf.Max(Mathf.Abs(p.X), Mathf.Abs(p.Z));
             var box = m.Mesh.GetAabb();
             Log($"Hito {m.Name}: a {new Vector2(p.X, p.Z).Length():0} m de la base, alto {box.Size.Y:0} m, {m.Mesh.GetFaces().Length / 3} triángulos");
-            Check(d > Terrain.Walkable && m.FindChildren("*", nameof(CollisionObject3D), true, false).Count == 0, $"{m.Name} fuera de los muros y sin colisión");
+            // Toda la malla, no solo su origen: ninguna pieza puede entrar en la zona jugable.
+            var faces = m.Mesh.GetFaces();
+            var reach = faces.Length == 0 ? 0f : faces.Min(f => { var q = m.GlobalTransform * f; return Mathf.Max(Mathf.Abs(q.X), Mathf.Abs(q.Z)); });
+            Check(d > Terrain.Walkable && reach > Terrain.Walkable && m.FindChildren("*", nameof(CollisionObject3D), true, false).Count == 0, $"{m.Name} fuera de los muros y sin colisión; punto más cercano a {reach:0} m del centro");
+            Check(faces.Length / 3 <= 8000, $"{m.Name} dentro del presupuesto de triángulos");
         }
 
         // Niveles de todos los sonidos generados, medidos sobre sus muestras.
@@ -775,7 +779,7 @@ public partial class AutoTest : Node
             Summarize(_frames, out var text);
             Log($"{name} GC: gen0={GC.CollectionCount(0) - gen0} gen1={GC.CollectionCount(1) - gen1} gen2={GC.CollectionCount(2) - gen2} pausa total={(GC.GetTotalPauseDuration() - pause).TotalMilliseconds:F1} ms, última pausa={GC.GetGCMemoryInfo().PauseDurations[0].TotalMilliseconds:F1} ms; SyncWorld máx={v.MaxSyncMs:F1} ms; Poll máx={v.MaxPollMs:F1} ms; deltas estructurales={v.Session.Client.StructuralDeltas - structuralBefore}");
             var info = $"objetos={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalObjectsInFrame)} dibujos={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalDrawCallsInFrame)} vídeo={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.VideoMemUsed) / 1048576} MB memoria={WorkingSetMb()} MB";
-            Log($"{name}: {text} {info}");
+            Log($"{name}: {text} {info} emisores={v.Activity.ActiveVents} focos={v.Activity.ActiveLights} fondo={v.Activity.BedDb:0.0} dB existencias={v.Belts.VisibleStock.Count}");
             Log($"{name} picos: {string.Join(" ", _spikes)}");
             _spikes.Clear();
             await Shot("measure_" + name);
@@ -937,7 +941,7 @@ public partial class AutoTest : Node
         var sorted = frames.OrderBy(f => f).ToList();
         var over33 = sorted.Count(f => f > 33.3f);
         var over100 = sorted.Count(f => f > 100f);
-        text = sorted.Count == 0 ? "sin frames" : $"frames={sorted.Count} media={sorted.Average():F2} p99={sorted[(int)(sorted.Count * 0.99)]:F2} máx={sorted[^1]:F2} ms >33ms={over33} >100ms={over100}";
+        text = sorted.Count == 0 ? "sin frames" : $"frames={sorted.Count} media={sorted.Average():F2} p95={sorted[(int)(sorted.Count * 0.95)]:F2} p99={sorted[(int)(sorted.Count * 0.99)]:F2} máx={sorted[^1]:F2} ms >33ms={over33} >100ms={over100}";
     }
 
     private static long WorkingSetMb() => System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / 1048576;

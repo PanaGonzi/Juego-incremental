@@ -74,7 +74,9 @@ Los triángulos por modelo son objetivo de diseño, no medidos uno a uno; los di
 | Guijarros | Bloques de 48 m, hasta 180 instancias por bloque, visibles a 95 m, sin sombra |
 | Rocas exteriores | 260 instancias en 3 `MultiMesh`, fuera de la zona edificable |
 | Luces de máquina | Sin sombra, alcance 7 m, se apagan a 46 m |
-| Polvo | 90 partículas |
+| Polvo | 90 partículas (30 con «Reducir efectos») |
+| Hitos de Plutón | 4 mallas, ≤ 8000 triángulos cada una, fuera de los muros y sin colisión |
+| Actividad de fábrica | 8 emisores de 7 partículas, 4 focos, 6 voces de máquina, 2 de cinta y un fondo, repartidos entre lo más cercano. No crece con la fábrica |
 | Terreno | Paso de 2 m hasta ±208 m; después, paso creciente |
 | Texturas | 9 capas de 512 px; 2 atlas comprimidos y 1 mapa de variación |
 
@@ -83,6 +85,12 @@ Objetivo de frame: media ≤ 16,7 ms y p99 ≤ 33 ms a 1080p en el escenario med
 ## Terreno y construcción
 
 La colisión sigue siendo el plano `y = 0`. Dentro de la zona jugable el relieve va de 0 a −0,19 m, solo hacia abajo: nada construido queda enterrado y las zapatas tienen faldón. Las normales exageran esa ondulación para que se vea. El relieve grande empieza fuera de los muros (±188 m). Los guijarros de la zona edificable son más bajos que una zapata.
+
+## Zona inicial de Plutón
+
+Cuatro hitos, uno por dirección, reconocibles por silueta y color (`Terrain.Landmarks`, `ModelsLandmarks.cs`): al norte la torre de antena roja y blanca con baliza; al este la grúa amarilla derribada; al oeste la cúpula clara con ventanas ámbar; al sur el pecio azul con la deriva naranja. Una pista apisonada con dos rodadas va de la base a cada uno: se pinta en los canales G y B del color de vértice del terreno, no cambia la colisión ni ocupa celdas.
+
+De cerca, a menos de 8 m, el material industrial y el bastidor de las cintas añaden una segunda escala de textura. Lo que apoya en el suelo usa `soil`, del mismo tono que el suelo de Plutón.
 
 ## Interfaz
 
