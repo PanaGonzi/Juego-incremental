@@ -232,19 +232,14 @@ public partial class AutoTest : Node
             {
                 _main.StartSession(GameSession.Local(_main, BeltWorld(), "autotest-belts", null, _main.Prefs));
             }
+            else if (_args.GetValueOrDefault("scenario") == "beltslong")
+            {
+                _main.StartSession(GameSession.Local(_main, BeltStage(), "autotest-long", null, _main.Prefs));
+            }
             else if (_args.GetValueOrDefault("scenario") == "beltstage")
             {
-                // Solo prepara una partida para jugarla con entradas reales: almacén junto al inicio y otro a unos 150 m.
-                var world = BeltWorld();
-                var near = new Machine { Id = world.NextId++, Def = "storage_crate", Planet = 0, X = 6, Z = 8 };
-                near.In.Add("ore", 150);
-                near.In.Add("ingot", 150);
-                world.Machines[near.Id] = near;
-                var far = new Machine { Id = world.NextId++, Def = "storage_crate", Planet = 0, X = -34, Z = -24 };
-                world.Machines[far.Id] = far;
-                foreach (var d in world.DebrisById.Values.Where(d => d.CoversNode < 0 && Math.Abs(d.X - near.X) < 5 && Math.Abs(d.Z - near.Z) < 5).ToList()) world.DebrisById.Remove(d.Id);
-                world.Reindex();
-                _main.Store.Save("belts-real", world);
+                // Solo prepara una partida para jugarla con entradas reales.
+                _main.Store.Save("belts-real", BeltStage());
                 Log("RESULTADO: CORRECTO");
                 GetTree().Quit(0);
                 return;
@@ -277,6 +272,7 @@ public partial class AutoTest : Node
             else if (_args.GetValueOrDefault("scenario") == "rail") await RailScenario();
             else if (_args.GetValueOrDefault("scenario") == "belts") await BeltScenario();
             else if (_args.GetValueOrDefault("scenario") == "beltsv4") await BeltMigrationScenario();
+            else if (_args.GetValueOrDefault("scenario") == "beltslong") await BeltLongScenario();
             else if (_args.GetValueOrDefault("scenario") == "fp") await FirstPersonScenario();
             else if (_args.GetValueOrDefault("scenario") == "travel") await TravelScenario();
             else if (_args.GetValueOrDefault("scenario") == "halloween") await HalloweenScenario();
@@ -978,6 +974,21 @@ public partial class AutoTest : Node
         await Shot("rail_09_reanudado");
     }
 
+    /// <summary>Almacén junto al inicio y otro a unos 150 m, con escombros y máquinas en medio.</summary>
+    private World BeltStage()
+    {
+        var world = BeltWorld();
+        var near = new Machine { Id = world.NextId++, Def = "storage_crate", Planet = 0, X = 6, Z = 8 };
+        near.In.Add("ore", 150);
+        near.In.Add("ingot", 150);
+        world.Machines[near.Id] = near;
+        var far = new Machine { Id = world.NextId++, Def = "storage_crate", Planet = 0, X = -34, Z = -24 };
+        world.Machines[far.Id] = far;
+        foreach (var d in world.DebrisById.Values.Where(d => d.CoversNode < 0 && (Math.Abs(d.X - near.X) < 5 && Math.Abs(d.Z - near.Z) < 5 || Math.Abs(d.X - far.X) < 5 && Math.Abs(d.Z - far.Z) < 5)).ToList()) world.DebrisById.Remove(d.Id);
+        world.Reindex();
+        return world;
+    }
+
     /// <summary>Base limpia y con material: el recorrido se monta después con comandos y herramientas normales.</summary>
     private World BeltWorld()
     {
@@ -1086,6 +1097,125 @@ public partial class AutoTest : Node
 
         Check(client.HashMismatches == 0, $"sin divergencias ({client.HashChecks} comprobaciones)");
         Log($"Cintas: {W.Links.Count}, objetos en cinta {W.Links.Values.Sum(l => l.Load)}, dibujados {v.Belts.DrawnItems}");
+    }
+
+    /// <summary>
+    /// Cinta larga con las teclas del juego (eventos de Godot, no de Windows): punto fijado, cancelar, otra ruta, retirar punto,
+    /// construir y comprobar que lo construido es lo previsualizado, que los objetos llegan y que se conserva al recargar.
+    /// </summary>
+    private async Task BeltLongScenario()
+    {
+        var v = _view!;
+        var near = W.Machines.Values.First(m => m.Def == "storage_crate" && m.X == 6 && m.Z == 8);
+        var far = W.Machines.Values.First(m => m.Def == "storage_crate" && m.X == -34);
+        var nearId = near.Id;
+        var farId = far.Id;
+        var credits = W.Credits;
+        var plan = () => v.Belts.Plan!;
+
+        Key(Godot.Key.L);
+        await Wait(0.2);
+        Check(v.CurrentTool == Tool.Link, "L activa la herramienta de cinta");
+        await UseOn(near, () => { });
+        v.AimAt(CenterOf(near));
+        await Wait(0.3);
+        await Shot("long_00_conector_origen");
+        v.Primary();
+        await Wait(0.2);
+        Check(plan().HasOrigin && plan().FromPort != null, $"origen con conector elegido: {plan().FromPort}");
+
+        // Cancelar sale sin coste y sin cambiar de herramienta.
+        var ground = v.PlayerPosition + new Vector3(-10, -v.PlayerPosition.Y, -6);
+        v.AimAt(ground);
+        await Wait(0.4);
+        v.Primary();
+        await Wait(0.3);
+        Check(plan().Waypoints.Count == 1, $"clic en el suelo fija un punto: {plan().Waypoints.Count}");
+        Key(Godot.Key.Z);
+        await Wait(0.3);
+        Check(!plan().HasOrigin && plan().Waypoints.Count == 0, "Z cancela el trazado");
+        Check(W.Credits == credits && W.Links.Count == 0, "cancelar no cuesta nada");
+        Check(v.CurrentTool == Tool.Link, "tras cancelar sigue la herramienta");
+
+        // De nuevo: origen, punto, destino lejano.
+        v.AimAt(CenterOf(near));
+        await Wait(0.3);
+        v.Primary();
+        await Wait(0.2);
+        ground = v.PlayerPosition + new Vector3(-16, -v.PlayerPosition.Y, 4);
+        v.AimAt(ground);
+        await Wait(0.4);
+        v.Primary();
+        await Wait(0.3);
+        var waypoint = plan().Waypoints[0];
+        await Shot("long_01_punto_fijado");
+
+        var cf = CenterOf(far);
+        await WalkTo(new Vector3(cf.X + 9, 0, cf.Z + 11), 35);
+        v.AimAt(cf);
+        Check(await Until(() => plan().State == BeltPlanState.Ready && plan().To == farId, 8), $"destino y ruta listos: {plan().State} {plan().Error}");
+        var first = plan().Route!.ToList();
+        Check(first.Count > 32, $"ruta larga, sin límite: {first.Count} celdas");
+        Check(first.Contains(waypoint), "la ruta respeta el punto fijado");
+        await Wait(0.3);
+        await Shot("long_02_previsualizacion");
+
+        Key(Godot.Key.R);
+        await Wait(1);
+        var alternative = plan().Route!.ToList();
+        Check(!alternative.SequenceEqual(first) && alternative.Contains(waypoint), $"R ofrece otra ruta válida ({plan().AlternativeIndex + 1}/{plan().AlternativeCount})");
+        await Shot("long_03_otra_ruta");
+
+        Key(Godot.Key.Backspace);
+        await Wait(0.2);
+        Check(plan().Waypoints.Count == 0, "Retroceso retira el último punto");
+        Check(await Until(() => plan().State == BeltPlanState.Ready, 8), "recalcula al retirar el punto");
+        var preview = plan().Route!.ToList();
+        Check(!preview.Contains(waypoint) || !first.SequenceEqual(preview), "la ruta ya no depende del punto");
+        var toPort = plan().ToPort;
+        await Wait(0.5);
+        await Shot("long_04_antes_de_construir");
+
+        // Construir: exactamente lo mostrado, sin mover nada del encuadre.
+        var before = W.Credits;
+        v.Primary();
+        Check(await Until(() => W.Links.Count == 1, 3), "la cinta se construye");
+        var built = W.Links.Values.Single();
+        Check(built.Cells.SequenceEqual(preview), "lo construido coincide celda a celda con lo previsualizado");
+        Check(built.Cells[^1] == toPort, "el conector de destino no cambió al hacer clic");
+        await Wait(0.3);
+        Check(W.Credits <= before - preview.Count, $"coste cobrado: {before} → {W.Credits}");
+        Check(v.CurrentTool == Tool.Link && !plan().HasOrigin, "la herramienta sigue activa para otra cinta");
+        await Shot("long_05_despues_de_construir");
+
+        // Objetos a lo largo de toda la cinta.
+        var transit = built.Slots.Length * 0.3;
+        Check(await Until(() => W.Machines[farId].In.Total > 0, transit + 15), $"los objetos recorren las {built.Cells.Count} celdas en unos {transit:0} s");
+        await Wait(1.5);
+        await Shot("long_06_llegan_objetos");
+        Check(W.Links.Values.Single().Load > 20, $"carga a lo largo de la cinta: {W.Links.Values.Single().Load}");
+
+        // Desnivel simulado: solo la vista, mediante el único punto de enlace con el terreno.
+        BeltView.GroundHeight = (x, z) => 2.2f * Mathf.Sin(x * 0.12f) * Mathf.Cos(z * 0.09f) + 2.2f;
+        v.Belts.Clear();
+        await Wait(1.5);
+        await Shot("long_07_desnivel_simulado");
+        BeltView.GroundHeight = (_, _) => 0f;
+        v.Belts.Clear();
+        await Wait(1);
+
+        // Guardar, cargar y conservar el trazado.
+        var slot = "autotest-long";
+        var keep = W.Links.Values.Single().Cells.ToList();
+        _main.EndSession("");
+        await Wait(0.5);
+        _main.StartSolo(slot, false);
+        _view = _main.GetChildren().OfType<GameView>().First(x => !x.IsQueuedForDeletion());
+        Check(await Until(() => _view.Session.Client.State == Pluton.Networking.ClientState.InGame, 20), "reanudar la partida");
+        await Wait(1);
+        Check(W.Links.Count == 1 && W.Links.Values.Single().Cells.SequenceEqual(keep), "el trazado se conserva al guardar y cargar");
+        Check(W.Links.Values.Single().Load > 0, "la carga se conserva");
+        Check(_view.Session.Client.HashMismatches == 0, "sin divergencias");
     }
 
     /// <summary>Partida 0.4.1 migrada: comprueba las cintas enrutadas, la elevada y que siguen transportando.</summary>

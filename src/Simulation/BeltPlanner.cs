@@ -164,7 +164,8 @@ public sealed class BeltPlanner
             _stamp = structuralStamp;
             if (HasOrigin) Invalidate();
         }
-        if (!HasOrigin || To < 0 && OpenTarget == null)
+        var target = OpenTarget ?? (_waypoints.Count > 0 ? _waypoints[^1] : null);
+        if (!HasOrigin || To < 0 && target == null)
         {
             State = BeltPlanState.Idle;
             Error = null;
@@ -191,7 +192,7 @@ public sealed class BeltPlanner
                 else if (State != BeltPlanState.Failed) State = BeltPlanState.Failed;
                 return;
             }
-            _running = new BeltRequest(From, To, _waypoints.ToList(), FromPort, ToPort, OpenTarget, Math.Min(_strategy, 2),
+            _running = new BeltRequest(From, To, _waypoints.ToList(), FromPort, ToPort, To >= 0 ? null : target, Math.Min(_strategy, 2),
                 _strategy == 3 ? _routes.SelectMany(r => r).ToHashSet() : null);
             _search = new World.BeltSearch(_w, _running);
         }

@@ -161,6 +161,17 @@ public class BeltRouteTests
         Assert.False(plan.RemoveLastWaypoint());
         Assert.Equal(direct, PlanToEnd(plan));
 
+        // Con el punto fijado y sin destino: la ruta llega al punto, también apuntando a él o a ninguna parte.
+        plan.SetOpenTarget(null);
+        Assert.Null(plan.AddWaypoint(-5, -80));
+        Assert.Equal((-5, -80), PlanToEnd(plan)[^1]);
+        plan.SetOpenTarget((-5, -80));
+        Assert.Equal((-5, -80), PlanToEnd(plan)[^1]);
+        Assert.Null(plan.Confirm());
+        Assert.True(plan.RemoveLastWaypoint());
+        plan.SetDestination(b.Id, null);
+        PlanToEnd(plan);
+
         // Punto sobre una máquina: rechazado sin cambiar nada.
         Assert.Equal("err_belt_waypoint", plan.AddWaypoint(b.X, b.Z));
         Assert.Empty(plan.Waypoints);

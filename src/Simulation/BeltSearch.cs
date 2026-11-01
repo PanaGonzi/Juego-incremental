@@ -119,6 +119,8 @@ public sealed partial class World
             }
             else if (_req.OpenTarget is { } open)
             {
+                // Apuntar al último punto fijado: la ruta termina ahí, no es un error.
+                if (_path.Count > 0 && _path[^1] == open) { Done = true; return; }
                 if (!Free(open.x, open.z) || _used.Contains(open)) { Fail("err_belt_waypoint"); return; }
                 _goals[open] = (0, -1);
             }

@@ -175,6 +175,8 @@ public partial class BeltView
                 status = Loc.T("belt_tracing");
                 return;
             case BeltPlanState.Failed:
+                // Apuntar a una celda inservible mientras se traza no es un fallo que merezca aviso; sin destino no se construye nada.
+                if (plan.To < 0) return;
                 status = Loc.T(plan.Error ?? "err_belt_route");
                 color = Ui.Bad;
                 return;
