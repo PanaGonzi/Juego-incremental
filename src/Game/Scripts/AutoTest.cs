@@ -789,12 +789,16 @@ public partial class AutoTest : Node
             await Wait(3);
         }
         Log($"Mundo: {W.Machines.Count} máquinas, {W.Trains.Count} trenes, {W.RailSegments.Count} tramos; representadas {v.RenderedMachines} máquinas; VSync desactivada");
-        foreach (var (name, walk, aim) in new[]
+        var views = new List<(string name, Vector3 walk, Vector3 aim)>
         {
             ("denso", new Vector3(0, 0, 40), new Vector3(10, 1, 70)),
             ("vias", new Vector3(0, 0, -20), new Vector3(0, 1, -60)),
             ("panoramica", new Vector3(-60, 0, 0), new Vector3(60, 1, 60)),
-        })
+        };
+        // Mirando a lo largo de las cintas largas, que es donde más carga entra en el encuadre.
+        if (_args.GetValueOrDefault("measure") is "long" or "saturated")
+            views.Add(("cintas", new Vector3(0, 0, -90), new Vector3(100, 1, -90)));
+        foreach (var (name, walk, aim) in views)
         {
             await WalkTo(walk, 25);
             v.AimAt(aim);
@@ -812,7 +816,7 @@ public partial class AutoTest : Node
             _measuring = false;
             Summarize(_frames, out var text);
             Log($"{name} GC: gen0={GC.CollectionCount(0) - gen0} gen1={GC.CollectionCount(1) - gen1} gen2={GC.CollectionCount(2) - gen2} pausa total={(GC.GetTotalPauseDuration() - pause).TotalMilliseconds:F1} ms, última pausa={GC.GetGCMemoryInfo().PauseDurations[0].TotalMilliseconds:F1} ms; SyncWorld máx={v.MaxSyncMs:F1} ms; Poll máx={v.MaxPollMs:F1} ms; deltas estructurales={v.Session.Client.StructuralDeltas - structuralBefore}");
-            var info = $"objetos={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalObjectsInFrame)} dibujos={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalDrawCallsInFrame)} vídeo={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.VideoMemUsed) / 1048576} MB memoria={WorkingSetMb()} MB";
+            var info = $"carga={W.ItemsOnBelts()} dibujada={v.Belts.DrawnItems} objetos={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalObjectsInFrame)} dibujos={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalDrawCallsInFrame)} vídeo={RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.VideoMemUsed) / 1048576} MB memoria={WorkingSetMb()} MB";
             Log($"{name}: {text} {info} emisores={v.Activity.ActiveVents} focos={v.Activity.ActiveLights} fondo={v.Activity.BedDb:0.0} dB existencias={v.Belts.VisibleStock.Count}");
             Log($"{name} picos: {string.Join(" ", _spikes)}");
             _spikes.Clear();

@@ -16,7 +16,7 @@ function Test-WindowArgs([int]$Width = 960, [int]$Height = 540, [int]$Slot = 0) 
     Add-Type -AssemblyName System.Windows.Forms
     $result = @('--audio-driver', 'Dummy')
     $screen = [System.Windows.Forms.Screen]::AllScreens |
-        Where-Object { -not $_.Primary -and $_.WorkingArea.Width -ge $Width -and $_.WorkingArea.Height -ge $Height } |
+        Where-Object { -not $_.Primary -and $_.Bounds.Width -ge $Width -and $_.Bounds.Height -ge $Height } |
         Sort-Object { $_.WorkingArea.Width -ge $_.WorkingArea.Height }, { $_.WorkingArea.Width * $_.WorkingArea.Height } -Descending |
         Select-Object -First 1
     if (-not $screen) { Write-Warning 'No secondary monitor fits the window: using the default position.'; return $result }

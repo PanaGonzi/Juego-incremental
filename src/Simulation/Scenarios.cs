@@ -14,6 +14,7 @@ public static class Scenarios
         ["medium"] = new Size(500, 25, 2000),
         ["stress"] = new Size(2000, 100, 10000),
         ["long"] = new Size(0, 0, 0),
+        ["saturated"] = new Size(0, 0, 0),
     };
 
     public static World Build(ContentDb content, string name)
@@ -142,6 +143,18 @@ public static class Scenarios
             machines += 2;
         }
         // 30 cintas de 168 celdas con carga escasa y regular: mide huecos largos en simulación y red.
+        if (name == "saturated")
+            for (var row = 0; row < 30; row++)
+            {
+                // Las mismas cintas, llenas desde el principio: el peor caso de carga dibujada.
+                var z = -88 + row * 3;
+                var stock = Add("storage_crate", -86, z);
+                stock.In.Add("scrap", 1000000);
+                var term = Add("export_terminal", 84, z);
+                term.AutoSell = true;
+                var line = Belt(stock, term, -84, 83, z, "scrap");
+                for (var s = 0; s < line.Slots.Length; s++) w.SeedBeltSlot(line, s, "scrap");
+            }
         if (name == "long")
             for (var row = 0; row < 30; row++)
             {

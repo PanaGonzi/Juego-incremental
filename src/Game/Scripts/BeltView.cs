@@ -630,6 +630,11 @@ public partial class BeltView : Node3D
         return b;
     }
 
+    private static VisualItem[] _reconciled = Array.Empty<VisualItem>();
+
+    // Pasar una cadena crea en cada llamada un StringName con finalizador, y esto corre por tramo y frame.
+    private static readonly StringName OffsetParam = "offset", PulseParam = "pulse", JamParam = "jam";
+
     /// <summary>Corrige la copia local con el estado real, conservando el objeto ya dibujado si es razonablemente el mismo.</summary>
     private static void Reconcile(BeltVisual v, Link l, World w)
     {
@@ -638,7 +643,8 @@ public partial class BeltView : Node3D
         if (v.Items.Length != l.Slots.Length) v.Items = new VisualItem[l.Slots.Length];
         var old = v.Items;
         var oldIndex = v.Count - 1;
-        var result = new VisualItem[l.Slots.Length];
+        if (_reconciled.Length < l.Slots.Length) _reconciled = new VisualItem[l.Slots.Length];
+        var result = _reconciled;
         var count = 0;
         // De la cabeza hacia la cola, emparejando por tipo y cercanía; cada objeto dibujado se usa una sola vez.
         for (var slot = l.Slots.Length - 1; slot >= 0; slot--)
@@ -699,29 +705,29 @@ public partial class BeltView : Node3D
             var dx = v.Center.X - player.X;
             var dz = v.Center.Z - player.Z;
             var distance = Mathf.Sqrt(dx * dx + dz * dz) - v.Radius;
-            if (v.Version != l.SlotsVersion) Reconcile(v, l, w);
             if (distance > ItemRange)
             {
-                // Lejos no se dibuja ni predice: al acercarse parte del último estado real.
+                // Lejos no se dibuja, ni se predice ni se reconcilia: al acercarse parte del último estado real.
                 v.Count = 0;
                 v.Version = -1;
                 continue;
             }
+            if (v.Version != l.SlotsVersion) Reconcile(v, l, w);
             if (!v.Blocked) v.Offset += hops * SlotLength * delta;
             if (v.Pulse >= 0)
             {
                 // Destello que recorre la cinta recién conectada, de la máquina de origen a la de destino.
                 v.Pulse = Scenery.Calm || v.Pulse > v.Length + 3f ? -1 : v.Pulse + delta * Mathf.Max(14f, v.Length / 0.8f);
-                foreach (var (node, _, _) in v.Chunks) node.SetInstanceShaderParameter("pulse", v.Pulse < 0 ? -100f : v.Pulse);
+                foreach (var (node, _, _) in v.Chunks) node.SetInstanceShaderParameter(PulseParam, v.Pulse < 0 ? -100f : v.Pulse);
             }
             var jam = v.Blocked ? 1f : 0f;
             var jamChanged = jam != v.ShownJam;
             v.ShownJam = jam;
             foreach (var (node, center, radius) in v.Chunks)
             {
-                if (jamChanged) node.SetInstanceShaderParameter("jam", jam);
+                if (jamChanged) node.SetInstanceShaderParameter(JamParam, jam);
                 if (center.DistanceSquaredTo(player with { Y = center.Y }) < (AnimRange + radius) * (AnimRange + radius))
-                    node.SetInstanceShaderParameter("offset", v.Offset);
+                    node.SetInstanceShaderParameter(OffsetParam, v.Offset);
             }
             Predict(v, hops, delta, l.Slots.Length);
             for (var i = 0; i < v.Count; i++)

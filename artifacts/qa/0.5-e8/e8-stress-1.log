@@ -1,0 +1,15 @@
+﻿[    0,3] OK    entrada en el mundo
+[    0,3] Renderizador forward_plus GPU AMD Radeon RX 7800 XT ventana (1920, 1080)
+[    5,9] Mundo: 2011 máquinas, 100 trenes, 10200 tramos; representadas 2008 máquinas; VSync desactivada
+[   23,4] denso GC: gen0=35 gen1=16 gen2=1 pausa total=131,5 ms, última pausa=4,0 ms; SyncWorld máx=29,2 ms; Poll máx=7,1 ms; deltas estructurales=0
+[   23,4] denso: frames=1562 media=9,60 p95=12,85 p99=17,88 máx=43,84 ms >33ms=3 >100ms=0 objetos=7653 dibujos=1733 vídeo=816 MB memoria=970 MB emisores=8 focos=4 fondo=-13,9 dB existencias=8
+[   23,4] denso picos: 10,01s:33ms 12,05s:44ms 17,62s:41ms
+[   45,5] vias GC: gen0=17 gen1=6 gen2=1 pausa total=47,5 ms, última pausa=2,5 ms; SyncWorld máx=9,0 ms; Poll máx=6,2 ms; deltas estructurales=0
+[   45,5] vias: frames=588 media=25,51 p95=29,07 p99=37,50 máx=45,07 ms >33ms=13 >100ms=0 objetos=13463 dibujos=11900 vídeo=816 MB memoria=970 MB emisores=0 focos=0 fondo=-13,9 dB existencias=0
+[   45,5] vias picos: 31,65s:36ms 32,54s:35ms 32,67s:37ms 34,67s:39ms 35,66s:36ms 36,65s:45ms 38,66s:43ms 39,66s:34ms 40,66s:34ms 40,87s:39ms 41,08s:37ms 42,66s:34ms 44,67s:44ms
+[   67,7] panoramica GC: gen0=34 gen1=11 gen2=2 pausa total=98,8 ms, última pausa=2,2 ms; SyncWorld máx=8,9 ms; Poll máx=62,9 ms; deltas estructurales=1
+[   67,7] panoramica: frames=1471 media=10,20 p95=13,28 p99=16,73 máx=85,64 ms >33ms=1 >100ms=0 objetos=6957 dibujos=2438 vídeo=816 MB memoria=986 MB emisores=2 focos=2 fondo=-13,9 dB existencias=2
+[   67,7] panoramica picos: 55,30s:86ms
+[   67,7] Servidor local: tick medio 1,43 ms, p99 6,17, máx 31,04, tardíos 0; 1 conectados; enviado 2,0 MiB, recibido 0,0 MiB en 68 s
+[   67,7] OK    sin divergencias (7 comprobaciones)
+[   67,7] RESULTADO: CORRECTO

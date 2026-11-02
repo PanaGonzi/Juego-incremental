@@ -424,6 +424,19 @@ public class BeltRouteTests
     }
 
     [Fact]
+    public void Saturated_measurement_scenario_stays_full_along_long_belts()
+    {
+        var w = Scenarios.Build(Fixture.Content, "saturated");
+        Assert.Equal(30, w.Links.Count);
+        Assert.All(w.Links.Values, l => Assert.Equal(168, l.Cells.Count));
+        var capacity = w.Links.Values.Sum(l => l.Slots.Length);
+        Assert.Equal(capacity, w.ItemsOnBelts());
+        for (var i = 0; i < 600; i++) w.Step();
+        Assert.True(w.ItemsOnBelts() >= capacity * 9 / 10, $"carga {w.ItemsOnBelts()} de {capacity}");
+        Assert.True(w.Stats.GetValueOrDefault("sold_credits") > 0, "la carga llega al final y se vende");
+    }
+
+    [Fact]
     public void Long_belts_replicate_with_acceptable_traffic()
     {
         // 10 cintas de ~170 celdas con carga escasa: el peor caso de tramos distintos por segundo.

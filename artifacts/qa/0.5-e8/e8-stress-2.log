@@ -1,0 +1,15 @@
+﻿[    0,3] OK    entrada en el mundo
+[    0,3] Renderizador forward_plus GPU AMD Radeon RX 7800 XT ventana (1920, 1080)
+[    5,9] Mundo: 2011 máquinas, 100 trenes, 10200 tramos; representadas 2008 máquinas; VSync desactivada
+[   48,5] denso GC: gen0=83 gen1=40 gen2=3 pausa total=388,8 ms, última pausa=4,4 ms; SyncWorld máx=29,6 ms; Poll máx=68,2 ms; deltas estructurales=1
+[   48,5] denso: frames=3680 media=10,87 p95=15,29 p99=21,37 máx=97,62 ms >33ms=8 >100ms=0 objetos=7662 dibujos=1732 vídeo=814 MB memoria=984 MB emisores=8 focos=4 fondo=-13,9 dB existencias=8
+[   48,5] denso picos: 11,87s:43ms 17,43s:42ms 19,83s:33ms 25,91s:98ms 27,83s:35ms 36,83s:36ms 41,26s:35ms 46,83s:35ms
+[   95,6] vias GC: gen0=42 gen1=13 gen2=2 pausa total=143,6 ms, última pausa=5,4 ms; SyncWorld máx=13,9 ms; Poll máx=59,3 ms; deltas estructurales=1
+[   95,6] vias: frames=1437 media=27,84 p95=33,61 p99=45,18 máx=105,31 ms >33ms=80 >100ms=1 objetos=13712 dibujos=11934 vídeo=814 MB memoria=993 MB emisores=0 focos=0 fondo=-13,9 dB existencias=0
+[   95,6] vias picos: 56,31s:36ms 56,50s:36ms 57,88s:34ms 58,08s:33ms 58,49s:36ms 59,48s:35ms 60,15s:37ms 60,51s:51ms 61,63s:34ms 62,51s:47ms 63,50s:42ms 64,50s:36ms 65,50s:35ms 66,02s:35ms 66,12s:37ms 66,52s:36ms 68,09s:33ms 68,50s:46ms 69,51s:41ms 70,50s:58ms 71,02s:35ms 72,04s:36ms 72,50s:47ms 73,50s:39ms 74,14s:33ms 75,50s:49ms 76,49s:45ms 77,50s:44ms 78,06s:36ms 79,51s:53ms 80,51s:39ms 80,54s:34ms 80,58s:35ms 80,61s:34ms 81,50s:48ms 83,49s:44ms 84,50s:42ms 85,55s:105ms 86,28s:39ms 87,49s:46ms 88,29s:34ms 88,49s:35ms 89,48s:34ms 90,90s:33ms 90,99s:33ms 91,03s:34ms 91,09s:34ms 91,43s:35ms 91,50s:44ms 91,94s:38ms 91,98s:46ms 92,02s:42ms 92,07s:43ms 92,13s:53ms 92,17s:40ms 92,22s:43ms 92,25s:35ms 92,29s:34ms 92,32s:35ms 92,48s:38ms 92,51s:43ms 92,58s:35ms 93,33s:35ms 93,42s:34ms 93,50s:52ms 93,67s:33ms 93,71s:36ms 93,98s:35ms 94,10s:33ms 94,16s:39ms 94,29s:34ms 94,38s:37ms 94,51s:36ms 94,60s:40ms 94,67s:35ms 94,70s:36ms 94,87s:34ms 94,90s:34ms 95,16s:40ms 95,51s:49ms
+[  142,8] panoramica GC: gen0=68 gen1=32 gen2=3 pausa total=256,9 ms, última pausa=3,8 ms; SyncWorld máx=19,6 ms; Poll máx=58,4 ms; deltas estructurales=1
+[  142,8] panoramica: frames=2799 media=14,30 p95=20,25 p99=27,84 máx=76,21 ms >33ms=9 >100ms=0 objetos=6966 dibujos=2443 vídeo=814 MB memoria=994 MB emisores=8 focos=4 fondo=-13,9 dB existencias=0
+[  142,8] panoramica picos: 108,97s:35ms 111,96s:33ms 115,02s:76ms 119,97s:44ms 125,97s:45ms 127,98s:49ms 132,98s:37ms 133,98s:43ms 135,97s:34ms
+[  142,8] Servidor local: tick medio 1,51 ms, p99 6,15, máx 32,05, tardíos 0; 1 conectados; enviado 3,5 MiB, recibido 0,0 MiB en 143 s
+[  142,8] OK    sin divergencias (14 comprobaciones)
+[  142,8] RESULTADO: CORRECTO
