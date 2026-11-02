@@ -2,7 +2,7 @@
 
 **Última build estable:** `builds/alpha-0.4.1` (commit babc91c, etiqueta `alpha-0.4.1`, protocolo 4, guardado 4). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`.
 
-**Última build de prueba:** `builds/alpha-0.5.0-qa6` (protocolo 9, guardado 6; commit en su `VERSION.txt`). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`. Sin QA con entradas reales de Windows: la última es la de `0.5.0-qa2`.
+**Última build de prueba:** `builds/alpha-0.5.0-qa7` (protocolo 9, guardado 6; commit en su `VERSION.txt`). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`. Sin QA con entradas reales de Windows: la última es la de `0.5.0-qa2`.
 
 **Hitos:** M0, A0.1, A0.2, A0.4 y evento/offline de A0.5 implementados, con verificación en una sola máquina. A0.3 completo salvo Steam en el menú.
 
@@ -10,7 +10,7 @@
 
 - **Comprobado con recorridos automáticos y xUnit, en un PC:** cintas, construcción, gestión, zona, tren, viaje, Marte, Halloween, ausencia, dos clientes sobre la misma fábrica con anfitrión y dedicado, y 12 clientes con el 13.º rechazado (T-018 a T-022).
 - **Comprobado con entradas reales de Windows:** solo hasta `0.5.0-qa2`, y en parte.
-- **No hecho:** revisión independiente de rendimiento (E-8).
+- **Revisión independiente de rendimiento (E-8):** hecha, con hallazgos abiertos, en [REVISION_E8](REVISION_E8.md).
 - **Mitigado sin resolver del todo:** BUG-005: causa medida y respuesta mejorada, pero con pérdida siguen los picos (T-023).
 
 **B-8, señales y desvíos:** primer sistema implementado y comprobado con órdenes automáticas en un PC (T-024). Con entradas reales: **NO VERIFICADO**.

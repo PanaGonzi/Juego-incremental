@@ -206,6 +206,42 @@ Estas tres imágenes son de `--scenario belts`, con 3 cintas: **no prueban nada 
 - Coste aislado de cada punto de código: no se usó perfilador.
 - Linux.
 
+## Seguimiento tras la revisión (mismo día, sin revisor independiente)
+
+Hecho por el desarrollador, no por el revisor. El dictamen de arriba no se ha reescrito.
+
+- **H-1:** escenario `saturated` y vista `cintas`; el registro anota carga y objetos dibujados.
+- **H-2:** corregido; una cinta lejana ya no se reconcilia. Coste aislado sin medir.
+- **H-5:** A/B alternando `dev` y `0.5.0-qa5` (abajo). Sin regresión de la qa5 a hoy. La diferencia con «Zona, Después» queda sin atribuir: esa tabla es anterior a la qa5 y no se ha medido una build tan antigua.
+- **H-7:** parámetros con `StringName` fijo. Efecto en el GC sin aislar.
+- **H-10:** parcial. Mismo encuadre antes y después: el hielo se quema menos, pero queda brillo a contraluz.
+- **H-11:** corregido; el filtro usa el tamaño total del monitor.
+- **Abiertos:** H-3, H-4, H-6, H-8, H-9 y los menores.
+
+Mediana de 3 tiradas alternas, 1920×1080, 15 s por vista, escenario medio, equipo en uso:
+
+| Vista | Build | Media (rango) | p99 (rango) |
+| --- | --- | --- | --- |
+| Densa | dev | 2,87 (2,78-2,88) | 5,24 (5,12-6,15) |
+| Densa | qa5 | 3,06 (2,88-3,28) | 6,27 (5,88-7,66) |
+| Vías | dev | 5,61 (5,23-5,73) | 9,18 (8,65-12,08) |
+| Vías | qa5 | 5,70 (5,53-5,96) | 11,78 (9,82-11,80) |
+| Panorámica | dev | 3,75 (3,62-4,25) | 6,38 (5,98-8,56) |
+| Panorámica | qa5 | 3,78 (3,73-4,62) | 8,02 (7,64-9,15) |
+
+Los rangos se solapan: `dev` no es peor. No demuestra que los arreglos mejoren.
+
+Cintas saturadas (`saturated`, una tirada, `dev` antes del cambio del hielo): 30 cintas de 168 celdas, 20 160 objetos.
+
+| Vista | Dibujados | Media | p99 | Máx. | >33 ms | Dibujos |
+| --- | --- | --- | --- | --- | --- | --- |
+| Densa | 4478 | 2,17 | 3,81 | 13,82 | 0 | 165 |
+| Vías | 9368 | 3,90 | 6,27 | 32,82 | 0 | 1274 |
+| Panorámica | 7498 | 3,02 | 5,15 | 24,43 | 0 | 502 |
+| Cintas | 12 902 | 3,95 | 6,15 | 20,68 | 0 | 1064 |
+
+Cumple el objetivo en este equipo, con cámara quieta. Equipo modesto, cámara en movimiento y anfitrión con 11 clientes: **NO VERIFICADO**.
+
 ## Evidencias
 
 En `artifacts/qa/0.5-e8/`: registros `e8-*.log`; muestreos `sampler-*.csv` y `threads-*.txt`; capturas `medium_*`, `long_*`, `stress_*`, `belt_*`; recortes `recorte_*`. En `sampler-e8-medium-1.csv` la columna de CPU es 0 por un contador mal localizado, corregido en las tiradas siguientes, y la ventana solo se pudo leer en la primera muestra.

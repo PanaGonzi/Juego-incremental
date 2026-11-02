@@ -30,6 +30,7 @@ m => m| INC-01 | Alta | 0.5.0-qa2 | Corregido en `agente/correcciones` | Mejora 
 | INC-21 | Baja | 0.5.0-qa6 | Corregido | El foco rojo de la señal tiraba a naranja a distancia. Ahora los focos usan un color saturado propio con poca energía. | `artifacts/qa/0.5-escritorio/inc21_foco_rojo.png` |
 | INC-22 | Baja | 0.5.0-qa6 o anterior | Corregido | Con interfaz al 150 % en 1280×720, la barra rápida pisaba el recuadro de la mochila. Ahora la mochila sube sobre la barra si no cabe a su lado. | `artifacts/qa/0.5-escritorio/ui150_720p_mochila_sobre_barra.png` |
 | INC-23 | Baja | 0.5.0-qa6 | Abierto | Accesibilidad de Windows en Ajustes: seleccionar una pestaña se acepta pero no la cambia, y `click` sobre los botones de opción tampoco tiene efecto (`toggle` sí). Un lector de pantalla no llega a Interfaz, Sonido ni Controles. Probablemente del motor: **NO VERIFICADO**. Con teclado y ratón normales no aplica. | T-025 |
+| INC-24 | Baja | 0.5.0-qa6 o anterior | Mitigado | El hielo y algunas crestas se queman en blanco a contraluz, y parecen un segundo sol (H-10). Menos brillo en el hielo desde 0.5.0-qa7; queda un brillo menor. | `docs/REVISION_E8.md` |
 
 ## Limitaciones de las alfas
 

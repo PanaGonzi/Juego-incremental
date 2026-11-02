@@ -79,7 +79,7 @@ Los mundos de medición llevan cintas rectas con carga y una línea saturada de 
 - Comando: ~1 byte por tramo recto; 300 celdas rectas caben en 16 bytes.
 - 10 cintas de 168 celdas con entrada irregular: 246 B/s comprimidos por cliente, tick 0,025 ms.
 
-**Cliente con cintas (`--measure medium`): NO VERIFICADO.** Cada cinta es una malla propia con dos superficies, y la carga, un `MultiMesh` por objeto.
+**Cliente con cintas:** medido en un solo equipo, con cámara quieta, en [REVISION_E8](REVISION_E8.md): mundo medio y 20 160 objetos en cintas saturadas, 12 902 dibujados, p99 6,15 ms. Cumple el objetivo. Equipo modesto y cámara en movimiento: **NO VERIFICADO**.
 
 ## Medición de producción por máquina (0.5, en desarrollo)
 

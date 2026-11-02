@@ -64,7 +64,7 @@ El guion ya conoce el camino: no se equivoca, no explora y no atraviesa colision
 
 ## Qué no mejora
 
-- **Los acarreos siguen en 36.** Los lingotes y piezas de los pagos se recogen a mano de la terminal, porque se paga desde mochila y depósito. Un divisor hacia el depósito podría reducirlos; no se ha medido.
+- **Los acarreos siguen en 36 en este guion, aunque 8 ya no hacen falta.** Desde D-045 se paga también desde la terminal, así que el guion recoge a mano lo que no necesita. Probado el 02-11-2026 sin esos 8: quedan 28, de chatarra y reciclado anteriores a la cinta. Pero la partida pasa de 22:18 a 25:22 y una espera sube a 102,7 s, por encima del límite de 60. Causa exacta sin aislar. El guion se dejó como estaba: quitar acarreos no acorta por sí solo el recorrido.
 - **La espera acumulada sigue siendo alta (37 % del recorrido)**, repartida en tramos cortos.
 - **Vender chatarra a mano rinde más que la primera línea:** unos 12 ¤ por montón frente a 2 ¤/s de la línea. Es finito y exige ir a la terminal, así que no se ha tocado. Conviene observarlo con jugadores.
 

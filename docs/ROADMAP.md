@@ -73,7 +73,7 @@ Cómo leer las columnas: **Implementado** es que el código existe. **Comprobado
 | E-5 | A | Menús, panel de máquina, objetivos, ajustes | sí | `artifacts/qa/0.5-arte`; correcciones INC-08 e INC-09 | Panel con cooperativo real. Calidad baja y alta y escalas de interfaz: comprobadas con capturas (T-025), sin entradas reales |
 | E-6 | A | QA de primera experiencia con controles normales | sí, hecha sobre qa1 y qa2 | real: hasta el objetivo 10 de 23 | Repetir en la versión actual; fallo de energía; cerrar y reabrir; Retroceso y N |
 | E-7 | A | Dos clientes viendo el mismo transporte; 12 clientes | sí | T-018, T-019, un solo PC y comandos de la interfaz | Dos personas o dos PC: NO VERIFICADO |
-| E-8 | A | Revisión independiente de calidad y rendimiento con cintas cargadas | no | medidas parciales en PERFORMANCE y T-019 | La revisión independiente no se ha hecho |
+| E-8 | A | Revisión independiente de calidad y rendimiento con cintas cargadas | sí, hecha el 02-11-2026 | [REVISION_E8](REVISION_E8.md): cumple en este equipo, también con 20 160 objetos en cinta | Abiertos H-3, H-4, H-6, H-8, H-9 y parte de H-10; equipo modesto y cámara en movimiento |
 | E-9 | M | Divisores y combinadores | sustituida por C-3 | — | — |
 | E-10 | M | Acabado de Marte y del resto de máquinas | terreno y cielo de Marte, plataforma de carga; enfriador, refinería de obleas, radiadores, divisor y unificador rehechos; piloto y animación por estado (2865495) | `artifacts/qa/0.5-marte/`, `artifacts/qa/0.5-maquinas/` con antes y después; auto `gallery` | Valoración de una persona; rendimiento en equipo modesto |
 | E-11 | M | BUG-005: picos de respuesta | causa medida y mitigada: reenvío 1,3×RTT y lectura cada 5 ms | T-021, T-023, relé en un PC | Picos con pérdidas seguidas; canales separados sin probar; redes reales |
@@ -88,7 +88,7 @@ Encargo: [PROMPT_CLAUDE_CONSTRUCCION_PRIMEROS_30_MIN.md](../PROMPT_CLAUDE_CONSTR
 | C-2 | A | Colocación consecutiva, previsualización con coste y motivo, desmontaje con lo que se recupera | sí: ed60e1e | auto `artifacts/qa/0.5-construccion`; real en parte, qa2 | Repetir con entradas reales |
 | C-3 | A | Divisores y unificadores | sí como máquina (1d1b828, 137d2b6) e insertados en una cinta tendida, con la carga conservada (db39124) | xUnit `BeltEditTests`; auto `manage`; `artifacts/qa/0.5-gestion/gestion_08..10` | Insertar y mover con teclado y ratón reales |
 | C-4 | A | Lectura de un vistazo, capacidad y producción real, seguir cadena | sí | `artifacts/qa/0.5-gestion`, real con H, C y Esc | Botón «Seguir cadena» con ratón real |
-| C-5 | A | Progresión de los primeros 30 min | sí | `docs/TIEMPOS_30_MIN.md`, recorridos con guion, no con personas | 36 acarreos manuales todavía; duración con personas |
+| C-5 | A | Progresión de los primeros 30 min | sí | `docs/TIEMPOS_30_MIN.md`, recorridos con guion, no con personas | 36 acarreos en el guion, 8 ya innecesarios (ver el documento); duración con personas |
 | C-6 | A | Zona inicial, respuesta sonora y visual, ajustes para reducir movimiento y efectos | sí | `artifacts/qa/0.5-zona` | El sonido no lo ha oído nadie |
 | C-7 | A | Controles normales, dos jugadores sobre la misma construcción, rendimiento, regresión de 12 | en parte | T-018, T-019 con comandos de la interfaz | Controles reales; dos personas; antes y después de rendimiento completo |
 
