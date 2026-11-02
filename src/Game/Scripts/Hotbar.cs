@@ -326,6 +326,9 @@ public partial class Hotbar : Control
     /// <summary>Altura a la que empieza la barra, medida: los paneles centrales terminan antes.</summary>
     public float TopY => _row == null ? GetViewportRect().Size.Y - 104 : _row.GetGlobalRect().Position.Y;
 
+    /// <summary>Borde derecho de la barra, medido, para que lo que va a su lado no la pise.</summary>
+    public float RightX => _row == null ? GetViewportRect().Size.X / 2 : _row.GetGlobalRect().End.X;
+
     public Hotbar(GameView view)
     {
         _view = view;

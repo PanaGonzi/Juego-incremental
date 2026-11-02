@@ -123,6 +123,7 @@ public static class Ui
 public partial class Hud : Control
 {
     private readonly GameView _view;
+    private PanelContainer _bagPanel = null!;
     private Label _credits = null!, _power = null!, _income = null!, _objective = null!, _objectiveNeed = null!, _objectiveStep = null!, _objectiveReward = null!, _objectiveCount = null!, _bag = null!, _prompt = null!, _status = null!, _players = null!, _chatLog = null!, _toast = null!;
     private readonly List<PanelContainer> _toolSlots = new();
     private readonly List<(Label label, string key)> _toolNames = new();
@@ -212,6 +213,7 @@ public partial class Hud : Control
         bagPanel.GrowVertical = GrowDirection.Begin;
         bagPanel.OffsetRight = -16; bagPanel.OffsetBottom = -16; bagPanel.OffsetLeft = -16; bagPanel.OffsetTop = -16;
         AddChild(bagPanel);
+        _bagPanel = bagPanel;
         _bag = Ui.Text("", 16);
         bagPanel.AddChild(_bag);
 
@@ -413,6 +415,9 @@ public partial class Hud : Control
 
         var bag = Ui.Amounts(me.Bag.Items);
         _bag.Text = $"{Loc.T("hud_bag")}: {(me.Bag.Kinds == 0 ? Loc.T("hud_empty") : "\n" + bag.Replace(", ", "\n"))}";
+        // Con poco ancho, por ejemplo interfaz al 150 % en 720p, la barra llegaría a la mochila: entonces va encima de ella.
+        var lifted = _view.HotbarRight + UiTheme.S > GetViewportRect().Size.X - 16 - _bagPanel.Size.X;
+        _bagPanel.OffsetBottom = _bagPanel.OffsetTop = lifted ? _view.HotbarTop - GetViewportRect().Size.Y - UiTheme.S : -16;
 
         var list = w.Players.Values.Where(p => p.Connected).ToList();
         var mode = _view.Session.IsSolo ? "" : $"  ·  {client.RoundTripMs} ms";

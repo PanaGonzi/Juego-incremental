@@ -653,6 +653,7 @@ public partial class GameView : Node3D
     public bool PointerShown => WorldShown && !_paused && !_hud.PanelOpen && !_inv.IsOpen;
     /// <summary>Altura a la que empieza la barra rápida: los paneles terminan antes.</summary>
     public float HotbarTop => _hotbar.TopY;
+    public float HotbarRight => _hotbar?.RightX ?? 0;
     private ulong _guideAt;
 
     /// <summary>Haz de luz, brújula y flecha apuntan al mismo sitio: el destino del objetivo o de lo que le falta. Depende de lo que hay en el mundo, no de ver la baliza.</summary>
