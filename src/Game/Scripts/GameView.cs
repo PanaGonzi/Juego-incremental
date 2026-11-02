@@ -22,7 +22,7 @@ public partial class GameView : Node3D
         public Node3D? Piston;
         public Vector3 PistonRest;
         public MeshInstance3D Warn = null!;
-        public string Key = "";
+        public (string def, int x, int z, int rot) Key;
         public string Def = "";
         public float Height;
         public MachineStatus Status;
@@ -49,7 +49,7 @@ public partial class GameView : Node3D
     private readonly ChainOverlay _chain = new();
     private readonly Dictionary<int, MeshInstance3D> _nodes = new();
     private readonly Dictionary<int, RemotePlayer> _remote = new();
-    private readonly Dictionary<int, MeshInstance3D> _rails = new();
+    private RailView _rails = null!;
     private readonly Dictionary<int, SignalView> _signals = new();
     private readonly Dictionary<int, MeshInstance3D> _switches = new();
     private double _signalClock;
@@ -79,6 +79,8 @@ public partial class GameView : Node3D
     private OmniLight3D? _eventLight;
     public bool EventDecorVisible => _eventDecor != null;
     private int _railStartX, _railStartZ;
+    private uint _railPending;
+    private int _railPreviousX, _railPreviousZ;
     private bool _railPlacing;
     private byte _railShape;
     /// <summary>La tecla de rotar recorre recta, las dos curvas y la señal.</summary>
@@ -384,8 +386,7 @@ public partial class GameView : Node3D
         Belts.Clear();
         foreach (var mesh in _nodes.Values) mesh.QueueFree();
         _nodes.Clear();
-        foreach (var mesh in _rails.Values) mesh.QueueFree();
-        _rails.Clear();
+        _rails?.Clear();
         foreach (var t in _trains.Values)
         {
             t.Loco.QueueFree();
@@ -499,15 +500,18 @@ public partial class GameView : Node3D
 
     // ---------- Sincronización de representación ----------
 
+    private readonly HashSet<int> _syncSeen = new();
+
     private void SyncWorld()
     {
         var w = Session.Client.World!;
-        var seen = new HashSet<int>();
+        var seen = _syncSeen;
+        seen.Clear();
         foreach (var m in w.Machines.Values)
         {
             if (m.Planet != _viewPlanet) continue;
             seen.Add(m.Id);
-            var key = $"{m.Def}|{m.X}|{m.Z}|{m.Rot}";
+            var key = (m.Def, m.X, m.Z, (int)m.Rot);
             if (!_machines.TryGetValue(m.Id, out var node) || node.Key != key)
             {
                 var isNew = node == null;
@@ -526,7 +530,8 @@ public partial class GameView : Node3D
                 if (node.Glow != null) node.Glow.LightEnergy = FactoryActivity.GlowEnergy(node.Running);
             }
         }
-        foreach (var id in _machines.Keys.Where(k => !seen.Contains(k)).ToList())
+        // Si cuadran los totales no sobra nada: recorrer para buscar qué retirar crea listas con cada delta (H-6).
+        if (seen.Count != _machines.Count) foreach (var id in _machines.Keys.Where(k => !seen.Contains(k)).ToList())
         {
             if (_viewSynced && _machines.TryGetValue(id, out var gone)) _feedback.Removed(gone.Root.GlobalPosition);
             FreeMachine(id);
@@ -546,7 +551,7 @@ public partial class GameView : Node3D
             var s = 0.45f + 0.55f * d.Hp / def.Hp;
             mesh.Scale = new Vector3(s, s, s);
         }
-        foreach (var id in _debris.Keys.Where(k => !seen.Contains(k)).ToList())
+        if (seen.Count != _debris.Count) foreach (var id in _debris.Keys.Where(k => !seen.Contains(k)).ToList())
         {
             var mesh = _debris[id];
             BreakEffect(mesh.GlobalPosition, _debrisKinds.GetValueOrDefault(id));
@@ -571,21 +576,8 @@ public partial class GameView : Node3D
 
         Belts.Sync(w, _viewPlanet, Session.Client.StructuralDeltas);
 
-        seen.Clear();
-        foreach (var s in w.RailSegments.Values)
-        {
-            if (s.Planet != _viewPlanet) continue;
-            seen.Add(s.Id);
-            if (_rails.ContainsKey(s.Id) || !w.RailNodes.TryGetValue(s.A, out var ra) || !w.RailNodes.TryGetValue(s.B, out var rb)) continue;
-            var mesh = new MeshInstance3D { Mesh = Models.RailMesh(t => RailPoint(ra, rb, s.Shape, t), s.LengthMm / 1000f) };
-            AddChild(mesh);
-            _rails[s.Id] = mesh;
-        }
-        foreach (var id in _rails.Keys.Where(k => !seen.Contains(k)).ToList())
-        {
-            _rails[id].QueueFree();
-            _rails.Remove(id);
-        }
+        _rails ??= new RailView(this, RailPoint);
+        _rails.Sync(w, _viewPlanet, Session.Client.StructuralDeltas);
         SyncSignals(w);
 
         seen.Clear();
@@ -959,7 +951,7 @@ public partial class GameView : Node3D
         return new Vector3(x / 1000f, 0, z / 1000f);
     }
 
-    private MachineNode CreateMachine(Machine m, string key)
+    private MachineNode CreateMachine(Machine m, (string def, int x, int z, int rot) key)
     {
         var w = Session.Client.World!;
         var model = Models.Machine(m.Def);
@@ -1542,9 +1534,20 @@ public partial class GameView : Node3D
                     _railStartZ = gz;
                     _railPlacing = true;
                 }
-                else
+                else if (gx != _railStartX || gz != _railStartZ)
                 {
-                    client.Send(new Command { Type = CommandType.PlaceRail, A = _railStartX, B = _railStartZ, C = gx, D = gz, Amount = _railShape });
+                    // Un tramo rechazado no mueve el inicio: el siguiente debe seguir saliendo de la vía ya tendida.
+                    var railError = client.World!.CheckRail(client.LocalPlayer!.Planet, _railStartX, _railStartZ, gx, gz, _railShape, out var railCredits);
+                    if (railError == null && client.World.Credits < railCredits) railError = "err_cost";
+                    if (railError != null)
+                    {
+                        Notify(Loc.T(railError));
+                        Sfx.Play("error");
+                        break;
+                    }
+                    _railPreviousX = _railStartX;
+                    _railPreviousZ = _railStartZ;
+                    _railPending = client.Send(new Command { Type = CommandType.PlaceRail, A = _railStartX, B = _railStartZ, C = gx, D = gz, Amount = _railShape });
                     Sfx.Play("build");
                     _railStartX = gx;
                     _railStartZ = gz;
@@ -1556,6 +1559,15 @@ public partial class GameView : Node3D
     private void OnResult(uint id, CommandResult result)
     {
         Belts.ToolResult(id, result);
+        if (id == _railPending && _railPending != 0)
+        {
+            _railPending = 0;
+            if (!result.Ok && _railPlacing)
+            {
+                _railStartX = _railPreviousX;
+                _railStartZ = _railPreviousZ;
+            }
+        }
         if (result.Ok) return;
         if (result.Error == "err_cooldown") return;
         _hud.Toast(Loc.T(result.Error));
@@ -1973,12 +1985,18 @@ public partial class GameView : Node3D
             return;
         }
         var (x, z) = RailSnap(p);
+        if (x == _railStartX && z == _railStartZ)
+        {
+            // Aún apunta al inicio: no hay tramo que juzgar.
+            RemoveRailGhost();
+            return;
+        }
         var error = w.CheckRail(me.Planet, _railStartX, _railStartZ, x, z, _railShape, out var credits);
         if (error == null && w.Credits < credits) error = "err_cost";
         status = error == null ? $"{Loc.T("rail_shape_" + _railShape)} — {credits} ¤" : Loc.T(error);
         color = error == null ? Ui.Ink : Ui.Bad;
         var key = $"{_railStartX},{_railStartZ},{x},{z},{_railShape}";
-        if (key != _railGhostKey && (x != _railStartX || z != _railStartZ))
+        if (key != _railGhostKey)
         {
             RemoveRailGhost();
             _railGhostKey = key;
@@ -2305,7 +2323,7 @@ public partial class GameView : Node3D
         {
             name = Loc.T("remove_rail");
             cells.AddRange(RailMath.Cells(w.RailNodes[segment.A], w.RailNodes[segment.B], segment.Shape));
-            highlight = _rails.GetValueOrDefault(id);
+            highlight = _rails?.HighlightOf(w, id);
         }
 
         highlightColor = preview.Error == null ? Ui.Bad : Ui.Dim;

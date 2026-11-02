@@ -209,7 +209,7 @@ internal static class Driver
         // Godot mide --position desde la esquina del escritorio virtual, no desde el monitor principal.
         var vx = screens.Min(s => s.Bounds.X);
         var vy = screens.Min(s => s.Bounds.Y);
-        foreach (var x in new[] { "--resolution", $"{w}x{h}", "--position", $"{px - vx},{py - vy}", "--", "--profile", profile }) psi.ArgumentList.Add(x);
+        foreach (var x in new[] { "--audio-driver", "Dummy", "--resolution", $"{w}x{h}", "--position", $"{px - vx},{py - vy}", "--", "--profile", profile }) psi.ArgumentList.Add(x);
         var extra = a.IndexOf("--");
         if (extra >= 0) foreach (var x in a.Skip(extra + 1)) psi.ArgumentList.Add(x);
         var proc = Process.Start(psi)!;

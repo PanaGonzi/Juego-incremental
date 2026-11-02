@@ -220,6 +220,10 @@ public sealed partial class World
             if (_occupied.ContainsKey((planet, c.x, c.z)) || _debrisCells.ContainsKey((planet, c.x, c.z))) return "err_rail_blocked";
         foreach (var c in cells)
             if (_beltCells.ContainsKey((planet, c.x, c.z))) return "err_blocked";
+        // Mismos extremos y misma forma: la vista previa debe avisar antes de que el servidor lo rechace.
+        if (_nodeAt.TryGetValue((planet, x1, z1), out var na) && _nodeAt.TryGetValue((planet, x2, z2), out var nb))
+            foreach (var s in RailSegments.Values)
+                if ((s.A == na && s.B == nb || s.A == nb && s.B == na) && s.Shape == shape) return "err_rail_exists";
         credits = cells.Count * R.CreditsPerCell;
         return null;
     }
@@ -239,12 +243,6 @@ public sealed partial class World
         SplitAt(p.Planet, x2, z2);
         var a = NodeAt(p.Planet, x1, z1);
         var b = NodeAt(p.Planet, x2, z2);
-        foreach (var s in RailSegments.Values)
-            if ((s.A == a.Id && s.B == b.Id || s.A == b.Id && s.B == a.Id) && s.Shape == shape)
-            {
-                AddCredits(credits);
-                return CommandResult.Fail("err_link_exists");
-            }
         AddSegment(p.Planet, a, b, (byte)shape, -1);
         Bump("built.rail");
         return CommandResult.Success;

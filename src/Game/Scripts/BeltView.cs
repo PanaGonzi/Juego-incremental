@@ -140,7 +140,7 @@ public partial class BeltView : Node3D
     private sealed class BeltVisual
     {
         public int Id;
-        public string Key = "";
+        public long Key;
         public readonly List<(MeshInstance3D node, Vector3 center, float radius)> Chunks = new(); // tramos internos: la cinta sigue siendo una sola
         public Vector3[] Points = Array.Empty<Vector3>();
         public Vector3 Center;
@@ -242,18 +242,21 @@ public partial class BeltView : Node3D
         v.Chunks.Clear();
     }
 
-    private static string KeyOf(World w, Link l)
+    /// <summary>Huella de lo que cambia la malla de una cinta. Sin cadenas: se calcula para todas con cada cambio de estructura (H-4).</summary>
+    private static long KeyOf(World w, Link l)
     {
         var a = w.Machines[l.From];
         var b = w.Machines[l.To];
-        var sb = new System.Text.StringBuilder();
-        sb.Append(a.X).Append(',').Append(a.Z).Append(',').Append(a.Rot).Append(';').Append(b.X).Append(',').Append(b.Z).Append(',').Append(b.Rot).Append(';').Append(l.Elevated).Append(';');
+        var h = Mix(Mix(Mix(Mix(Mix(Mix(-3750763034362895579L, a.X), a.Z), a.Rot), b.X), b.Z), b.Rot);
+        h = Mix(h, l.Elevated ? 1 : 0);
         for (var i = 0; i < l.Cells.Count; i++)
-            sb.Append(l.Cells[i].x).Append(',').Append(l.Cells[i].z).Append(w.IsBridge(l, i) ? '^' : ' ');
-        return sb.ToString();
+            h = Mix(Mix(Mix(h, l.Cells[i].x), l.Cells[i].z), w.IsBridge(l, i) ? 1 : 0);
+        return h;
     }
 
-    private BeltVisual Build(World w, Link l, string key)
+    private static long Mix(long hash, int value) => unchecked((hash ^ value) * 1099511628211L);
+
+    private BeltVisual Build(World w, Link l, long key)
     {
         var points = l.Elevated ? ElevatedPath(w, l) : RoutePath(w, l.From, l.To, l.Cells, i => w.IsBridge(l, i));
         var visual = new BeltVisual
@@ -626,7 +629,8 @@ public partial class BeltView : Node3D
             Lift = -aabb.Position.Y * scale + 0.015f,
             Scale = scale,
         };
-        b.Node = new MultiMeshInstance3D { Multimesh = b.Multi, CustomAabb = new Aabb(new Vector3(-2000, -50, -2000), new Vector3(4000, 200, 4000)) };
+        // La carga no proyecta sombra: son objetos pequeños sobre una cinta que ya la da, y entraría en cada partición (H-8).
+        b.Node = new MultiMeshInstance3D { Multimesh = b.Multi, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, CustomAabb = new Aabb(new Vector3(-2000, -50, -2000), new Vector3(4000, 200, 4000)) };
         AddChild(b.Node);
         _batches[item] = b;
         return b;
@@ -742,7 +746,7 @@ public partial class BeltView : Node3D
         foreach (var b in _batches.Values)
         {
             if (b.Count == 0 && b.Shown == 0) continue;
-            b.Multi.Buffer = b.Buffer;
+            if (b.Count > 0) b.Multi.Buffer = b.Buffer;
             b.Multi.VisibleInstanceCount = b.Count;
             b.Shown = b.Count;
         }

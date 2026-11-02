@@ -50,6 +50,19 @@ public class BeltTests
     }
 
     [Fact]
+    public void Rail_preview_rejects_the_same_section_before_the_server_does()
+    {
+        var (w, p) = Open();
+        Assert.Null(w.CheckRail(0, 0, -30, 8, -30, 0, out _));
+        Assert.True(w.Apply(p, new Command { Type = CommandType.PlaceRail, A = 0, B = -30, C = 8, D = -30 }).Ok);
+        Assert.Equal("err_rail_exists", w.CheckRail(0, 0, -30, 8, -30, 0, out _));
+        Assert.Equal("err_rail_exists", w.CheckRail(0, 8, -30, 0, -30, 0, out _));
+        var credits = w.Credits;
+        Assert.False(w.Apply(p, new Command { Type = CommandType.PlaceRail, A = 8, B = -30, C = 0, D = -30 }).Ok);
+        Assert.Equal(credits, w.Credits);
+    }
+
+    [Fact]
     public void Ports_follow_rotation_and_storage_opens_all_sides()
     {
         var (w, p) = Open();

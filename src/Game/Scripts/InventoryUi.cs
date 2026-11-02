@@ -66,6 +66,8 @@ public partial class ItemSlot : PanelContainer
         {
             Quantity = quantity;
             _qty.Text = quantity.ToString("N0");
+            // Con cuatro cifras o más, el número no debe tapar el icono.
+            _qty.AddThemeFontSizeOverride("font_size", quantity >= 1000 ? 13 : 16);
         }
         if (usable != _usable)
         {
@@ -909,7 +911,7 @@ public partial class InventoryUi : Control
         if (def.Node != null) lines.Add(Loc.T("cat_needs_node", Loc.T("item_" + def.Node)));
         if (def.Power > 0) lines.Add($"{Loc.T("panel_power_use")}: {def.Power}");
         if (def.PowerGen > 0) lines.Add($"{Loc.T("panel_power_gen")}: {def.PowerGen}");
-        if (def.Capacity > 0) lines.Add(Loc.T("panel_capacity", def.Capacity.ToString()));
+        if (def.Capacity > 0) lines.Add(Loc.T("cat_capacity", def.Capacity.ToString()));
         _catalogDetail.Text = string.Join("\n", lines);
 
         foreach (var c in _costList.GetChildren()) { _costList.RemoveChild(c); c.QueueFree(); }
@@ -946,6 +948,7 @@ public partial class InventoryUi : Control
         if (def.Length > 0 && client.World.Content.Machines.TryGetValue(def, out var d)) ShowCost(client.World, client.LocalPlayer, d);
         else if (_tab == InventoryTab.Items)
         {
+            _detailItem = "";
             _detailTitle.Text = EntryInfo.Name(card.Entry);
             _detailBody.Text = $"{Loc.T("tool_" + EntryInfo.ToolOf(card.Entry) + "_d")}\n{Loc.T("inv_catalog_pin")}";
         }

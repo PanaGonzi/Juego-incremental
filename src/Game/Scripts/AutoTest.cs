@@ -278,6 +278,20 @@ public partial class AutoTest : Node
                 world.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0).In.TryRemove("ingot", 95); // no alcanza para la ensambladora
                 _main.StartSession(GameSession.Local(_main, world, "autotest-build", null, _main.Prefs));
             }
+            else if (_args.GetValueOrDefault("scenario") == "qastage")
+            {
+                // Partida con todo desbloqueado y material, para comprobar a mano con teclado y ratón sin repetir el inicio.
+                var world = RailWorld();
+                foreach (var id in world.Content.Upgrades.Keys) world.Upgrades.Add(id);
+                world.Credits = 200000;
+                var depot = world.Machines.Values.First(m => m.Def == "depot" && m.Planet == 0);
+                foreach (var item in new[] { "scrap", "recovered", "ingot", "parts" }) depot.In.Add(item, 2000);
+                world.Reindex();
+                _main.Store.Save("qa", world);
+                Log("RESULTADO: CORRECTO");
+                GetTree().Quit(0);
+                return;
+            }
             else if (_args.GetValueOrDefault("scenario") == "coopstage")
             {
                 // Partida con material para que un servidor dedicado sirva el escenario de fábrica compartida.

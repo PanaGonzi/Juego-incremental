@@ -1022,8 +1022,14 @@ public static partial class Models
     public static ArrayMesh RailMesh(Func<double, Vector3> eval, float lengthM)
     {
         var b = new Builder();
+        AppendRail(b, eval, lengthM);
+        return b.Commit();
+    }
+
+    /// <summary>Añade un tramo a una malla compartida: varios tramos en un solo dibujo por material (H-3).</summary>
+    public static void AppendRail(Builder b, Func<double, Vector3> eval, float lengthM)
+    {
         var steps = Mathf.Max(1, Mathf.RoundToInt(lengthM / 1.2f));
-        var last = eval(0);
         for (var i = 0; i <= steps; i++)
         {
             var t = i / (double)steps;
@@ -1043,10 +1049,7 @@ public static partial class Models
             b.Box("regolith", mid.X, -0.06f, mid.Z, 2.7f, 0.22f, len, segYaw, bevel: 0);
             b.Box("steel", mid.X + side.X, 0.17f, mid.Z + side.Z, 0.07f, 0.14f, len, segYaw, bevel: 0.015f);
             b.Box("steel", mid.X - side.X, 0.17f, mid.Z - side.Z, 0.07f, 0.14f, len, segYaw, bevel: 0.015f);
-            last = q;
         }
-        _ = last;
-        return b.Commit();
     }
 
     private static void Bogie(Builder b, float z)

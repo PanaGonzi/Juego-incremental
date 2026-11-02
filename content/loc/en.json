@@ -239,7 +239,7 @@
   "err_need_stats": "The contract's conditions are not met yet.",
   "settings_event_ambience": "Event ambience intensity",
 
-  "objective_o_clear": "Hold left click with the Multitool ({tool_cutter}) on 3 scrap piles: they give material and credits.",
+  "objective_o_clear": "Hold left click with the Multitool ({tool_cutter}) on 3 scrap piles or ice blocks: they give material and credits.",
   "objective_o_recycle": "Deposit the scrap in the Recycler ({interact_insert}) and collect 8 recovered material ({interact_take}): machines are built with it.",
   "objective_o_extractor": "Cut the ice crust from an ore deposit and place an Extractor ({tool_build}): it mines ore on its own.",
   "objective_o_smelter": "Place a Smelter near the Extractor ({tool_build}): it turns ore into ingots, which are worth far more.",
@@ -329,7 +329,9 @@
   "panel_input": "Input",
   "panel_output": "Output",
   "panel_contents": "Contents",
+  "err_rail_exists": "That rail section already exists.",
   "panel_capacity": "Contents (max {0} per type):",
+  "cat_capacity": "Capacity: {0} per type",
   "panel_status": "Status",
   "panel_power_use": "Consumption",
   "panel_power_gen": "Generates",

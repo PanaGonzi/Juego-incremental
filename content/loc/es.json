@@ -232,7 +232,7 @@
   "err_need_stats": "Aún faltan condiciones del contrato.",
   "settings_event_ambience": "Intensidad del ambiente del evento",
 
-  "objective_o_clear": "Mantén clic izquierdo con la Multiherramienta ({tool_cutter}) sobre 3 montones de chatarra: dan material y créditos.",
+  "objective_o_clear": "Mantén clic izquierdo con la Multiherramienta ({tool_cutter}) sobre 3 montones de chatarra o bloques de hielo: dan material y créditos.",
   "objective_o_recycle": "Deposita la chatarra en la Recicladora ({interact_insert}) y recoge 8 de material recuperado ({interact_take}): con él se construyen las máquinas.",
   "objective_o_extractor": "Corta la costra de hielo de un yacimiento de mineral y coloca un Extractor ({tool_build}): sacará mineral sin que hagas nada.",
   "objective_o_smelter": "Coloca una Fundición cerca del Extractor ({tool_build}): convierte el mineral en lingotes, que valen mucho más.",
@@ -309,7 +309,9 @@
   "panel_input": "Entrada",
   "panel_output": "Salida",
   "panel_contents": "Contenido",
+  "err_rail_exists": "Ese tramo de vía ya existe.",
   "panel_capacity": "Contenido (máx. {0} por tipo):",
+  "cat_capacity": "Capacidad: {0} por tipo",
   "panel_status": "Estado",
   "panel_power_use": "Consumo",
   "panel_power_gen": "Genera",
