@@ -293,7 +293,7 @@ public static class Terrain
           icec = mix(icec,soil*1.4,smoothstep(0.62,0.42,edge)*0.5);
           vec3 c = mix(soil,icec,ice);
           c = mix(c,mix(soil,ice_tint*0.45,0.42+ra.a*0.3),frost*0.75);
-          float rough = mix(rd.b,clamp(id.b*(0.9+polygon),0.08,1.0),ice);
+          float rough = mix(rd.b,clamp(id.b*(0.9+polygon),0.42,1.0),ice);
           vec2 nmap = mix(rd.rg,id.rg,ice);
           float ao = mix(rd.a,id.a,ice)*mix(1.0,0.7,polygon*ice);
           // Laderas: roca estratificada, con la dirección de los estratos en horizontal.
@@ -317,7 +317,7 @@ public static class Terrain
           ALBEDO = c;
           ROUGHNESS = rough;
           METALLIC = 0.0;
-          SPECULAR = mix(0.35,0.6,ice);
+          SPECULAR = mix(0.35,0.42,ice); // más brillo quema el hielo en blanco, y a contraluz parece un segundo sol
           NORMAL_MAP = vec3(nmap,1.0);
           NORMAL_MAP_DEPTH = 1.0;
           AO = ao;
