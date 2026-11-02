@@ -3,6 +3,27 @@ namespace Pluton.Simulation;
 /// <summary>Geometría de vías. El estado guarda solo nodos, forma y longitud; la curva se evalúa al vuelo.</summary>
 public static class RailMath
 {
+    /// <summary>
+    /// Lleva el punto apuntado al destino válido más cercano desde el inicio: una recta va a 0°, 45° o 90°
+    /// y una curva tiene igual avance en ambos ejes. Solo ayuda a apuntar; el servidor sigue validando.
+    /// </summary>
+    public static (int x, int z) AlignTarget(int startX, int startZ, int x, int z, byte shape)
+    {
+        var dx = x - startX;
+        var dz = z - startZ;
+        var ax = Math.Abs(dx);
+        var az = Math.Abs(dz);
+        if (ax == 0 && az == 0) return (x, z);
+        if (shape == 0)
+        {
+            // Frontera a 22,5°: tan = 0,414 ≈ 5/12.
+            if (az * 12 <= ax * 5) return (x, startZ);
+            if (ax * 12 <= az * 5) return (startX, z);
+        }
+        var d = Math.Max(ax, az);
+        return (startX + (dx < 0 ? -d : d), startZ + (dz < 0 ? -d : d));
+    }
+
     public static (double x, double z) Control(RailNode a, RailNode b, byte shape) =>
         shape == 1 ? (b.X, a.Z) : (a.X, b.Z);
 

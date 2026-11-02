@@ -49,6 +49,34 @@ public class BeltTests
         for (var i = 0; i < ticks; i++) w.Step();
     }
 
+    [Theory]
+    [InlineData(10, 2, 0, 10, 0)]    // casi este: recta en el eje
+    [InlineData(-10, 3, 0, -10, 0)]
+    [InlineData(1, -10, 0, 0, -10)]  // casi norte
+    [InlineData(10, 8, 0, 10, 10)]   // cerca de la diagonal: 45°
+    [InlineData(-6, 9, 0, -9, 9)]
+    [InlineData(10, 4, 1, 10, 10)]   // una curva siempre avanza igual en ambos ejes
+    [InlineData(0, -7, 2, 7, -7)]
+    [InlineData(0, 0, 0, 0, 0)]      // sobre el inicio: sin tramo
+    public void Aimed_rail_target_aligns_to_the_nearest_valid_direction(int dx, int dz, byte shape, int wantX, int wantZ)
+    {
+        Assert.Equal((100 + wantX, -50 + wantZ), RailMath.AlignTarget(100, -50, 100 + dx, -50 + dz, shape));
+    }
+
+    [Fact]
+    public void Aligned_rail_targets_always_pass_the_shape_rule()
+    {
+        var (w, _) = Open();
+        for (byte shape = 0; shape <= 2; shape++)
+            for (var dx = -12; dx <= 12; dx++)
+                for (var dz = -12; dz <= 12; dz++)
+                {
+                    var (x, z) = RailMath.AlignTarget(0, -60, dx, -60 + dz, shape);
+                    if (x == 0 && z == -60) continue;
+                    Assert.NotEqual("err_rail_shape", w.CheckRail(0, 0, -60, x, z, shape, out _));
+                }
+    }
+
     [Fact]
     public void Rail_preview_rejects_the_same_section_before_the_server_does()
     {

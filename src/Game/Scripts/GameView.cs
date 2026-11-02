@@ -1534,8 +1534,10 @@ public partial class GameView : Node3D
                     _railStartZ = gz;
                     _railPlacing = true;
                 }
-                else if (gx != _railStartX || gz != _railStartZ)
+                else if (RailMath.AlignTarget(_railStartX, _railStartZ, gx, gz, _railShape) is var aligned && (aligned.x != _railStartX || aligned.z != _railStartZ))
                 {
+                    gx = aligned.x;
+                    gz = aligned.z;
                     // Un tramo rechazado no mueve el inicio: el siguiente debe seguir saliendo de la vía ya tendida.
                     var railError = client.World!.CheckRail(client.LocalPlayer!.Planet, _railStartX, _railStartZ, gx, gz, _railShape, out var railCredits);
                     if (railError == null && client.World.Credits < railCredits) railError = "err_cost";
@@ -1985,6 +1987,7 @@ public partial class GameView : Node3D
             return;
         }
         var (x, z) = RailSnap(p);
+        (x, z) = RailMath.AlignTarget(_railStartX, _railStartZ, x, z, _railShape);
         if (x == _railStartX && z == _railStartZ)
         {
             // Aún apunta al inicio: no hay tramo que juzgar.
