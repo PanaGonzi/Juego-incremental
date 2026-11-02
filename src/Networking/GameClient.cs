@@ -28,6 +28,10 @@ public sealed class GameClient : IDisposable
     public int HashChecks => Volatile.Read(ref _hashChecks);
     public int PendingCount => _pending.Count;
     public int StructuralDeltas { get; private set; }
+    public int DebrisDeltas { get; private set; }
+
+    /// <summary>Cambia cuando puede cambiar dónde se puede construir, incluidos los escombros.</summary>
+    public int PlacementVersion => StructuralDeltas + DebrisDeltas;
     public int SlotDeltas { get; private set; }
 
     public event Action<uint>? CommandSent;
@@ -263,12 +267,12 @@ public sealed class GameClient : IDisposable
         for (var i = 0; i < n; i++)
         {
             var d = WorldCodec.ReadDebris(r);
-            structural |= !world.DebrisById.ContainsKey(d.Id);
-            world.DebrisById[d.Id] = d;
+            if (!world.DebrisById.ContainsKey(d.Id)) DebrisDeltas++;
+            world.ApplyReplicatedDebris(d);
         }
         n = r.Read7BitEncodedInt();
-        structural |= n > 0;
-        for (var i = 0; i < n; i++) world.DebrisById.Remove(r.ReadInt32());
+        if (n > 0) DebrisDeltas++;
+        for (var i = 0; i < n; i++) world.RemoveReplicatedDebris(r.ReadInt32());
         n = r.Read7BitEncodedInt();
         structural |= n > 0;
         for (var i = 0; i < n; i++)

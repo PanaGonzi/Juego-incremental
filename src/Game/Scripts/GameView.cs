@@ -2140,7 +2140,7 @@ public partial class GameView : Node3D
                 UpdateGhost(w, me, ref status, ref statusColor, ref prompt);
                 break;
             case Tool.Link:
-                prompt = Belts.ToolFrame(w, me, _aim.kind, _aim.id, _aimPoint, TryGroundPoint(out var beltAim) ? beltAim : null, client.StructuralDeltas, (float)delta, ref status, ref statusColor);
+                prompt = Belts.ToolFrame(w, me, _aim.kind, _aim.id, _aimPoint, TryGroundPoint(out var beltAim) ? beltAim : null, client.PlacementVersion, (float)delta, ref status, ref statusColor);
                 break;
             case Tool.Remove:
                 UpdateRemoval(w, me, ref status, ref statusColor, ref prompt, ref highlight, ref highlightColor);
@@ -2247,7 +2247,7 @@ public partial class GameView : Node3D
         // Las marcas se reducen al acercarse: de cerca, una flecha de tamaño fijo ocupa media pantalla.
         var sizeStep = Mathf.Clamp((int)(Mathf.Max(0f, away) / 3f), 0, 3);
         _cellMarkScale = 0.55f + sizeStep * 0.15f;
-        ShowCellMark($"build|{_buildDef}|{x}|{z}|{shownRot}|{cellColor.ToHtml()}|{sizeStep}|{Session.Client.StructuralDeltas}", w.Footprint(_buildDef, x, z, shownRot), cellColor, ports);
+        ShowCellMark($"build|{_buildDef}|{x}|{z}|{shownRot}|{cellColor.ToHtml()}|{sizeStep}|{Session.Client.PlacementVersion}", w.Footprint(_buildDef, x, z, shownRot), cellColor, ports);
         PlacementMarkCount = ports.Count;
         if (w.CanSendByBelt(def) || w.CanReceiveByBelt(def)) prompt += "\n" + Loc.T("build_ports_legend");
     }
@@ -2309,7 +2309,7 @@ public partial class GameView : Node3D
         }
 
         highlightColor = preview.Error == null ? Ui.Bad : Ui.Dim;
-        ShowCellMark($"remove|{kind}|{id}|{preview.Error}|{Session.Client.StructuralDeltas}", cells, preview.Error == null ? Ui.Bad : Ui.Dim);
+        ShowCellMark($"remove|{kind}|{id}|{preview.Error}|{Session.Client.PlacementVersion}", cells, preview.Error == null ? Ui.Bad : Ui.Dim);
         if (preview.Error != null)
         {
             status = $"{name}\n{Loc.T(preview.Error)}";

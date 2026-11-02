@@ -44,8 +44,10 @@ public partial class BeltView : Node3D
           vec4 det = texture(detail_tex, uvw);
           // Tacos transversales cada 12,5 cm, con relieve por el mapa de normales; el centro está más gastado.
           float rib = fract(along * 8.0);
-          float cleat = smoothstep(0.0, 0.1, rib) * (1.0 - smoothstep(0.26, 0.36, rib));
-          float slope = (smoothstep(0.0, 0.1, rib) - smoothstep(0.26, 0.36, rib)) * (rib < 0.18 ? 1.0 : -1.0);
+          // A distancia o en ángulo rasante los tacos bajan de 2 píxeles: se apagan para evitar el muaré.
+          float ribFade = 1.0 - smoothstep(0.25, 0.5, fwidth(along * 8.0));
+          float cleat = smoothstep(0.0, 0.1, rib) * (1.0 - smoothstep(0.26, 0.36, rib)) * ribFade;
+          float slope = (smoothstep(0.0, 0.1, rib) - smoothstep(0.26, 0.36, rib)) * (rib < 0.18 ? 1.0 : -1.0) * ribFade;
           float worn = 1.0 - smoothstep(0.1, 0.75, x);
           vec3 rubber = vec3(0.03, 0.03, 0.033) * (0.7 + tex.r * 1.1) * (1.0 + cleat * 0.45) + vec3(0.012, 0.011, 0.01) * worn;
           // Flecha pintada y desconchada: indica el sentido sin parecer un letrero luminoso.

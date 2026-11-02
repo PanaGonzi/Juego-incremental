@@ -213,6 +213,42 @@ public class NetworkTests
 
     /// <summary>El cliente numera desde 1 en cada sesión: la primera orden tras reconectar no puede recibir la respuesta guardada de la sesión anterior.</summary>
     [Fact]
+    public void Cutting_debris_updates_the_client_index_without_a_structural_delta()
+    {
+        var world = World.CreateNew(Fixture.Content);
+        var pile = world.DebrisById.Values.Where(d => d.CoversNode < 0).OrderBy(d => d.Id).First();
+        var player = Fixture.AddPlayer(world, KeyA);
+        player.Planet = pile.Planet;
+        player.X = pile.X * 2;
+        player.Z = pile.Z * 2;
+        world.ClearReplicationState();
+        using var h = new NetHarness(null, world);
+        var client = h.Join(KeyA);
+        h.Settle(100);
+        h.Server.World.Players[KeyA].X = pile.X * 2;
+        h.Server.World.Players[KeyA].Z = pile.Z * 2;
+        Assert.Equal("err_debris", client.World!.CheckPlacement(pile.Planet, "storage_crate", pile.X, pile.Z, 0, -1, out _));
+        var structural = client.StructuralDeltas;
+        var version = client.PlacementVersion;
+
+        for (var i = 0; i < 400 && client.World.DebrisById.ContainsKey(pile.Id); i++)
+        {
+            CommandResult? answer = null;
+            void OnResult(uint _, CommandResult r) => answer = r;
+            client.ResultReceived += OnResult;
+            client.Send(new Command { Type = CommandType.CutDebris, A = pile.Id });
+            h.Pump(() => answer != null);
+            client.ResultReceived -= OnResult;
+            h.Settle(120);
+        }
+
+        Assert.False(client.World.DebrisById.ContainsKey(pile.Id));
+        Assert.NotEqual("err_debris", client.World.CheckPlacement(pile.Planet, "storage_crate", pile.X, pile.Z, 0, -1, out _));
+        Assert.Equal(structural, client.StructuralDeltas);
+        Assert.True(client.PlacementVersion > version);
+    }
+
+    [Fact]
     public void First_command_after_reconnecting_is_applied_not_answered_from_the_old_session()
     {
         var world = World.CreateNew(Fixture.Content);

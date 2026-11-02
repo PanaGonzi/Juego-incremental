@@ -216,7 +216,19 @@ Hecho por el desarrollador, no por el revisor. El dictamen de arriba no se ha re
 - **H-7:** parámetros con `StringName` fijo. Efecto en el GC sin aislar.
 - **H-10:** parcial. Mismo encuadre antes y después: el hielo se quema menos, pero queda brillo a contraluz.
 - **H-11:** corregido; el filtro usa el tamaño total del monitor.
-- **Abiertos:** H-3, H-4, H-6, H-8, H-9 y los menores.
+- **H-4:** corregido para escombros: cortar o renovar chatarra ya no reindexa el mundo. Además, `Reindex` deja de ser cuadrático entre nodos y máquinas. Construir y desmontar siguen reindexando y comparando todas las cintas: abierto en ese caso.
+- **H-9:** los tacos se apagan al bajar de 2 píxeles. Mejora vista en una captura fija; en movimiento, **NO VERIFICADO**.
+- **Abiertos:** H-3, H-6, H-8, parte de H-4 y H-10, y los menores.
+
+Estrés, después de H-4, una sola tirada de 40 s, comparada con `e8-stress-2`, sin alternar builds. Puede influir el estado del equipo; la caída de `Poll` y los deltas estructurales a 0 sí se explican por el cambio:
+
+| Vista | Media | p99 | Máx. | >33 ms | Poll máx. | Pausa GC |
+| --- | --- | --- | --- | --- | --- | --- |
+| Densa | 10,87 → 10,17 | 21,37 → 18,40 | 97,62 → 55,62 | 8 → 6 | 68,2 → 7,4 ms | 388,8 → 129,3 ms |
+| Vías | 27,84 → 25,58 | 45,18 → 43,88 | 105,31 → 59,74 | 80 → 35 | 59,3 → 4,8 ms | 143,6 → 71,4 ms |
+| Panorámica | 14,30 → 10,31 | 27,84 → 18,01 | 76,21 → 38,06 | 9 → 1 | 58,4 → 4,0 ms | 256,9 → 100,2 ms |
+
+Vías sigue sin cumplir en estrés: el límite son sus 11 900 dibujos (H-3).
 
 Mediana de 3 tiradas alternas, 1920×1080, 15 s por vista, escenario medio, equipo en uso:
 

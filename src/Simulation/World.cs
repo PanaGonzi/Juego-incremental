@@ -173,16 +173,25 @@ public sealed partial class World
             foreach (var cell in Footprint(m.Def, m.X, m.Z, m.Rot))
                 _occupied[(m.Planet, cell.x, cell.z)] = m.Id;
         foreach (var d in DebrisById.Values) _debrisCells[(d.Planet, d.X, d.Z)] = d.Id;
-        foreach (var n in Nodes.Values)
-        {
-            n.OccupiedBy = -1;
-            foreach (var m in Machines.Values)
-                if (m.NodeId == n.Id) n.OccupiedBy = m.Id;
-        }
+        foreach (var n in Nodes.Values) n.OccupiedBy = -1;
+        foreach (var m in Machines.Values)
+            if (Nodes.TryGetValue(m.NodeId, out var occupied)) occupied.OccupiedBy = m.Id;
         _machineList = Machines.Values.ToArray();
         ReindexBelts();
         ReindexRail();
         RecomputeMods();
+    }
+
+    /// <summary>Un escombro replicado, sin reindexar todo el mundo: cortar y la chatarra renovada son frecuentes.</summary>
+    public void ApplyReplicatedDebris(Debris d)
+    {
+        DebrisById[d.Id] = d;
+        _debrisCells[(d.Planet, d.X, d.Z)] = d.Id;
+    }
+
+    public void RemoveReplicatedDebris(int id)
+    {
+        if (DebrisById.Remove(id, out var d)) _debrisCells.Remove((d.Planet, d.X, d.Z));
     }
 
     /// <summary>
