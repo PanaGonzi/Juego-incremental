@@ -404,6 +404,17 @@ public sealed partial class World
     /// Regla de no atasco: lo que ya ninguna salida conectada puede aceptar vuelve al depósito, igual que al retirar una cinta.
     /// Sin salidas se espera sin más: el jugador puede estar a medio conectar. Un objeto por tick, sin coste si no hay nada retenido.
     /// </summary>
+    /// <summary>Solo reparte si tiene salida y le llega algo: guarda carga o una cinta de entrada trae carga.</summary>
+    private bool JunctionHasFlow(Machine m)
+    {
+        if (!_beltsOut.ContainsKey(m.Id)) return false;
+        if (m.In.Kinds > 0) return true;
+        if (!_beltsIn.TryGetValue(m.Id, out var ins)) return false;
+        foreach (var l in ins)
+            if (l.Load > 0) return true;
+        return false;
+    }
+
     private void StepJunction(Machine m)
     {
         if (m.In.Kinds == 0 || !_beltsOut.ContainsKey(m.Id)) return;

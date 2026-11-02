@@ -878,7 +878,7 @@ public sealed partial class World
                 break;
             case MachineKind.Splitter:
             case MachineKind.Merger:
-                m.Status = MachineStatus.Passing;
+                m.Status = JunctionHasFlow(m) ? MachineStatus.Passing : MachineStatus.Idle;
                 StepJunction(m);
                 break;
             case MachineKind.Production:

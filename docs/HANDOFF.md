@@ -7,7 +7,7 @@
 - **Bloqueos exactos:** ver [STATUS](STATUS.md). Todos requieren al titular.
 - **Pruebas pendientes:** «Sin verificar» en [TEST_REPORTS](TEST_REPORTS.md).
 - **Agentes:** ninguno activo. Las ramas `agente/*` ya están integradas en `evolucion-0.5`.
-- **Siguiente tarea concreta:** lo que queda abierto en [PENDIENTE_CONTROLES_REALES](PENDIENTE_CONTROLES_REALES.md) e INC-33; después, el resto de H-4, H-6 y H-8 en [REVISION_E8](REVISION_E8.md). `0.5.0-qa8` incluye H-3, H-4, H-6, H-8, H-9 y los arreglos de T-028.
+- **Siguiente tarea concreta:** lo que queda abierto en [PENDIENTE_CONTROLES_REALES](PENDIENTE_CONTROLES_REALES.md); después, el resto de H-4, H-6 y H-8 en [REVISION_E8](REVISION_E8.md). `0.5.0-qa8` incluye H-3, H-4, H-6, H-8, H-9 y los arreglos de T-028.
 - **Pruebas sin molestar al titular:** `auto-test`, `coop-test` y `host-test` abren sin sonido y en un monitor secundario (`tools/lib-ventana.ps1`). En `auto-test`, `-NoCapture` evita capturar el ratón. Mientras use el equipo, no ejecutar `PlayDriver`, ni `fp` o el bucle sin `-NoCapture`: capturan el ratón. El titular lo pidió el 01-11-2026.
 - **Menús sin molestar:** `tools/desktop-start.ps1` abre `alpha-dev` con accesibilidad, sin foco y sin capturar el ratón; después, `agent-desktop` con `--window-id`. No volver a activar la ventana quitando `WS_EX_NOACTIVATE`: un clic semántico le da el primer plano. En botones de opción, `toggle`, no `click`. Alcance en T-025.
 - **Pruebas visuales:** `tools/PlayDriver`. Una sola sesión a la vez; siempre perfil `test*`.

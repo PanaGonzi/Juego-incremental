@@ -74,6 +74,41 @@ public class BeltEditTests
         Assert.Equal(inDepot + w.Content.Balance.BeltSlotsPerCell, depot.In.Get("scrap"));
     }
 
+    [Theory]
+    [InlineData("splitter")]
+    [InlineData("merger")]
+    public void A_junction_only_says_it_is_passing_while_load_reaches_it(string def)
+    {
+        var (w, p, a, _, l) = StraightBelt();
+        var (x, z) = l.Cells[4];
+        Assert.True(w.Apply(p, new Command { Type = CommandType.InsertJunction, Text = def, A = x, B = z }).Ok);
+        var junction = w.Machines.Values.Single(m => m.Def == def);
+        w.Step();
+        Assert.Equal(MachineStatus.Idle, junction.Status);
+
+        a.In.Add("scrap", 20);
+        var passed = false;
+        for (var i = 0; i < 300 && !passed; i++)
+        {
+            w.Step();
+            passed = junction.Status == MachineStatus.Passing;
+        }
+        Assert.True(passed);
+
+        for (var i = 0; i < 3000; i++) w.Step();
+        Assert.Equal(MachineStatus.Idle, junction.Status);
+    }
+
+    [Fact]
+    public void A_junction_with_nowhere_to_send_load_does_not_say_it_is_passing()
+    {
+        var (w, p) = BeltTests.Open();
+        var junction = BeltTests.Place(w, p, "splitter", 0, -40);
+        junction.In.Add("scrap", 1);
+        w.Step();
+        Assert.Equal(MachineStatus.Idle, junction.Status);
+    }
+
     [Fact]
     public void The_factory_keeps_running_and_conserves_after_inserting()
     {

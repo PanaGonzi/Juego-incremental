@@ -39,7 +39,7 @@ m => m| INC-01 | Alta | 0.5.0-qa2 | Corregido en `agente/correcciones` | Mejora 
 | INC-30 | Baja | 0.5.0-qa7 | Corregido | Cortar hielo contaba para un objetivo que solo hablaba de chatarra. El texto ahora incluye los bloques de hielo. | `t8_hielo.jpg` |
 | INC-31 | Baja | 0.5.0-qa7 | Corregido | Las cifras de 4 dígitos tapaban el icono en el inventario. | T-028 |
 | INC-32 | Media | 0.5.0-qa7 | Corregido | Una recta exige dirección exacta, y con el ratón casi nunca se acertaba. El destino encaja ahora en el eje válido más cercano; el servidor sigue validando. | `eje5f_lateral.jpg`, `eje6_puesta.jpg`, `eje_e_curva_puesta.jpg` |
-| INC-33 | Baja | 0.5.0-qa8 | Abierto | Divisor y unificador dicen «Repartiendo» aunque estén vacíos o sin conectar. Además, la ayuda llama «Backspace» a la tecla de Retroceso. | T-028 |
+| INC-33 | Baja | 0.5.0-qa8 | Corregido tras qa8 | Divisor y unificador decían «Repartiendo» aunque estuvieran vacíos o sin conectar. Ahora dicen «En espera» y no animan. Queda menor: las ayudas muestran los nombres de tecla de Windows en inglés, como «Backspace». | `A_junction_only_says_it_is_passing_while_load_reaches_it` |
 
 ## Limitaciones de las alfas
 
