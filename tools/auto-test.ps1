@@ -15,7 +15,10 @@ if ($Measure -ne '') { $args2 += @('--measure', $Measure) }
 if ($Language -ne '') { $args2 += @('--language', $Language) }
 if ($NoShots) { $args2 += '--no-shots' }
 if ($NoCapture) { $args2 += '--no-capture' } # sin capturar el ratón: omite las comprobaciones de entrada del bucle
-$p = Start-Process (Join-Path $Repo "builds\alpha-$Build\client\Pluton.exe") -PassThru -ArgumentList $args2 -RedirectStandardOutput "$Out\stdout.txt" -RedirectStandardError "$Out\stderr.txt"
+$Exe = Join-Path $Repo "builds\alpha-$Build\client\Pluton.exe"
+if ($NoCapture) { Set-NoFocus $Exe } # sin captura no hace falta el foco: no se le quita al titular
+$p = Start-Process $Exe -PassThru -ArgumentList $args2 -RedirectStandardOutput "$Out\stdout.txt" -RedirectStandardError "$Out\stderr.txt"
+if ($NoCapture) { Clear-NoFocus $Exe }
 $null = $p.Handle
 if (-not $p.WaitForExit($Timeout * 1000)) { $p.Kill(); 'TIEMPO AGOTADO' }
 "exit=$($p.ExitCode)"

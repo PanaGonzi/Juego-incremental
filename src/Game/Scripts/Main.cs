@@ -19,6 +19,9 @@ public partial class Main : Node
     private string _pendingMessage = "";
     public AutoTest? Auto;
 
+    /// <summary>Con --no-capture el ratón sigue libre durante la partida: para probar el juego mientras el titular usa el equipo.</summary>
+    public bool NoCapture { get; private set; }
+
     public override void _Ready()
     {
         var args = CmdArgs.Parse();
@@ -32,6 +35,9 @@ public partial class Main : Node
         Prefs.ApplyDisplay();
         Sfx.Setup(this, Prefs);
 
+        NoCapture = args.ContainsKey("no-capture");
+        // tools\desktop-start abre la ventana sin foco; ya abierta, debe volver a ser una ventana normal para que la vea la accesibilidad.
+        if (NoCapture && args.ContainsKey("desktop-test")) GetWindow().Unfocusable = false;
         if (args.ContainsKey("autotest"))
         {
             Auto = new AutoTest(this, args);

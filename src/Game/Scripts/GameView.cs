@@ -1387,7 +1387,8 @@ public partial class GameView : Node3D
     public void UpdateMouseMode()
     {
         var free = _paused || _hud.PanelOpen || _hud.ChatOpen || _inv.IsOpen || !_worldReady;
-        var mode = _main.Auto != null && !TestCapture ? Input.MouseModeEnum.Visible : free ? Input.MouseModeEnum.Visible : Input.MouseModeEnum.Captured;
+        var neverCapture = _main.Auto != null ? !TestCapture : _main.NoCapture;
+        var mode = neverCapture ? Input.MouseModeEnum.Visible : free ? Input.MouseModeEnum.Visible : Input.MouseModeEnum.Captured;
         if (mode == Input.MouseModeEnum.Captured && Input.MouseMode != mode)
         {
             // Recupera el control sin clics accidentales ni salto de cámara.

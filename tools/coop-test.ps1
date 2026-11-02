@@ -10,6 +10,7 @@ New-Item -ItemType Directory -Force "$Out\a", "$Out\b", "$Out\barrier" | Out-Nul
 
 . "$PSScriptRoot\lib-ventana.ps1"
 $script:Slot = 0
+Set-NoFocus $Exe # las ventanas de prueba no quitan el foco al titular
 function Client($dir, $profile, $extra) {
     $a = (Test-WindowArgs 960 540 $script:Slot) + @('--', '--autotest', '--profile', $profile, '--outdir', "`"$Out\$dir`"", '--width', '960', '--height', '540', '--seconds', $Seconds) + $extra
     if ($Scenario -ne '') { $a += @('--scenario', $Scenario, '--role', $dir, '--barrier', "`"$Out\barrier`"") }
@@ -42,6 +43,7 @@ if ($Mode -eq 'dedicated') {
 }
 $b = Client 'b' 'test-b' @('--join', "127.0.0.1:$Port")
 
+Clear-NoFocus $Exe
 foreach ($p in $a, $b) { if (-not $p.WaitForExit(300000)) { $p.Kill(); 'TIEMPO AGOTADO' } }
 if ($srv) { Stop-Process -Id $srv.Id -Force; Get-Content "$Out\server.log" | Select-Object -Last 8 }
 "A exit=$($a.ExitCode)"; Get-Content "$Out\a\autotest.log" -Encoding utf8 -ErrorAction SilentlyContinue

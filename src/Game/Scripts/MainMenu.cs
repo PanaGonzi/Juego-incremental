@@ -158,10 +158,10 @@ public partial class MainMenu : Control
         var note = Ui.Text(Loc.T("host_note"), 15, Ui.Dim);
         note.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _box.AddChild(note);
-        var name = new LineEdit { Text = _main.Prefs.PlayerName, MaxLength = Protocol.MaxNameLength };
+        var name = new LineEdit { Text = _main.Prefs.PlayerName, MaxLength = Protocol.MaxNameLength, AccessibilityName = Loc.T("join_name") };
         _box.AddChild(Ui.Text(Loc.T("join_name"), 15, Ui.Dim));
         _box.AddChild(name);
-        var port = new LineEdit { Text = Main.DefaultPort.ToString() };
+        var port = new LineEdit { Text = Main.DefaultPort.ToString(), AccessibilityName = Loc.T("join_port") };
         _box.AddChild(Ui.Text(Loc.T("join_port"), 15, Ui.Dim));
         _box.AddChild(port);
         var saves = _main.Store.List();
@@ -181,10 +181,10 @@ public partial class MainMenu : Control
     {
         Clear();
         _box.AddChild(Ui.Heading(Loc.T("join_title"), UiTheme.Heading));
-        var name = new LineEdit { Text = _main.Prefs.PlayerName, MaxLength = Protocol.MaxNameLength };
-        var address = new LineEdit { Text = "127.0.0.1" };
-        var port = new LineEdit { Text = Main.DefaultPort.ToString() };
-        var password = new LineEdit { Secret = true };
+        var name = new LineEdit { Text = _main.Prefs.PlayerName, MaxLength = Protocol.MaxNameLength, AccessibilityName = Loc.T("join_name") };
+        var address = new LineEdit { Text = "127.0.0.1", AccessibilityName = Loc.T("join_address") };
+        var port = new LineEdit { Text = Main.DefaultPort.ToString(), AccessibilityName = Loc.T("join_port") };
+        var password = new LineEdit { Secret = true, AccessibilityName = Loc.T("join_password") };
         _box.AddChild(Ui.Text(Loc.T("join_name"), 15, Ui.Dim));
         _box.AddChild(name);
         _box.AddChild(Ui.Text(Loc.T("join_address"), 15, Ui.Dim));
@@ -234,7 +234,7 @@ public static class SettingsForm
             label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
             var amount = Ui.Text(show(value), UiTheme.Small, Ui.Amber);
             to.AddChild(Ui.Row(UiTheme.M, label, amount));
-            var s = new HSlider { MinValue = min, MaxValue = max, Step = step, Value = value, CustomMinimumSize = new Vector2(380, 22), FocusMode = Control.FocusModeEnum.All };
+            var s = new HSlider { MinValue = min, MaxValue = max, Step = step, Value = value, CustomMinimumSize = new Vector2(380, 22), FocusMode = Control.FocusModeEnum.All, AccessibilityName = Loc.T(key) };
             s.ValueChanged += v =>
             {
                 set((float)v);

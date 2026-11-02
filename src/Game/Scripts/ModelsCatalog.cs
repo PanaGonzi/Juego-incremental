@@ -985,17 +985,19 @@ public static partial class Models
 
     private static StandardMaterial3D? _signalRed, _signalGreen;
 
-    /// <summary>Focos de señal con menos brillo que los pilotos: a más energía, el rojo se ve rosa y deja de leerse como rojo.</summary>
+    /// <summary>Focos de señal: color saturado y poca energía. Con el color de los pilotos, el resplandor y el tonemap los llevan a rosa o naranja.</summary>
     public static StandardMaterial3D SignalLamp(bool red)
     {
-        if (red) return _signalRed ??= Dimmed("red");
-        return _signalGreen ??= Dimmed("green");
-        static StandardMaterial3D Dimmed(string name)
+        if (red) return _signalRed ??= Focus(new Color(1f, 0.02f, 0.01f), 1.1f);
+        return _signalGreen ??= Focus(new Color(0.05f, 1f, 0.2f), 0.9f);
+        static StandardMaterial3D Focus(Color color, float energy) => new()
         {
-            var m = (StandardMaterial3D)Materials.Lamp(name).Duplicate();
-            m.EmissionEnergyMultiplier = 0.9f;
-            return m;
-        }
+            AlbedoColor = color * 0.4f,
+            EmissionEnabled = true,
+            Emission = color,
+            EmissionEnergyMultiplier = energy,
+            Roughness = 0.4f,
+        };
     }
 
     public static readonly Vector3 SignalRedLamp = new(0, 3.97f, 0);
