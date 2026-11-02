@@ -4,6 +4,8 @@ Estas pruebas toman el foco y el ratón, así que solo se ejecutan con `tools/Pl
 
 Hasta que se hagan, todo lo que aparece aquí está **NO VERIFICADO** con entradas reales, aunque tenga comprobación automática.
 
+`agent-desktop` no cubre esta lista: no da teclas mantenidas ni ratón relativo (T-025).
+
 ## Base: repetir sobre la última versión
 
 La última sesión con entradas reales fue la de `0.5.0-qa2`. La versión actual es `0.5.0-qa6`.
@@ -45,7 +47,7 @@ La última sesión con entradas reales fue la de `0.5.0-qa2`. La versión actual
 
 - [ ] Multiherramienta a 1080p y 3440×1440, y con otros FOV.
 - [ ] Partículas al cortar hielo y roca.
-- [ ] Calidad baja y alta; escala de interfaz distinta de 100.
+- [ ] Jugar con calidad baja y alta y con escala de interfaz distinta de 100. Ya hay capturas sin entradas reales (T-025).
 - [ ] Vapor en movimiento y existencias en los puertos de la zona inicial.
 
 ## Solo una persona puede decidirlo

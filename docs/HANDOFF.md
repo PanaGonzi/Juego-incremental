@@ -9,6 +9,7 @@
 - **Agentes:** ninguno activo. Las ramas `agente/*` ya están integradas en `evolucion-0.5`.
 - **Siguiente tarea concreta:** las seis tareas del encargo vigente están hechas, con sus límites en [STATUS](STATUS.md) y T-024. Lo siguiente es la primera con pendiente en el [ROADMAP](ROADMAP.md), con INC-21 como arreglo menor. Con el equipo libre, además, [PENDIENTE_CONTROLES_REALES](PENDIENTE_CONTROLES_REALES.md).
 - **Pruebas sin molestar al titular:** `auto-test`, `coop-test` y `host-test` abren sin sonido y en un monitor secundario (`tools/lib-ventana.ps1`). En `auto-test`, `-NoCapture` evita capturar el ratón. Mientras use el equipo, no ejecutar `PlayDriver`, ni `fp` o el bucle sin `-NoCapture`: capturan el ratón. El titular lo pidió el 01-11-2026.
+- **Menús sin molestar:** `tools/desktop-start.ps1` abre `alpha-dev` con accesibilidad, sin foco y sin capturar el ratón; después, `agent-desktop` con `--window-id`. No volver a activar la ventana quitando `WS_EX_NOACTIVATE`: un clic semántico le da el primer plano. En botones de opción, `toggle`, no `click`. Alcance en T-025.
 - **Pruebas visuales:** `tools/PlayDriver`. Una sola sesión a la vez; siempre perfil `test*`.
 - **Cuidado:**
   - `auto-test`, `coop-test` y `host-test` abren ventanas y usan GPU: comprobar antes que no haya un `Pluton.exe` del titular abierto.

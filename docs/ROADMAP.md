@@ -70,7 +70,7 @@ Cómo leer las columnas: **Implementado** es que el código existe. **Comprobado
 | E-2 | A | Brazos, multiherramienta y animaciones | sí | auto `artifacts/qa/0.5-fp`; real en qa2: la herramienta reacciona | 1080p, 3440×1440 y otros FOV; partículas de hielo y roca; sonido |
 | E-3 | A | Controles, barra rápida e inventario con transferencias | sí | real en qa2: 1-9, L, clic derecho con selector, arrastrar | Mayús+clic, Ctrl+clic, fijar a la barra rápida |
 | E-4 | A | Zona representativa industrial | sí | `artifacts/qa/0.5-zona`, real y auto | Montículo gris junto al pecio; vapor en movimiento; existencias en los puertos |
-| E-5 | A | Menús, panel de máquina, objetivos, ajustes | sí | `artifacts/qa/0.5-arte`; correcciones INC-08 e INC-09 | Calidad baja y alta; escala de interfaz distinta de 100; panel con cooperativo real |
+| E-5 | A | Menús, panel de máquina, objetivos, ajustes | sí | `artifacts/qa/0.5-arte`; correcciones INC-08 e INC-09 | Panel con cooperativo real. Calidad baja y alta y escalas de interfaz: comprobadas con capturas (T-025), sin entradas reales |
 | E-6 | A | QA de primera experiencia con controles normales | sí, hecha sobre qa1 y qa2 | real: hasta el objetivo 10 de 23 | Repetir en la versión actual; fallo de energía; cerrar y reabrir; Retroceso y N |
 | E-7 | A | Dos clientes viendo el mismo transporte; 12 clientes | sí | T-018, T-019, un solo PC y comandos de la interfaz | Dos personas o dos PC: NO VERIFICADO |
 | E-8 | A | Revisión independiente de calidad y rendimiento con cintas cargadas | no | medidas parciales en PERFORMANCE y T-019 | La revisión independiente no se ha hecho |
@@ -103,7 +103,7 @@ Encargo: [PROMPT_CLAUDE_CONSTRUCCION_PRIMEROS_30_MIN.md](../PROMPT_CLAUDE_CONSTR
 | B-5 | M | Exportar y comprobar servidor Linux | pendiente; sin entorno Linux aquí, no se anuncia |
 | B-6 | M | Arte: variedad, animación de jugadores, audio ambiente | pendiente |
 | B-7 | B | Prestigio opcional | pendiente |
-| B-8 | A | Desvíos y señales | primer sistema implementado: reservas por bloques, señales con foco, rutas deterministas, desvíos en mitad de una recta y cruces. Comprobado en un PC con xUnit, auto `signals` y `coopfactory` con señales (T-024). Pendiente: entradas reales, valoración de una persona, un tren ante una señal con dos clientes Godot, INC-21 y caudal por encima de unos 8 trenes por línea |
+| B-8 | A | Desvíos y señales | primer sistema implementado: reservas por bloques, señales con foco, rutas deterministas, desvíos en mitad de una recta y cruces. Comprobado en un PC con xUnit, auto `signals` y `coopfactory` con señales (T-024). Pendiente: entradas reales, valoración de una persona, un tren ante una señal con dos clientes Godot y caudal por encima de unos 8 trenes por línea |
 
 ## RC
 

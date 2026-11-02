@@ -27,7 +27,9 @@ m => m| INC-01 | Alta | 0.5.0-qa2 | Corregido en `agente/correcciones` | Mejora 
 | INC-18 | Baja | 0.5.0-qa2 | Corregido en `agente/correcciones` | Foco en «Guardar» y Esc saliendo de golpe. | `18_pausa_foco`, `18_esc_retrocede` |
 | INC-19 | Baja | 0.5.0-qa2 | Corregido en `agente/correcciones` | «Ingresos/min» se disparaba con ventas sueltas y contratos: media de 5 min, solo ventas. | `16_vendido_lingote` (50 ¤ → 10/min) |
 | INC-20 | Baja | 0.5.0-qa4 | Corregido | Las piezas grandes llenaban de flechas el lugar de colocación. Ahora, al colocar, hay una marca por cara y sentido: la plataforma de carga pasa de 32 a 8, más pequeñas y escaladas con la distancia. Al tender una cinta se ve el conector elegido, resaltado, y sus vecinos libres. Los conectores reales no cambian. Con entradas reales: NO VERIFICADO. | `artifacts/qa/0.5-visual/inc20_*.png`; `PortIndicatorTests`; auto `mars` |
-| INC-21 | Baja | 0.5.0-qa6 | Abierto | El foco rojo de la señal tira a naranja a distancia, aunque con menos brillo ya no se ve rosa. | `artifacts/qa/0.5-senales/signals_05_rojo_tren_detenido.png` |
+| INC-21 | Baja | 0.5.0-qa6 | Corregido | El foco rojo de la señal tiraba a naranja a distancia. Ahora los focos usan un color saturado propio con poca energía. | `artifacts/qa/0.5-escritorio/inc21_foco_rojo.png` |
+| INC-22 | Baja | 0.5.0-qa6 o anterior | Corregido | Con interfaz al 150 % en 1280×720, la barra rápida pisaba el recuadro de la mochila. Ahora la mochila sube sobre la barra si no cabe a su lado. | `artifacts/qa/0.5-escritorio/ui150_720p_mochila_sobre_barra.png` |
+| INC-23 | Baja | 0.5.0-qa6 | Abierto | Accesibilidad de Windows en Ajustes: seleccionar una pestaña se acepta pero no la cambia, y `click` sobre los botones de opción tampoco tiene efecto (`toggle` sí). Un lector de pantalla no llega a Interfaz, Sonido ni Controles. Probablemente del motor: **NO VERIFICADO**. Con teclado y ratón normales no aplica. | T-025 |
 
 ## Limitaciones de las alfas
 
