@@ -2,18 +2,18 @@
 
 **Última build estable:** `builds/alpha-0.4.1` (commit babc91c, etiqueta `alpha-0.4.1`, protocolo 4, guardado 4). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`.
 
-**Última build de prueba:** `builds/alpha-0.5.0-qa7` (protocolo 9, guardado 6; commit en su `VERSION.txt`). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`. Sin QA con entradas reales de Windows: la última es la de `0.5.0-qa2`.
+**Última build de prueba:** `builds/alpha-0.5.0-qa8` (protocolo 9, guardado 6; commit en su `VERSION.txt`). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`. Regresión automática sobre el paquete (T-029); entradas reales sobre `alpha-dev` (T-028).
 
 **Hitos:** M0, A0.1, A0.2, A0.4 y evento/offline de A0.5 implementados, con verificación en una sola máquina. A0.3 completo salvo Steam en el menú.
 
 **Rama `evolucion-0.5`, bloques E y C:** el código de E-0 a E-7 y de C-1 a C-6 está integrado, pero integrado no significa comprobado. El desglose por tarea, con lo implementado, lo comprobado y lo pendiente, está en el [ROADMAP](ROADMAP.md).
 
 - **Comprobado con recorridos automáticos y xUnit, en un PC:** cintas, construcción, gestión, zona, tren, viaje, Marte, Halloween, ausencia, dos clientes sobre la misma fábrica con anfitrión y dedicado, y 12 clientes con el 13.º rechazado (T-018 a T-022).
-- **Comprobado con entradas reales de Windows:** solo hasta `0.5.0-qa2`, y en parte.
+- **Comprobado con entradas reales de Windows:** sesión de un agente sobre `alpha-dev`, casi toda la lista (T-028). Lo que queda, en [PENDIENTE_CONTROLES_REALES](PENDIENTE_CONTROLES_REALES.md).
 - **Revisión independiente de rendimiento (E-8):** hecha, con hallazgos abiertos, en [REVISION_E8](REVISION_E8.md).
 - **Mitigado sin resolver del todo:** BUG-005: causa medida y respuesta mejorada, pero con pérdida siguen los picos (T-023).
 
-**B-8, señales y desvíos:** primer sistema implementado y comprobado con órdenes automáticas en un PC (T-024). Con entradas reales: **NO VERIFICADO**.
+**B-8, señales y desvíos:** primer sistema implementado y comprobado en un PC con órdenes automáticas (T-024) y, para poner señales y ramales, con entradas reales (T-028). Con personas: **NO VERIFICADO**.
 
 **Pendiente con controles reales:** lista concreta en [PENDIENTE_CONTROLES_REALES](PENDIENTE_CONTROLES_REALES.md). Toma el foco y el ratón: solo cuando el titular no esté usando el equipo. No detiene el resto del trabajo.
 
@@ -28,6 +28,6 @@
 
 **Riesgos:**
 
-1. Ninguna persona ha jugado todavía: todo lo verificado son bots y recorridos automáticos.
+1. Ninguna persona ha jugado todavía: todo lo verificado son bots, recorridos automáticos y un agente con teclado y ratón.
 2. BUG-001, reinicio de GPU una vez, sin repetir; este PC los registra desde antes del proyecto.
 3. Rendimiento solo medido en un equipo potente.

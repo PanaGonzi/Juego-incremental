@@ -218,7 +218,11 @@ Hecho por el desarrollador, no por el revisor. El dictamen de arriba no se ha re
 - **H-11:** corregido; el filtro usa el tamaño total del monitor.
 - **H-4:** corregido para escombros: cortar o renovar chatarra ya no reindexa el mundo. Además, `Reindex` deja de ser cuadrático entre nodos y máquinas. Construir y desmontar siguen reindexando y comparando todas las cintas: abierto en ese caso.
 - **H-9:** los tacos se apagan al bajar de 2 píxeles. Mejora vista en una captura fija; en movimiento, **NO VERIFICADO**.
-- **Abiertos:** H-3, H-6, H-8, parte de H-4 y H-10, y los menores.
+- **H-3:** parcial. Las vías se dibujan con una malla por zona de 32 celdas, y un cambio solo rehace su zona. Sin distancia de dibujo ni LOD.
+- **H-4:** la clave de cada cinta ya no crea cadenas. Construir y desmontar siguen llamando a `Reindex` y recorren todas las cintas: abierto en parte.
+- **H-6:** parcial. Sin cadena por máquina, conjuntos reutilizados y sin listas si no sobra nada. `SyncWorld` sigue recorriendo todo con cada delta.
+- **H-8:** parcial. La carga no proyecta sombra. Se mantiene el AABB grande, porque el lote cerca del jugador casi siempre está a la vista. Sigue la copia del búfer por frame, salvo con el lote vacío; su capacidad es como mucho el doble de lo usado.
+- **Abiertos:** el resto de H-3, H-4, H-6, H-8 y H-10, y los menores.
 
 Estrés, después de H-4, una sola tirada de 40 s, comparada con `e8-stress-2`, sin alternar builds. Puede influir el estado del equipo; la caída de `Poll` y los deltas estructurales a 0 sí se explican por el cambio:
 
@@ -253,6 +257,34 @@ Cintas saturadas (`saturated`, una tirada, `dev` antes del cambio del hielo): 30
 | Cintas | 12 902 | 3,95 | 6,15 | 20,68 | 0 | 1064 |
 
 Cumple el objetivo en este equipo, con cámara quieta. Equipo modesto, cámara en movimiento y anfitrión con 11 clientes: **NO VERIFICADO**.
+
+Estrés después de H-3, H-4, H-6 y H-8, una tirada de 40 s en `alpha-dev`, comparada con la fila «después de H-4», sin alternar builds:
+
+| Vista | Media | p99 | Máx. | >33 ms | Dibujos |
+| --- | --- | --- | --- | --- | --- |
+| Densa | 10,17 → 10,04 | 18,40 → 17,84 | 55,62 → 38,64 | 6 → 1 | 1718 |
+| Vías | 25,58 → 7,24 | 43,88 → 11,74 | 59,74 → 35,04 | 35 → 3 | 11 900 → 615 |
+| Panorámica | 10,31 → 8,88 | 18,01 → 14,47 | 38,06 → 33,38 | 1 → 1 | 1340 |
+
+Vías pasa a cumplir media y p99 en estrés, y el cambio se explica por los dibujos. En densa y panorámica la diferencia puede ser ruido. Quedan picos sueltos por encima de 33 ms.
+
+Paquete `0.5.0-qa8`, una tirada, 15 s por vista, 1920×1080, cámara quieta (T-029):
+
+| Mundo | Vista | Media | p99 | Máx. | >33 ms | Dibujada | Dibujos |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Medio | Densa | 2,62 | 4,17 | 17,55 | 0 | 450 | 942 |
+| Medio | Vías | 2,62 | 3,71 | 10,93 | 0 | 304 | 375 |
+| Medio | Panorámica | 2,86 | 4,15 | 11,56 | 0 | 290 | 1193 |
+| Long | Densa | 1,68 | 2,72 | 16,12 | 0 | 22 | 162 |
+| Long | Vías | 2,52 | 3,53 | 14,45 | 0 | 323 | 1281 |
+| Long | Panorámica | 2,09 | 3,12 | 20,93 | 0 | 562 | 497 |
+| Long | Cintas | 2,46 | 3,44 | 18,26 | 0 | 967 | 1061 |
+| Saturado | Densa | 2,02 | 3,03 | 16,70 | 0 | 4478 | 161 |
+| Saturado | Vías | 3,17 | 4,14 | 21,11 | 0 | 9368 | 1270 |
+| Saturado | Panorámica | 2,59 | 3,55 | 24,83 | 0 | 7498 | 498 |
+| Saturado | Cintas | 3,30 | 4,82 | 20,63 | 0 | 12 902 | 1060 |
+
+Medir con equipo modesto, cámara en movimiento y anfitrión con 11 clientes: sigue **NO VERIFICADO**.
 
 ## Evidencias
 

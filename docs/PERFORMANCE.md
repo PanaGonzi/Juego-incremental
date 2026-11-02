@@ -79,6 +79,8 @@ Los mundos de medición llevan cintas rectas con carga y una línea saturada de 
 - Comando: ~1 byte por tramo recto; 300 celdas rectas caben en 16 bytes.
 - 10 cintas de 168 celdas con entrada irregular: 246 B/s comprimidos por cliente, tick 0,025 ms.
 
+**Vías por zonas (H-3):** en estrés, vista de vías, de 11 900 a 615 dibujos, y de 25,58 a 7,24 ms de media en una tirada; en `0.5.0-qa8`, mundo medio, 375 dibujos y p99 3,71 ms. Cifras en [REVISION_E8](REVISION_E8.md). Las tablas anteriores de este documento son previas a este cambio.
+
 **Cliente con cintas:** medido en un solo equipo, con cámara quieta, en [REVISION_E8](REVISION_E8.md): mundo medio y 20 160 objetos en cintas saturadas, 12 902 dibujados, p99 6,15 ms. Cumple el objetivo. Equipo modesto y cámara en movimiento: **NO VERIFICADO**.
 
 ## Medición de producción por máquina (0.5, en desarrollo)

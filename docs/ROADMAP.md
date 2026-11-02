@@ -84,13 +84,13 @@ Encargo: [PROMPT_CLAUDE_CONSTRUCCION_PRIMEROS_30_MIN.md](../PROMPT_CLAUDE_CONSTR
 
 | ID | P | Tarea | Implementado | Comprobado | Pendiente |
 | --- | --- | --- | --- | --- | --- |
-| C-1 | A | Cintas sin límite arbitrario, trazado automático, puntos intermedios, rutas alternativas, confirmación exacta, validación en servidor | sí: b0ff255, 50de932, 3229fa5, a657005, d8353f9 | xUnit; auto `beltslong`; real en qa2: R, M, clic de punto, Z | Pendientes reales: cuestas (el terreno es llano: solo simuladas); Retroceso y N con entradas reales |
-| C-2 | A | Colocación consecutiva, previsualización con coste y motivo, desmontaje con lo que se recupera | sí: ed60e1e | auto `artifacts/qa/0.5-construccion`; real en parte, qa2 | Repetir con entradas reales |
-| C-3 | A | Divisores y unificadores | sí como máquina (1d1b828, 137d2b6) e insertados en una cinta tendida, con la carga conservada (db39124) | xUnit `BeltEditTests`; auto `manage`; `artifacts/qa/0.5-gestion/gestion_08..10` | Insertar y mover con teclado y ratón reales |
-| C-4 | A | Lectura de un vistazo, capacidad y producción real, seguir cadena | sí | `artifacts/qa/0.5-gestion`, real con H, C y Esc | Botón «Seguir cadena» con ratón real |
+| C-1 | A | Cintas sin límite arbitrario, trazado automático, puntos intermedios, rutas alternativas, confirmación exacta, validación en servidor | sí: b0ff255, 50de932, 3229fa5, a657005, d8353f9 | xUnit; auto `beltslong`; real en qa2: R, M, clic de punto, Z | Pendientes reales: cuestas (el terreno es llano: solo simuladas). Retroceso, N, R, M, punto y Z, hechos en T-028 |
+| C-2 | A | Colocación consecutiva, previsualización con coste y motivo, desmontaje con lo que se recupera | sí: ed60e1e | auto `artifacts/qa/0.5-construccion`; real en T-028 | Nada con entradas reales; valoración de una persona |
+| C-3 | A | Divisores y unificadores | sí como máquina (1d1b828, 137d2b6) e insertados en una cinta tendida, con la carga conservada (db39124) | xUnit `BeltEditTests`; auto `manage`; `artifacts/qa/0.5-gestion/gestion_08..10` | Insertar y mover hechos en T-028. Falta tender una cinta hacia estas piezas con ratón; INC-33 |
+| C-4 | A | Lectura de un vistazo, capacidad y producción real, seguir cadena | sí | `artifacts/qa/0.5-gestion`; real con H, C, Esc y el botón (T-028) | Parpadeo del rótulo en movimiento (INC-14) |
 | C-5 | A | Progresión de los primeros 30 min | sí | `docs/TIEMPOS_30_MIN.md`, recorridos con guion, no con personas | 36 acarreos en el guion, 8 ya innecesarios (ver el documento); duración con personas |
 | C-6 | A | Zona inicial, respuesta sonora y visual, ajustes para reducir movimiento y efectos | sí | `artifacts/qa/0.5-zona` | El sonido no lo ha oído nadie |
-| C-7 | A | Controles normales, dos jugadores sobre la misma construcción, rendimiento, regresión de 12 | en parte | T-018, T-019 con comandos de la interfaz | Controles reales; dos personas; antes y después de rendimiento completo |
+| C-7 | A | Controles normales, dos jugadores sobre la misma construcción, rendimiento, regresión de 12 | en parte | T-018, T-019 con comandos de la interfaz; controles reales de un jugador en T-028; regresión de 12 en T-029 | Dos personas; primera experiencia completa con entradas reales; rendimiento en movimiento |
 
 ## Beta
 
@@ -99,11 +99,11 @@ Encargo: [PROMPT_CLAUDE_CONSTRUCCION_PRIMEROS_30_MIN.md](../PROMPT_CLAUDE_CONSTR
 | B-1 | A | Inglés, controles reasignables, ultrawide | verificada (revisión de inglés nativo pendiente) |
 | B-2 | A | Ensayo de 60 min, escenario medio, anfitrión + 11 | verificada con clientes automáticos (T-015, T-009) |
 | B-3 | A | Tutorial propio con ayudas contextuales | implementada en parte: objetivos con marcador y distancia; validar con personas |
-| B-4 | M | Dibujo instanciado de vías y LOD | pendiente; hoy cumple el objetivo sin ello |
+| B-4 | M | Dibujo instanciado de vías y LOD | en parte: una malla por zona (H-3, T-029). De 11 900 a 615 dibujos en estrés. Sin LOD ni distancia de dibujo |
 | B-5 | M | Exportar y comprobar servidor Linux | pendiente; sin entorno Linux aquí, no se anuncia |
 | B-6 | M | Arte: variedad, animación de jugadores, audio ambiente | pendiente |
 | B-7 | B | Prestigio opcional | pendiente |
-| B-8 | A | Desvíos y señales | primer sistema implementado: reservas por bloques, señales con foco, rutas deterministas, desvíos en mitad de una recta y cruces. Comprobado en un PC con xUnit, auto `signals` y `coopfactory` con señales (T-024). Pendiente: entradas reales, valoración de una persona, un tren ante una señal con dos clientes Godot y caudal por encima de unos 8 trenes por línea |
+| B-8 | A | Desvíos y señales | primer sistema implementado: reservas por bloques, señales con foco, rutas deterministas, desvíos en mitad de una recta y cruces. Comprobado en un PC con xUnit, auto `signals` y `coopfactory` con señales (T-024, T-029); poner señales y ramales con entradas reales (T-028). Pendiente: valoración de una persona, un tren ante una señal con dos clientes Godot y caudal por encima de unos 8 trenes por línea |
 
 ## RC
 

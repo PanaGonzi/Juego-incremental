@@ -31,6 +31,15 @@ m => m| INC-01 | Alta | 0.5.0-qa2 | Corregido en `agente/correcciones` | Mejora 
 | INC-22 | Baja | 0.5.0-qa6 o anterior | Corregido | Con interfaz al 150 % en 1280×720, la barra rápida pisaba el recuadro de la mochila. Ahora la mochila sube sobre la barra si no cabe a su lado. | `artifacts/qa/0.5-escritorio/ui150_720p_mochila_sobre_barra.png` |
 | INC-23 | Baja | 0.5.0-qa6 | Abierto | Accesibilidad de Windows en Ajustes: seleccionar una pestaña se acepta pero no la cambia, y `click` sobre los botones de opción tampoco tiene efecto (`toggle` sí). Un lector de pantalla no llega a Interfaz, Sonido ni Controles. Probablemente del motor: **NO VERIFICADO**. Con teclado y ratón normales no aplica. | T-025 |
 | INC-24 | Baja | 0.5.0-qa6 o anterior | Mitigado | El hielo y algunas crestas se queman en blanco a contraluz, y parecen un segundo sol (H-10). Menos brillo en el hielo desde 0.5.0-qa7; queda un brillo menor. | `docs/REVISION_E8.md` |
+| INC-25 | Media | 0.5.0-qa7 | Corregido | Un tramo de vía rechazado por el servidor movía igualmente el inicio, y el siguiente salía de un sitio equivocado. Ahora el inicio vuelve atrás. | `artifacts/qa/0.5-real/y3_vuelve.jpg` |
+| INC-26 | Baja | 0.5.0-qa7 | Corregido | Un tramo repetido se previsualizaba como válido y el rechazo hablaba de una cinta. Ahora se avisa antes, con `err_rail_exists`. El texto nuevo: lógica, sin verlo en pantalla. | `Rail_preview_rejects_the_same_section_before_the_server_does` |
+| INC-27 | Baja | 0.5.0-qa7 | Corregido | Apuntar al propio inicio de la vía mostraba un error falso. Ahora la vista queda neutra. | T-028 |
+| INC-28 | Baja | 0.5.0-qa7 | Corregido | La cabecera del detalle del inventario mezclaba el objeto anterior y el señalado. | T-028 |
+| INC-29 | Baja | 0.5.0-qa7 | Corregido | El catálogo llamaba «Contenido» a la capacidad. | T-028 |
+| INC-30 | Baja | 0.5.0-qa7 | Corregido | Cortar hielo contaba para un objetivo que solo hablaba de chatarra. El texto ahora incluye los bloques de hielo. | `t8_hielo.jpg` |
+| INC-31 | Baja | 0.5.0-qa7 | Corregido | Las cifras de 4 dígitos tapaban el icono en el inventario. | T-028 |
+| INC-32 | Media | 0.5.0-qa7 | Corregido | Una recta exige dirección exacta, y con el ratón casi nunca se acertaba. El destino encaja ahora en el eje válido más cercano; el servidor sigue validando. | `eje5f_lateral.jpg`, `eje6_puesta.jpg`, `eje_e_curva_puesta.jpg` |
+| INC-33 | Baja | 0.5.0-qa8 | Abierto | Divisor y unificador dicen «Repartiendo» aunque estén vacíos o sin conectar. Además, la ayuda llama «Backspace» a la tecla de Retroceso. | T-028 |
 
 ## Limitaciones de las alfas
 
