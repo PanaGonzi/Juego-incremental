@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # PLUTON — NOVENO PLANETA
 
 Incremental industrial en primera persona, con cooperativo de hasta 12 jugadores. Godot 4.7.2 .NET + C#.
@@ -41,3 +42,6 @@ Pluton.Server.exe --port 27777 --world mundo [--password clave] [--max-players 1
 UDP. Guarda en `%APPDATA%\PlutonNovenoPlaneta\server\saves`. Ctrl+C guarda y cierra; `--stop-file RUTA` hace lo mismo cuando aparece ese archivo. El primero en entrar a un mundo nuevo es su propietario.
 
 Más información en [docs/](docs/) y [CLAUDE.md](CLAUDE.md).
+=======
+# Juego-incremental
+>>>>>>> 4ea98a81d5146d5df4be998acb1d2e4c181e6ff7
