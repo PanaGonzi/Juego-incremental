@@ -187,6 +187,15 @@ public sealed class RailDef
 }
 
 /// <summary>Fuente mínima de chatarra: sin ella, agotar los campos podría dejar al jugador sin material recuperado.</summary>
+/// <summary>Nueva expedición (prestigio): opcional, tras el contrato final; cada una da ventajas acumulables hasta un tope.</summary>
+public sealed class ExpeditionDef
+{
+    public string RequiresContract { get; set; } = "";
+    public int MaxStacks { get; set; }
+    public long StartCreditsPerStack { get; set; }
+    public Dictionary<string, int> Mods { get; set; } = new();
+}
+
 public sealed class ScrapRenewalDef
 {
     public int MinPiles { get; set; }
@@ -217,6 +226,7 @@ public sealed class BalanceDef
     public int TravelTicks { get; set; }
     public int ShuttleRangeMm { get; set; }
     public ScrapRenewalDef ScrapRenewal { get; set; } = new();
+    public ExpeditionDef Expedition { get; set; } = new();
     public Dictionary<string, DebrisDef> Debris { get; set; } = new();
 }
 
@@ -304,6 +314,15 @@ public sealed class ContentDb
                 Item(id, where);
                 if (qty <= 0) throw new ContentException($"{where}: cantidad no positiva de '{id}'");
             }
+        }
+
+        var expedition = Balance.Expedition;
+        if (expedition.MaxStacks > 0)
+        {
+            if (!Contracts.ContainsKey(expedition.RequiresContract))
+                throw new ContentException($"Expedición: contrato desconocido '{expedition.RequiresContract}'");
+            if (expedition.StartCreditsPerStack < 0 || expedition.Mods.Values.Any(v => v < 0))
+                throw new ContentException("Expedición: las ventajas no pueden ser negativas");
         }
 
         foreach (var r in Recipes.Values)

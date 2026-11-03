@@ -10,6 +10,9 @@ namespace Pluton.Game;
 public sealed class RailView
 {
     private const int ZoneCells = 32;
+    private const float CellM = 2f;
+    /// <summary>Distancia de dibujo de una zona, medida a su centro; la zona mide 64 m de lado.</summary>
+    public const float DrawRange = 300f;
 
     private readonly Node _parent;
     private readonly Func<RailNode, RailNode, byte, double, Vector3> _point;
@@ -127,16 +130,19 @@ public sealed class RailView
             return;
         }
         var builder = new Models.Builder();
+        // La malla se monta relativa al centro de su zona: así la distancia de dibujo se mide desde la zona y no desde el origen (B-4).
+        var center = new Vector3((zone.x + 0.5f) * ZoneCells * CellM, 0, (zone.z + 0.5f) * ZoneCells * CellM);
         foreach (var id in members)
         {
             var s = w.RailSegments[id];
             var a = w.RailNodes[s.A];
             var b = w.RailNodes[s.B];
-            Models.AppendRail(builder, t => _point(a, b, s.Shape, t), s.LengthMm / 1000f);
+            Models.AppendRail(builder, t => _point(a, b, s.Shape, t) - center, s.LengthMm / 1000f);
         }
         if (!_meshes.TryGetValue(zone, out var mesh))
         {
-            mesh = new MeshInstance3D();
+            // Más allá no se distingue una vía de 1,5 m de ancho y las máquinas ya han desaparecido (220 m).
+            mesh = new MeshInstance3D { Position = center, VisibilityRangeEnd = DrawRange, VisibilityRangeEndMargin = 20 };
             _parent.AddChild(mesh);
             _meshes[zone] = mesh;
         }

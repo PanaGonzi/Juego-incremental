@@ -1,9 +1,11 @@
 namespace Pluton.Simulation;
 
 /// <summary>Una línea de coste: cuánto hay disponible y cuánto se pide.</summary>
-public sealed record CostLine(string Item, long Have, long Need)
+public sealed record CostLine(string Item, long Have, long Need, long OnSale = 0)
 {
     public long Short => Math.Max(0, Need - Have);
+    /// <summary>Alcanza solo contando lo que una terminal con venta automática puede vender antes de pagar.</summary>
+    public bool AtRisk => Short == 0 && Have - OnSale < Need;
 }
 
 /// <summary>Qué falta exactamente para pagar un coste, con la misma regla que aplica el servidor al cobrarlo.</summary>
@@ -15,6 +17,7 @@ public sealed class CostReport
     public long CreditsShort => Math.Max(0, CreditsNeed - CreditsHave);
     public IEnumerable<CostLine> Missing => Lines.Where(l => l.Short > 0);
     public bool Ok => CreditsShort == 0 && Lines.All(l => l.Short == 0);
+    public IEnumerable<CostLine> AtRisk => Lines.Where(l => l.AtRisk);
 }
 
 /// <summary>Qué hacer para reunir lo que falta en el objetivo actual.</summary>
@@ -72,12 +75,22 @@ public sealed partial class World
         return have;
     }
 
+    /// <summary>Lo que las terminales con venta automática del planeta tienen por encima de su reserva: se venderá si nadie lo usa antes.</summary>
+    public long OnSale(int planet, string item)
+    {
+        long total = 0;
+        foreach (var m in _machineList)
+            if (m.Planet == planet && m.AutoSell && Content.Machines[m.Def].Kind == MachineKind.Terminal)
+                total += Math.Max(0, m.In.Get(item) - m.Reserves.GetValueOrDefault(item));
+        return total;
+    }
+
     /// <summary>Desglose de un coste con lo disponible ahora: la interfaz nunca calcula otra regla.</summary>
     public CostReport CheckCost(PlayerState p, long credits, IReadOnlyDictionary<string, long> cost) => new()
     {
         CreditsHave = Credits,
         CreditsNeed = credits,
-        Lines = cost.Select(kv => new CostLine(kv.Key, PlanetStock(p, kv.Key), kv.Value)).ToList(),
+        Lines = cost.Select(kv => new CostLine(kv.Key, PlanetStock(p, kv.Key), kv.Value, OnSale(p.Planet, kv.Key))).ToList(),
     };
 
     /// <summary>

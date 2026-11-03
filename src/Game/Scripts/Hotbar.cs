@@ -185,7 +185,9 @@ public static class EntryInfo
             var have = HaveOf(w, me, item);
             if (have < qty) parts.Add($"{qty - have} {Loc.T("item_" + item)}");
         }
-        return parts.Count == 0 ? Loc.T("cost_ready") : Loc.T("cost_lacking", string.Join(", ", parts));
+        if (parts.Count > 0) return Loc.T("cost_lacking", string.Join(", ", parts));
+        var onSale = Ui.OnSale(w.CheckCost(me, d.Credits, d.Cost));
+        return onSale.Length > 0 ? Loc.T("cost_ready") + System.Environment.NewLine + onSale : Loc.T("cost_ready");
     }
 
     /// <summary>Lo disponible para construir: exactamente lo que el servidor puede cobrar.</summary>

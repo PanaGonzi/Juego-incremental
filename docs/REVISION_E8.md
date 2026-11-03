@@ -286,6 +286,24 @@ Paquete `0.5.0-qa8`, una tirada, 15 s por vista, 1920×1080, cámara quieta (T-0
 
 Medir con equipo modesto, cámara en movimiento y anfitrión con 11 clientes: sigue **NO VERIFICADO**.
 
+Segundo seguimiento, 03-11-2026 (T-030, sin revisor independiente):
+
+- **H-4:** cerrado. El cliente reindexa solo las partes que toca cada delta (máquinas, escombros, cintas, vías, mejoras). Construir ya no recorre vías ni cintas. xUnit compara por red, tras cada tipo de cambio, la firma de todos los índices con la de un `Reindex` completo (D-049).
+- **H-6:** cerrado. `SyncWorld` solo repasa las máquinas y escombros que tocó el delta. Con cambios de estructura recorre todas las máquinas, pero no las vías ni las cintas.
+- **H-8:** cerrado. Si el lote no cambia (misma cuenta y misma huella de posiciones), no se vuelve a subir el búfer.
+- **H-3 / B-4:** la malla de cada zona de vías deja de dibujarse a 300 m. Sin LOD de geometría.
+- **H-10:** sigue parcial. Se subió el umbral del brillo a 1,5, las lámparas de estado bajan a 2× y los focos reflejan menos. En el mismo encuadre que la qa8, las lámparas se queman menos, pero sigue el blanco de la placa iluminada en el centro. Las dos capturas son de instantes distintos de la fábrica, así que la comparación es solo orientativa.
+
+Estrés, una tirada de 15 s por vista, 1920×1080, en `alpha-dev`, comparada con la fila anterior y sin alternar builds:
+
+| Vista | Media | p99 | Máx. | >33 ms | Dibujos | `SyncWorld` máx. |
+| --- | --- | --- | --- | --- | --- | --- |
+| Densa | 10,04 → 8,61 | 17,84 → 14,95 | 38,64 → 37,56 | 1 → 1 | 1716 | 6,6 ms |
+| Vías | 7,24 → 5,31 | 11,74 → 9,31 | 35,04 → 29,77 | 3 → 0 | 615 → 558 | 14,7 ms |
+| Panorámica | 8,88 → 6,88 | 14,47 → 10,95 | 33,38 → 25,32 | 1 → 0 | 1341 | 6,9 ms |
+
+En el escenario medio no hay diferencia medible con la qa8: medias de 2,5 a 2,8 ms en las dos. Los máximos de `SyncWorld` varían mucho entre tiradas y no sirven para atribuir la mejora. Siguen abiertos el resto de H-10, los menores, y medir con un equipo modesto y la cámara en movimiento: **NO VERIFICADO**.
+
 ## Evidencias
 
 En `artifacts/qa/0.5-e8/`: registros `e8-*.log`; muestreos `sampler-*.csv` y `threads-*.txt`; capturas `medium_*`, `long_*`, `stress_*`, `belt_*`; recortes `recorte_*`. En `sampler-e8-medium-1.csv` la columna de CPU es 0 por un contador mal localizado, corregido en las tiradas siguientes, y la ventana solo se pudo leer en la primera muestra.

@@ -20,6 +20,7 @@
   "cargo": { "intervalTicks": 300, "travelTicks": 300, "unitsPerShipment": 200 },
   "shuttleRangeMm": 12000,
   "scrapRenewal": { "minPiles": 4, "intervalTicks": 300 },
+  "expedition": { "requiresContract": "c_ninth_planet", "maxStacks": 5, "startCreditsPerStack": 300, "mods": { "sell_bonus": 100 } },
   "rail": {
     "creditsPerCell": 1,
     "maxStraightCells": 24,

@@ -29,6 +29,16 @@ public sealed class GameClient : IDisposable
     public int PendingCount => _pending.Count;
     public int StructuralDeltas { get; private set; }
     public int DebrisDeltas { get; private set; }
+    /// <summary>Cambia cuando puede cambiar la malla de alguna cinta: cintas nuevas, retiradas o máquinas movidas.</summary>
+    public int BeltStamp { get; private set; }
+    /// <summary>Cambia con vías, nodos de vía, señales o trenes que aparecen o desaparecen.</summary>
+    public int RailStamp { get; private set; }
+    /// <summary>Solo la vista lee los conjuntos de abajo; sin ella, no se llenan.</summary>
+    public bool TrackChanges;
+    /// <summary>Máquinas recibidas o retiradas desde que la vista las leyó; las vacía quien las consume.</summary>
+    public readonly HashSet<int> TouchedMachines = new();
+    /// <summary>Escombros recibidos o retirados desde que la vista los leyó; los vacía quien los consume.</summary>
+    public readonly HashSet<int> TouchedDebris = new();
 
     /// <summary>Cambia cuando puede cambiar dónde se puede construir, incluidos los escombros.</summary>
     public int PlacementVersion => StructuralDeltas + DebrisDeltas;
@@ -240,20 +250,33 @@ public sealed class GameClient : IDisposable
     {
         var world = World!;
         var upgrades = world.Upgrades.Count;
+        var expeditions = world.Expeditions;
         if (r.ReadBoolean()) WorldCodec.ReadGlobal(r, world);
-        var structural = world.Upgrades.Count != upgrades;
+        // Solo se reindexa la parte que cambió: construir una máquina no recorre vías ni cintas (H-4).
+        var scope = world.Upgrades.Count != upgrades || world.Expeditions != expeditions ? ReindexScope.Mods : ReindexScope.None;
+        var beltsMoved = false;
         var n = r.Read7BitEncodedInt();
-        for (var i = 0; i < n; i++) structural |= world.ApplyReplicatedMachine(WorldCodec.ReadMachine(r));
+        for (var i = 0; i < n; i++)
+        {
+            var m = WorldCodec.ReadMachine(r);
+            var known = world.Machines.ContainsKey(m.Id);
+            if (TrackChanges) TouchedMachines.Add(m.Id);
+            if (!world.ApplyReplicatedMachine(m)) continue;
+            scope |= ReindexScope.Machines;
+            // La malla de una cinta depende de dónde están sus máquinas; una máquina nueva aún no tiene cintas.
+            beltsMoved |= known;
+        }
         n = r.Read7BitEncodedInt();
-        structural |= n > 0;
+        if (n > 0) scope |= ReindexScope.Machines;
         for (var i = 0; i < n; i++)
         {
             var gone = r.ReadInt32();
             world.Machines.Remove(gone);
             world.MeasuredRates.Remove(gone);
+            if (TrackChanges) TouchedMachines.Add(gone);
         }
         n = r.Read7BitEncodedInt();
-        structural |= n > 0;
+        if (n > 0) scope |= ReindexScope.Belts;
         for (var i = 0; i < n; i++)
         {
             var l = WorldCodec.ReadLink(r, Content);
@@ -261,7 +284,7 @@ public sealed class GameClient : IDisposable
             world.Links[l.Id] = l;
         }
         n = r.Read7BitEncodedInt();
-        structural |= n > 0;
+        if (n > 0) scope |= ReindexScope.Belts;
         for (var i = 0; i < n; i++) world.Links.Remove(r.ReadInt32());
         n = r.Read7BitEncodedInt();
         for (var i = 0; i < n; i++)
@@ -269,12 +292,19 @@ public sealed class GameClient : IDisposable
             var d = WorldCodec.ReadDebris(r);
             if (!world.DebrisById.ContainsKey(d.Id)) DebrisDeltas++;
             world.ApplyReplicatedDebris(d);
+            if (TrackChanges) TouchedDebris.Add(d.Id);
         }
         n = r.Read7BitEncodedInt();
         if (n > 0) DebrisDeltas++;
-        for (var i = 0; i < n; i++) world.RemoveReplicatedDebris(r.ReadInt32());
+        for (var i = 0; i < n; i++)
+        {
+            var gone = r.ReadInt32();
+            world.RemoveReplicatedDebris(gone);
+            if (TrackChanges) TouchedDebris.Add(gone);
+        }
         n = r.Read7BitEncodedInt();
-        structural |= n > 0;
+        // Un yacimiento nuevo pierde su ocupante y cambia las celdas que las cintas no pisan.
+        if (n > 0) scope |= ReindexScope.Machines | ReindexScope.Belts;
         for (var i = 0; i < n; i++)
         {
             var node = WorldCodec.ReadNode(r);
@@ -287,44 +317,44 @@ public sealed class GameClient : IDisposable
             world.Players[p.Key] = p;
         }
         n = r.Read7BitEncodedInt();
-        structural |= n > 0;
+        if (n > 0) scope |= ReindexScope.Rail;
         for (var i = 0; i < n; i++)
         {
             var node = WorldCodec.ReadRailNode(r);
             world.RailNodes[node.Id] = node;
         }
         n = r.Read7BitEncodedInt();
-        structural |= n > 0;
+        if (n > 0) scope |= ReindexScope.Rail;
         for (var i = 0; i < n; i++) world.RailNodes.Remove(r.ReadInt32());
         n = r.Read7BitEncodedInt();
-        structural |= n > 0;
+        if (n > 0) scope |= ReindexScope.Rail;
         for (var i = 0; i < n; i++)
         {
             var s = WorldCodec.ReadRailSegment(r);
             world.RailSegments[s.Id] = s;
         }
         n = r.Read7BitEncodedInt();
-        structural |= n > 0;
+        if (n > 0) scope |= ReindexScope.Rail;
         for (var i = 0; i < n; i++) world.RailSegments.Remove(r.ReadInt32());
         n = r.Read7BitEncodedInt();
         for (var i = 0; i < n; i++)
         {
             var t = WorldCodec.ReadTrain(r, id => world.Trains.GetValueOrDefault(id));
-            structural |= !world.Trains.ContainsKey(t.Id);
+            if (!world.Trains.ContainsKey(t.Id)) scope |= ReindexScope.Rail;
             world.Trains[t.Id] = t;
         }
         n = r.Read7BitEncodedInt();
-        structural |= n > 0;
+        if (n > 0) scope |= ReindexScope.Rail;
         for (var i = 0; i < n; i++) world.Trains.Remove(r.ReadInt32());
         if (r.ReadBoolean()) WorldCodec.ReadShipments(r, world);
         n = r.Read7BitEncodedInt();
         for (var i = 0; i < n; i++) WorldCodec.ReadSlotsCompact(r, world);
         if (n > 0) SlotDeltas++;
-        if (structural)
-        {
-            StructuralDeltas++;
-            world.Reindex();
-        }
+        if (scope == ReindexScope.None && !beltsMoved) return;
+        StructuralDeltas++;
+        if ((scope & ReindexScope.Belts) != 0 || beltsMoved) BeltStamp++;
+        if ((scope & ReindexScope.Rail) != 0) RailStamp++;
+        world.Reindex(scope);
     }
 
     private void ReadPositions(BinaryReader r)

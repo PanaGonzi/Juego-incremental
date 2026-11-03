@@ -187,6 +187,15 @@ public partial class AutoTest : Node
                 var parts = join.Split(':');
                 _main.StartJoin(parts[0], int.Parse(parts[1]), "");
             }
+            else if (_args.GetValueOrDefault("scenario") == "expedition")
+            {
+                // Campaña terminada sobre una fábrica con cintas, vías y trenes: lo que una nueva expedición debe retirar.
+                var world = Scenarios.Build(_main.Content, "small");
+                world.ContractsDone.Add(_main.Content.Balance.Expedition.RequiresContract);
+                world.Cosmetics.Add("spectral_train");
+                world.Reindex();
+                _main.StartSession(GameSession.Local(_main, world, "autotest-expedition", null, _main.Prefs));
+            }
             else if (_args.GetValueOrDefault("scenario") == "halloween")
             {
                 var world = RailWorld();
@@ -350,6 +359,7 @@ public partial class AutoTest : Node
             else if (_args.GetValueOrDefault("scenario") == "travel") await TravelScenario();
             else if (_args.GetValueOrDefault("scenario") == "halloween") await HalloweenScenario();
             else if (_args.GetValueOrDefault("scenario") == "mars") await MarsScenario();
+            else if (_args.GetValueOrDefault("scenario") == "expedition") await ExpeditionScenario();
             else if (_args.GetValueOrDefault("scenario") == "offline")
             {
                 await Wait(1);
@@ -1630,6 +1640,61 @@ public partial class AutoTest : Node
         Check(!v.MovingForTest && v.CurrentTool == Tool.Cutter, "tras mover vuelve a la herramienta");
         await Wait(0.5);
         Check(v.Session.Client.HashMismatches == 0, "sin divergencias tras corregir la fábrica");
+    }
+
+    /// <summary>Pulsa el botón visible cuyo texto empieza así, como un clic: recorre la interfaz real, no envía la orden por su cuenta.</summary>
+    private bool PressButton(string text)
+    {
+        foreach (var node in _view!.GetTree().Root.FindChildren("*", "Button", true, false))
+            if (node is Button { Visible: true, Disabled: false } b && b.IsVisibleInTree() && b.Text.StartsWith(text, StringComparison.Ordinal))
+            {
+                b.EmitSignal(BaseButton.SignalName.Pressed);
+                return true;
+            }
+        return false;
+    }
+
+    /// <summary>B-7: el propietario confirma una nueva expedición desde el panel y la partida vuelve a empezar con su ventaja.</summary>
+    private async Task ExpeditionScenario()
+    {
+        var v = _view!;
+        var client = v.Session.Client;
+        var builtins = _main.Content.Planets.Sum(p => p.Builtins.Count);
+        Check(W.Links.Count > 0 && W.RailSegments.Count > 0 && W.Trains.Count > 0, $"fábrica de partida: {W.Machines.Count} máquinas, {W.Links.Count} cintas, {W.Trains.Count} trenes");
+        Key(Godot.Key.P);
+        await Wait(0.4);
+        Check(v.PanelIsOpen, "P abre el panel de jugadores");
+        await Shot("expedition_01_panel");
+        Check(PressButton(Loc.T("expedition_open")), "el propietario ve «Preparar una nueva expedición»");
+        await Wait(0.4);
+        await Shot("expedition_02_confirmar");
+        Check(W.Expeditions == 0 && W.Links.Count > 0, "abrir la confirmación no cambia nada");
+        Check(PressButton(Loc.T("expedition_cancel")), "se puede cancelar");
+        await Wait(0.3);
+        Check(W.Expeditions == 0, "cancelar no inicia la expedición");
+        Check(PressButton(Loc.T("expedition_open")), "se vuelve a abrir");
+        await Wait(0.3);
+        Check(PressButton(Loc.T("expedition_confirm", 1)), "botón de confirmar con el número de expedición");
+        Check(await Until(() => W.Expeditions == 1, 5), "expedición 1 iniciada");
+        await Wait(1.5);
+        Check(W.Machines.Count == builtins && W.Links.Count == 0 && W.RailSegments.Count == 0 && W.Trains.Count == 0, $"la fábrica se retira: {W.Machines.Count} máquinas (fijas {builtins}), {W.Links.Count} cintas");
+        Check(v.MachineViewsForTest == W.Machines.Values.Count(m => m.Planet == Me.Planet), $"la escena sigue al mundo: {v.MachineViewsForTest} máquinas dibujadas");
+        Check(v.Belts.DrawnBelts == 0, $"sin cintas dibujadas: {v.Belts.DrawnBelts}");
+        Check(v.DebrisViewsForTest == W.DebrisById.Values.Count(d => d.Planet == Me.Planet), $"escombros dibujados: {v.DebrisViewsForTest}");
+        Check(W.ObjectiveIndex == 0 && W.Upgrades.Count == 0, "objetivos y mejoras desde el principio");
+        Check(W.Cosmetics.Contains("spectral_train"), "los cosméticos se conservan");
+        Check(W.Mod("sell_bonus") == _main.Content.Balance.Expedition.Mods["sell_bonus"], $"ventaja de venta: {W.Mod("sell_bonus")} ‰");
+        await Shot("expedition_03_inicio");
+        var near = W.DebrisById.Values.Where(d => d.Planet == Me.Planet && d.CoversNode < 0).OrderBy(d => (d.X * 2 - Me.X) * (d.X * 2 - Me.X) + (d.Z * 2 - Me.Z) * (d.Z * 2 - Me.Z)).First();
+        await CutDebris(near);
+        Check(Me.Bag.Total > 0, $"se puede volver a jugar: mochila {Me.Bag.Total}");
+        Key(Godot.Key.P);
+        await Wait(0.3);
+        await Shot("expedition_04_panel_despues");
+        Key(Godot.Key.Escape);
+        var checks = client.HashChecks;
+        Check(await Until(() => client.HashChecks > checks, 20), "llega al menos una firma tras la expedición");
+        Check(client.HashMismatches == 0, $"sin divergencias ({client.HashChecks} comprobaciones)");
     }
 
     private static void PressAction(string action)

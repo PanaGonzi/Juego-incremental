@@ -36,7 +36,7 @@ if (map.TryGetValue("trace", out var traceDir))
     if (relay != null) relay.Trace = new System.IO.StreamWriter(System.IO.Path.Combine(traceDir, $"relay{index}.csv"));
 }
 
-var content = ContentDb.Load(map.GetValueOrDefault("content", ContentDb.LocateDirectory()));
+var content = ContentDb.Load(map.TryGetValue("content", out var contentDir) ? contentDir : ContentDb.LocateDirectory());
 var total = Stopwatch.StartNew();
 long ok = 0, failed = 0, chats = 0, moves = 0, reconnects = 0, connectMsSum = 0, connects = 0;
 int mismatches = 0, checks = 0;

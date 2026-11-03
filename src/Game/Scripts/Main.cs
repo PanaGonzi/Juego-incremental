@@ -303,4 +303,12 @@ public static class Loc
     }
 
     public static string T(string key, string arg) => T(key).Replace("{0}", arg);
+
+    /// <summary>Varios marcadores {0}, {1}…</summary>
+    public static string T(string key, params object[] args)
+    {
+        var text = T(key);
+        for (var i = 0; i < args.Length; i++) text = text.Replace("{" + i + "}", args[i].ToString());
+        return text;
+    }
 }

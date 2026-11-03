@@ -38,6 +38,10 @@ public partial class GameView : Node3D
         public float TargetYaw;
         public double LastSeen;
         public RemoteToolView Tool = null!;
+        public Node3D Body = null!;
+        public MeshInstance3D[] Legs = null!;
+        public Vector3 Last;
+        public float Speed, Phase;
         public byte Action;
     }
 
@@ -240,6 +244,7 @@ public partial class GameView : Node3D
 
         var client = Session.Client;
         client.WorldReady += OnWorldReady;
+        client.TrackChanges = true;
         client.DeltaApplied += () => _worldDirty = true;
         client.ResultReceived += OnResult;
         client.ChatReceived += (from, text) => { _hud.AddChat($"{from}: {text}"); };
@@ -316,7 +321,7 @@ public partial class GameView : Node3D
         _body.AddChild(_head);
         _camera = new Camera3D { Fov = _main.Prefs.Fov, Far = 3000, Near = 0.08f, Current = true };
         _head.AddChild(_camera);
-        var lamp = new SpotLight3D { LightColor = new Color(1f, 0.93f, 0.8f), LightEnergy = 0.55f, SpotRange = 26, SpotAngle = 38, Position = new Vector3(0.25f, -0.2f, 0) };
+        var lamp = new SpotLight3D { LightColor = new Color(1f, 0.93f, 0.8f), LightEnergy = 0.55f, LightSpecular = 0.15f, SpotRange = 26, SpotAngle = 38, Position = new Vector3(0.25f, -0.2f, 0) };
         _camera.AddChild(lamp);
         AddChild(_body);
 
@@ -500,99 +505,153 @@ public partial class GameView : Node3D
 
     // ---------- Sincronización de representación ----------
 
-    private readonly HashSet<int> _syncSeen = new();
+    private void SyncMachine(World w, Machine m)
+    {
+        var key = (m.Def, m.X, m.Z, (int)m.Rot);
+        if (!_machines.TryGetValue(m.Id, out var node) || node.Key != key)
+        {
+            var isNew = node == null;
+            if (node != null) FreeMachine(m.Id);
+            node = CreateMachine(m, key);
+            _machines[m.Id] = node;
+            // Solo lo que aparece con la partida ya en marcha: cargar el mundo no es construir.
+            if (isNew && _viewSynced) _feedback.Placed(node.Root, w.Content.Machines[m.Def].W * Cell);
+        }
+        if (node.Status != m.Status)
+        {
+            node.Status = m.Status;
+            node.Warn.Mesh = Models.StatusIcon(m.Status);
+            node.Lamp.MaterialOverride = Models.LampState(m.Status);
+            // La luz de trabajo dice de lejos si la máquina produce: encendida en marcha, en piloto si no.
+            if (node.Glow != null) node.Glow.LightEnergy = FactoryActivity.GlowEnergy(node.Running);
+        }
+    }
 
+    private void RemoveMachineView(int id)
+    {
+        if (_viewSynced && _machines.TryGetValue(id, out var gone)) _feedback.Removed(gone.Root.GlobalPosition);
+        FreeMachine(id);
+    }
+
+    private void SyncDebris(World w, Debris d)
+    {
+        if (!_debris.TryGetValue(d.Id, out var mesh))
+        {
+            mesh = CreateDebris(d);
+            _debris[d.Id] = mesh;
+        }
+        var def = w.Content.Balance.Debris[d.Def];
+        var s = 0.45f + 0.55f * d.Hp / def.Hp;
+        mesh.Scale = new Vector3(s, s, s);
+    }
+
+    private void RemoveDebrisView(int id)
+    {
+        var mesh = _debris[id];
+        BreakEffect(mesh.GlobalPosition, _debrisKinds.GetValueOrDefault(id));
+        if (_highlighted == mesh) _highlighted = null;
+        _debrisKinds.Remove(id);
+        mesh.QueueFree();
+        _debris.Remove(id);
+        if (_debrisBodies.Remove(id, out var body))
+        {
+            _pickables.Remove(body.GetInstanceId());
+            body.QueueFree();
+        }
+    }
+
+    private readonly HashSet<int> _syncSeen = new();
+    private int _syncedStructure = int.MinValue, _syncedRail = int.MinValue, _syncedPlanet = int.MinValue;
+
+    /// <summary>
+    /// Sin cambios de estructura solo se repasan las máquinas y escombros que trajo el delta: recorrer toda la
+    /// fábrica con cada delta, hasta cinco veces por segundo, sumaba milisegundos en mundos grandes (H-6).
+    /// </summary>
     private void SyncWorld()
     {
-        var w = Session.Client.World!;
+        var client = Session.Client;
+        var w = client.World!;
+        var full = !_viewSynced || _syncedPlanet != _viewPlanet;
+        var structure = full || _syncedStructure != client.StructuralDeltas;
         var seen = _syncSeen;
-        seen.Clear();
-        foreach (var m in w.Machines.Values)
+        if (structure)
         {
-            if (m.Planet != _viewPlanet) continue;
-            seen.Add(m.Id);
-            var key = (m.Def, m.X, m.Z, (int)m.Rot);
-            if (!_machines.TryGetValue(m.Id, out var node) || node.Key != key)
+            seen.Clear();
+            foreach (var m in w.Machines.Values)
             {
-                var isNew = node == null;
-                if (node != null) FreeMachine(m.Id);
-                node = CreateMachine(m, key);
-                _machines[m.Id] = node;
-                // Solo lo que aparece con la partida ya en marcha: cargar el mundo no es construir.
-                if (isNew && _viewSynced) _feedback.Placed(node.Root, w.Content.Machines[m.Def].W * Cell);
+                if (m.Planet != _viewPlanet) continue;
+                seen.Add(m.Id);
+                SyncMachine(w, m);
             }
-            if (node.Status != m.Status)
+            // Si cuadran los totales no sobra nada: recorrer para buscar qué retirar crea listas con cada delta (H-6).
+            if (seen.Count != _machines.Count) foreach (var id in _machines.Keys.Where(k => !seen.Contains(k)).ToList()) RemoveMachineView(id);
+        }
+        else
+        {
+            foreach (var id in client.TouchedMachines)
             {
-                node.Status = m.Status;
-                node.Warn.Mesh = Models.StatusIcon(m.Status);
-                node.Lamp.MaterialOverride = Models.LampState(m.Status);
-                // La luz de trabajo dice de lejos si la máquina produce: encendida en marcha, en piloto si no.
-                if (node.Glow != null) node.Glow.LightEnergy = FactoryActivity.GlowEnergy(node.Running);
+                if (w.Machines.TryGetValue(id, out var m) && m.Planet == _viewPlanet) SyncMachine(w, m);
+                else if (_machines.ContainsKey(id)) RemoveMachineView(id);
             }
         }
-        // Si cuadran los totales no sobra nada: recorrer para buscar qué retirar crea listas con cada delta (H-6).
-        if (seen.Count != _machines.Count) foreach (var id in _machines.Keys.Where(k => !seen.Contains(k)).ToList())
-        {
-            if (_viewSynced && _machines.TryGetValue(id, out var gone)) _feedback.Removed(gone.Root.GlobalPosition);
-            FreeMachine(id);
-        }
+        client.TouchedMachines.Clear();
 
-        seen.Clear();
-        foreach (var d in w.DebrisById.Values)
+        if (full)
         {
-            if (d.Planet != _viewPlanet) continue;
-            seen.Add(d.Id);
-            if (!_debris.TryGetValue(d.Id, out var mesh))
+            seen.Clear();
+            foreach (var d in w.DebrisById.Values)
             {
-                mesh = CreateDebris(d);
-                _debris[d.Id] = mesh;
+                if (d.Planet != _viewPlanet) continue;
+                seen.Add(d.Id);
+                SyncDebris(w, d);
             }
-            var def = w.Content.Balance.Debris[d.Def];
-            var s = 0.45f + 0.55f * d.Hp / def.Hp;
-            mesh.Scale = new Vector3(s, s, s);
+            if (seen.Count != _debris.Count) foreach (var id in _debris.Keys.Where(k => !seen.Contains(k)).ToList()) RemoveDebrisView(id);
         }
-        if (seen.Count != _debris.Count) foreach (var id in _debris.Keys.Where(k => !seen.Contains(k)).ToList())
+        else
         {
-            var mesh = _debris[id];
-            BreakEffect(mesh.GlobalPosition, _debrisKinds.GetValueOrDefault(id));
-            if (_highlighted == mesh) _highlighted = null;
-            _debrisKinds.Remove(id);
-            mesh.QueueFree();
-            _debris.Remove(id);
-            if (_debrisBodies.Remove(id, out var body))
+            foreach (var id in client.TouchedDebris)
             {
-                _pickables.Remove(body.GetInstanceId());
-                body.QueueFree();
+                if (w.DebrisById.TryGetValue(id, out var d) && d.Planet == _viewPlanet) SyncDebris(w, d);
+                else if (_debris.ContainsKey(id)) RemoveDebrisView(id);
+            }
+        }
+        client.TouchedDebris.Clear();
+
+        if (structure)
+        {
+            foreach (var n in w.Nodes.Values)
+            {
+                if (n.Planet != _viewPlanet || !n.Revealed || _nodes.ContainsKey(n.Id)) continue;
+                var mesh = new MeshInstance3D { Mesh = Models.NodeMesh(n.Item), Position = new Vector3((n.X + 1) * Cell, 0, (n.Z + 1) * Cell) };
+                AddChild(mesh);
+                _nodes[n.Id] = mesh;
             }
         }
 
-        foreach (var n in w.Nodes.Values)
-        {
-            if (n.Planet != _viewPlanet || !n.Revealed || _nodes.ContainsKey(n.Id)) continue;
-            var mesh = new MeshInstance3D { Mesh = Models.NodeMesh(n.Item), Position = new Vector3((n.X + 1) * Cell, 0, (n.Z + 1) * Cell) };
-            AddChild(mesh);
-            _nodes[n.Id] = mesh;
-        }
-
-        Belts.Sync(w, _viewPlanet, Session.Client.StructuralDeltas);
+        Belts.Sync(w, _viewPlanet, client.BeltStamp);
 
         _rails ??= new RailView(this, RailPoint);
-        _rails.Sync(w, _viewPlanet, Session.Client.StructuralDeltas);
-        SyncSignals(w);
-
-        seen.Clear();
-        foreach (var t in w.Trains.Values)
+        _rails.Sync(w, _viewPlanet, client.RailStamp);
+        if (full || _syncedRail != client.RailStamp)
         {
-            if (t.Planet != _viewPlanet) continue;
-            seen.Add(t.Id);
-            if (!_trains.ContainsKey(t.Id)) _trains[t.Id] = CreateTrainNode();
+            SyncSignals(w);
+            seen.Clear();
+            foreach (var t in w.Trains.Values)
+            {
+                if (t.Planet != _viewPlanet) continue;
+                seen.Add(t.Id);
+                if (!_trains.ContainsKey(t.Id)) _trains[t.Id] = CreateTrainNode();
+            }
+            foreach (var id in _trains.Keys.Where(k => !seen.Contains(k)).ToList())
+            {
+                _trains[id].Loco.QueueFree();
+                _trains[id].Wagon.QueueFree();
+                _trains.Remove(id);
+            }
         }
-        foreach (var id in _trains.Keys.Where(k => !seen.Contains(k)).ToList())
-        {
-            _trains[id].Loco.QueueFree();
-            _trains[id].Wagon.QueueFree();
-            _trains.Remove(id);
-        }
+        _syncedStructure = client.StructuralDeltas;
+        _syncedRail = client.RailStamp;
+        _syncedPlanet = _viewPlanet;
 
         UpdateEvent(w);
 
@@ -993,7 +1052,7 @@ public partial class GameView : Node3D
         root.AddChild(node.Lamp);
         if (model.GlowPos is { } glow)
         {
-            node.Glow = new OmniLight3D { Position = glow, LightColor = model.GlowColor, LightEnergy = FactoryActivity.GlowEnergy(false), LightSpecular = 0.3f, OmniRange = 7f, DistanceFadeEnabled = true, DistanceFadeBegin = 34, DistanceFadeLength = 12 };
+            node.Glow = new OmniLight3D { Position = glow, LightColor = model.GlowColor, LightEnergy = FactoryActivity.GlowEnergy(false), LightSpecular = 0.1f, OmniRange = 7f, DistanceFadeEnabled = true, DistanceFadeBegin = 34, DistanceFadeLength = 12 };
             root.AddChild(node.Glow);
         }
         AddChild(root);
@@ -1164,6 +1223,8 @@ public partial class GameView : Node3D
     public ChainTag ChainTagForTest { get; private set; } = null!;
     public Material? LampForTest(int id) => _machines.TryGetValue(id, out var node) ? node.Lamp.MaterialOverride : null;
     public bool RotorTurnsForTest(int id) => _machines.TryGetValue(id, out var node) && node.Rotor != null;
+    public int MachineViewsForTest => _machines.Count;
+    public int DebrisViewsForTest => _debris.Count;
     public Rect2 HudSafeArea => _hud.SafeArea();
     public Rect2 ObjectiveRect => _hud.ObjectiveRect;
     public LookReadout LookForTest => _hud.Look;
@@ -1581,7 +1642,17 @@ public partial class GameView : Node3D
         if (!_remote.TryGetValue(num, out var r))
         {
             var root = new Node3D();
-            root.AddChild(new MeshInstance3D { Mesh = Models.Astronaut() });
+            // Cuerpo y piernas por separado: el paso se anima en el cliente con la velocidad observada (B-6).
+            var body = new Node3D();
+            root.AddChild(body);
+            body.AddChild(new MeshInstance3D { Mesh = Models.AstronautBody() });
+            var legs = new MeshInstance3D[2];
+            for (var i = 0; i < 2; i++)
+            {
+                var side = i == 0 ? -1f : 1f;
+                legs[i] = new MeshInstance3D { Mesh = Models.AstronautLeg(side), Position = new Vector3(side * 0.13f, Models.AstronautHip, 0) };
+                body.AddChild(legs[i]);
+            }
             var w = Session.Client.World;
             var name = w?.Players.Values.FirstOrDefault(p => p.Num == num)?.Name ?? "?";
             root.AddChild(new Label3D { Text = name, Billboard = BaseMaterial3D.BillboardModeEnum.Enabled, Position = new Vector3(0, 2.15f, 0), PixelSize = 0.008f, FontSize = 48, OutlineSize = 10 });
@@ -1589,8 +1660,8 @@ public partial class GameView : Node3D
             root.GlobalPosition = new Vector3(x, y, z);
             // Herramienta del modelo externo. El modelo mira a +Z; la mano derecha queda en -X.
             var tool = new RemoteToolView { Position = new Vector3(-0.3f, 1.02f, 0.42f), RotationDegrees = new Vector3(0, 180, 0) };
-            root.AddChild(tool);
-            r = new RemotePlayer { Root = root, Tool = tool };
+            body.AddChild(tool);
+            r = new RemotePlayer { Root = root, Body = body, Legs = legs, Tool = tool, Last = root.GlobalPosition };
             _remote[num] = r;
         }
         r.Target = new Vector3(x, y, z);
@@ -1754,7 +1825,31 @@ public partial class GameView : Node3D
             r.Root.GlobalPosition = r.Root.GlobalPosition.Lerp(r.Target, k);
             r.Root.Rotation = new Vector3(0, Mathf.LerpAngle(r.Root.Rotation.Y, r.TargetYaw + Mathf.Pi, k), 0);
             r.Tool.Tick((float)delta, PlayerAction.Equipped(r.Action), PlayerAction.IsWorking(r.Action));
+            AnimateStride(r, (float)delta);
         }
+    }
+
+    /// <summary>
+    /// Paso procedural con la velocidad horizontal observada: piernas alternas y un leve rebote del cuerpo.
+    /// Quieto vuelve a la postura neutra. Con «reducir movimiento», sin rebote.
+    /// </summary>
+    private static void AnimateStride(RemotePlayer r, float delta)
+    {
+        var now = r.Root.GlobalPosition;
+        var moved = new Vector2(now.X - r.Last.X, now.Z - r.Last.Z).Length();
+        r.Last = now;
+        var speed = delta > 0 ? moved / delta : 0;
+        r.Speed = Mathf.Lerp(r.Speed, speed, 1f - Mathf.Exp(-delta * 10f));
+        var amount = Mathf.Clamp(r.Speed / 5f, 0f, 1f);
+        // Una zancada de unos 1,6 m: la cadencia crece con la velocidad y no patina a paso lento.
+        r.Phase = (r.Phase + r.Speed / 1.6f * Mathf.Tau * delta) % Mathf.Tau;
+        if (amount < 0.02f) r.Phase = Mathf.Lerp(r.Phase, r.Phase < Mathf.Pi ? 0 : Mathf.Tau, 1f - Mathf.Exp(-delta * 8f));
+        var swing = Mathf.Sin(r.Phase) * 0.55f * amount;
+        r.Legs[0].Rotation = new Vector3(swing, 0, 0);
+        r.Legs[1].Rotation = new Vector3(-swing, 0, 0);
+        var bob = Scenery.Calm ? 0 : Mathf.Abs(Mathf.Cos(r.Phase)) * 0.045f * amount;
+        r.Body.Position = new Vector3(0, bob, 0);
+        r.Body.Rotation = new Vector3(0.06f * amount, 0, Scenery.Calm ? 0 : Mathf.Sin(r.Phase) * 0.03f * amount);
     }
 
     private void UpdateAudio(double delta)

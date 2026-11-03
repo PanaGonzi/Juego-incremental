@@ -1305,9 +1305,11 @@ public static partial class Models
         return mesh;
     }
 
-    public static ArrayMesh Astronaut()
+    public static ArrayMesh Astronaut() => AstronautMesh(withLegs: true);
+
+    private static ArrayMesh AstronautMesh(bool withLegs)
     {
-        const string key = "astronaut";
+        var key = withLegs ? "astronaut" : "astronaut_body";
         if (DebrisCache.TryGetValue(key, out var mesh)) return mesh;
         var b = new Builder();
         // Torso, mochila vital y extremidades redondeadas: se lee como persona a distancia.
@@ -1318,8 +1320,11 @@ public static partial class Models
         b.Box("visor", 0, 1.61f, 0.17f, 0.26f, 0.13f, 0.08f);
         foreach (var side in new[] { -1f, 1f })
         {
-            b.Tube("suit", 0.085f, 8, new Vector3(side * 0.13f, 0.82f, 0), new Vector3(side * 0.15f, 0.44f, 0.03f), new Vector3(side * 0.15f, 0.08f, 0));
-            b.Box("rubber", side * 0.15f, 0.05f, 0.05f, 0.14f, 0.1f, 0.27f);
+            if (withLegs)
+            {
+                b.Tube("suit", 0.085f, 8, new Vector3(side * 0.13f, 0.82f, 0), new Vector3(side * 0.15f, 0.44f, 0.03f), new Vector3(side * 0.15f, 0.08f, 0));
+                b.Box("rubber", side * 0.15f, 0.05f, 0.05f, 0.14f, 0.1f, 0.27f);
+            }
             // Brazo derecho (−X) con el codo doblado hasta la mano de la herramienta de RemoteToolView; el izquierdo, en postura de marcha.
             var hand = side < 0 ? new Vector3(-0.3f, 1.0f, 0.36f) : new Vector3(0.34f, 0.84f, 0.16f);
             var elbow = side < 0 ? new Vector3(-0.35f, 1.03f, 0.03f) : new Vector3(0.37f, 1.02f, 0.0f);
@@ -1331,4 +1336,23 @@ public static partial class Models
         DebrisCache[key] = mesh;
         return mesh;
     }
+
+    /// <summary>Astronauta sin piernas: las piernas van aparte para poder animar el paso (B-6).</summary>
+    public static ArrayMesh AstronautBody() => AstronautMesh(withLegs: false);
+
+    /// <summary>Pierna con la cadera en el origen, para girarla sobre X. side: −1 derecha, 1 izquierda.</summary>
+    public static ArrayMesh AstronautLeg(float side)
+    {
+        var key = side < 0 ? "astronaut_leg_r" : "astronaut_leg_l";
+        if (DebrisCache.TryGetValue(key, out var mesh)) return mesh;
+        var b = new Builder();
+        b.Tube("suit", 0.085f, 8, Vector3.Zero, new Vector3(side * 0.02f, -0.38f, 0.03f), new Vector3(side * 0.02f, -0.74f, 0));
+        b.Box("rubber", side * 0.02f, -0.77f, 0.05f, 0.14f, 0.1f, 0.27f);
+        mesh = b.Commit();
+        DebrisCache[key] = mesh;
+        return mesh;
+    }
+
+    /// <summary>Altura de la cadera del astronauta, donde pivotan las piernas.</summary>
+    public const float AstronautHip = 0.82f;
 }

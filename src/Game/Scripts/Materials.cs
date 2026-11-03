@@ -249,7 +249,7 @@ public static class Materials
             AlbedoColor = spec.Tint.LinearToSrgb() * 0.5f,
             EmissionEnabled = true,
             Emission = spec.Tint.LinearToSrgb(),
-            EmissionEnergyMultiplier = 3f,
+            EmissionEnergyMultiplier = 2f, // con 3, el halo hacía la lámpara mayor que su pieza (H-10)
             Roughness = 0.4f,
         };
         StandardCache[key] = m;

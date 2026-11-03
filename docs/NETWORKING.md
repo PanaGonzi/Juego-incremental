@@ -6,7 +6,7 @@
 | --- | --- | --- | --- |
 | Solo | Hilo local | Memoria (`LoopbackHub`), sin sockets | Verificado |
 | Anfitrión | Hilo local, 1 local + hasta 11 remotos | Memoria + LiteNetLib UDP (`CompositeTransport`) | Verificado con 2 clientes en una máquina |
-| Dedicado | `Pluton.Server.exe` sin interfaz | LiteNetLib UDP | Verificado en una máquina; Linux NO VERIFICADO |
+| Dedicado | `Pluton.Server.exe` sin interfaz | LiteNetLib UDP | Verificado en una máquina. Linux: linux-musl-x64 autocontenido comprobado en WSL2 con 12 clientes (T-030); necesita `libstdc++` y `libgcc` del sistema. Linux fuera de WSL2: NO VERIFICADO |
 | Steam (lobby, invitación, relay) | — | Pendiente, ver [STEAM_RELEASE](STEAM_RELEASE.md) | Binding comprobado; conexión entre dos cuentas NO VERIFICADA |
 
 Al salir el anfitrión se guarda el mundo y sus invitados reciben `reject_shutdown`. No hay migración de anfitrión.

@@ -17,7 +17,8 @@ var loadTestUnlock = args2.ContainsKey("load-test-unlock");
 
 void Log(string message) => Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}");
 
-var content = ContentDb.Load(args2.GetValueOrDefault("content", ContentDb.LocateDirectory()));
+// Solo se busca la carpeta junto al binario si no se indicó otra: antes se buscaba siempre y fallaba aunque se pasara --content (INC-36).
+var content = ContentDb.Load(args2.TryGetValue("content", out var contentDir) ? contentDir : ContentDb.LocateDirectory());
 var store = new SaveStore(profile, args2.GetValueOrDefault("data-root"));
 
 World world;

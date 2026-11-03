@@ -107,6 +107,31 @@ public class QaFixesTests
     }
 
     [Fact]
+    public void Report_warns_when_it_only_adds_up_with_what_the_terminal_will_sell()
+    {
+        var (w, p) = Fixture.NewWorld();
+        var terminal = Fixture.Find(w, "export_terminal");
+        var u = w.Content.Upgrades["tech_assembly"];
+        var need = u.Cost["ingot"];
+        w.Credits = u.Credits;
+        p.Bag.Add("ingot", need - 4);
+        terminal.In.Add("ingot", 6);
+        terminal.AutoSell = true;
+        terminal.Reserves["ingot"] = 1;
+
+        var line = w.CheckCost(p, u.Credits, u.Cost).Lines.Single(l => l.Item == "ingot");
+        Assert.Equal(5, line.OnSale);
+        Assert.True(line.AtRisk);
+        // Basta reservar lo que falta para que deje de estar en riesgo; sin venta automática, tampoco hay riesgo.
+        terminal.Reserves["ingot"] = 4;
+        Assert.False(w.CheckCost(p, u.Credits, u.Cost).Lines.Single(l => l.Item == "ingot").AtRisk);
+        terminal.Reserves["ingot"] = 0;
+        terminal.AutoSell = false;
+        Assert.False(w.CheckCost(p, u.Credits, u.Cost).AtRisk.Any());
+        Assert.True(w.CheckCost(p, u.Credits, u.Cost).Ok);
+    }
+
+    [Fact]
     public void Report_tells_exactly_what_is_missing_and_how_much_there_is()
     {
         var (w, p) = Fixture.NewWorld();

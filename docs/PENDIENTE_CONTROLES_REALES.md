@@ -53,6 +53,10 @@ Lo que sigue sin marcar está **NO VERIFICADO** con entradas reales, aunque teng
 - [x] Jugar con calidad baja y alta y con escala de interfaz 125 %.
 - [x] Existencias en los puertos.
 - [ ] Vapor en movimiento.
+- [ ] Nueva expedición con P, el panel de confirmación y lo que se ve justo después del reinicio (solo con el recorrido automático `expedition`, T-030).
+- [ ] Aviso de material a la venta en el panel de mejoras, en contratos y en la barra rápida (solo xUnit).
+- [ ] Avatar de otro jugador caminando: la zancada en movimiento (solo capturas fijas en `coop-test`).
+- [ ] «Unirse por IP» con una dirección mal escrita: debe avisar de que el servidor es inalcanzable (INC-35, solo xUnit).
 
 ## Solo una persona puede decidirlo
 

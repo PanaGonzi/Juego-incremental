@@ -461,7 +461,8 @@ public sealed class Scenery
             GlowEnabled = prefs.Glow,
             GlowIntensity = 0.45f,
             GlowBloom = 0f,
-            GlowHdrThreshold = 1.1f,
+            // Con 1,1 las caras al sol ya entraban en el brillo y se quemaban en blanco con halo (H-10).
+            GlowHdrThreshold = 1.5f,
             FogEnabled = true,
             FogLightColor = new Color(0.22f, 0.28f, 0.42f),
             FogDensity = 0.0022f,

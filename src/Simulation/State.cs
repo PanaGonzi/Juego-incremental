@@ -165,6 +165,22 @@ public sealed class Train
 
 public enum Role : byte { Visitor, Builder, Admin, Owner }
 
+/// <summary>Partes de los índices derivados que se pueden reconstruir por separado.</summary>
+[Flags]
+public enum ReindexScope
+{
+    None = 0,
+    /// <summary>Celdas ocupadas, yacimientos ocupados y lista de máquinas.</summary>
+    Machines = 1,
+    Debris = 2,
+    /// <summary>Celdas de cinta, celdas de yacimiento y listas de entradas y salidas.</summary>
+    Belts = 4,
+    /// <summary>Vías, cruces y reservas de los trenes.</summary>
+    Rail = 8,
+    Mods = 16,
+    All = Machines | Debris | Belts | Rail | Mods,
+}
+
 public sealed class PlayerState
 {
     public string Key = "";
@@ -185,6 +201,7 @@ public enum CommandType : byte
     CutDebris, Place, Remove, Move, Link, Unlink, Insert, Extract, Sell, SetAutoSell,
     FulfillContract, BuyUpgrade, SetRole, Kick,
     PlaceRail, RemoveRail, StationMode, CreateTrain, RemoveTrain, Travel, SetEvent, SetCosmetic, InsertJunction, ToggleSignal,
+    StartExpedition,
 }
 
 /// <summary>Intención de un jugador. Todo lo que contiene se valida antes de aplicarse.</summary>

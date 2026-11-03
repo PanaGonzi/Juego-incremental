@@ -7,7 +7,7 @@ namespace Pluton.Simulation;
 /// </summary>
 public static class WorldCodec
 {
-    public const int FormatVersion = 6;
+    public const int FormatVersion = 7;
 
     private static void WriteInv(BinaryWriter w, Inventory inv)
     {
@@ -448,6 +448,7 @@ public static class WorldCodec
         WriteSet(w, world.EventsSeeded);
         WriteSet(w, world.Cosmetics);
         WriteSet(w, world.EquippedCosmetics);
+        w.Write7BitEncodedInt(world.Expeditions);
     }
 
     private static void WriteSet(BinaryWriter w, SortedSet<string> set)
@@ -487,6 +488,11 @@ public static class WorldCodec
             ReadSet(r, world.EventsSeeded);
             ReadSet(r, world.Cosmetics);
             ReadSet(r, world.EquippedCosmetics);
+        }
+        if (version >= 7)
+        {
+            // v7: expediciones completadas (B-7). Los guardados anteriores empiezan en 0.
+            world.Expeditions = r.Read7BitEncodedInt();
         }
     }
 

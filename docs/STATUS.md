@@ -4,13 +4,15 @@
 
 **Última build de prueba:** `builds/alpha-0.5.0-qa8` (protocolo 9, guardado 6; commit en su `VERSION.txt`). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`. Regresión automática sobre el paquete (T-029); entradas reales sobre `alpha-dev` (T-028).
 
+**Rama tras la qa8, sin empaquetar:** protocolo 10, guardado 7, migra desde el 6 con un guardado real. Incluye la nueva expedición (B-7), el cierre de H-4, H-6 y H-8, el servidor Linux comprobado en WSL2 (B-5) y los arreglos INC-34 a INC-36. Comprobado con xUnit, recorridos automáticos y cooperativo con anfitrión en `alpha-dev` (T-030).
+
 **Hitos:** M0, A0.1, A0.2, A0.4 y evento/offline de A0.5 implementados, con verificación en una sola máquina. A0.3 completo salvo Steam en el menú.
 
 **Rama `evolucion-0.5`, bloques E y C:** el código de E-0 a E-7 y de C-1 a C-6 está integrado, pero integrado no significa comprobado. El desglose por tarea, con lo implementado, lo comprobado y lo pendiente, está en el [ROADMAP](ROADMAP.md).
 
 - **Comprobado con recorridos automáticos y xUnit, en un PC:** cintas, construcción, gestión, zona, tren, viaje, Marte, Halloween, ausencia, dos clientes sobre la misma fábrica con anfitrión y dedicado, y 12 clientes con el 13.º rechazado (T-018 a T-022).
 - **Comprobado con entradas reales de Windows:** sesión de un agente sobre `alpha-dev`, casi toda la lista (T-028). Lo que queda, en [PENDIENTE_CONTROLES_REALES](PENDIENTE_CONTROLES_REALES.md).
-- **Revisión independiente de rendimiento (E-8):** hecha, con hallazgos abiertos, en [REVISION_E8](REVISION_E8.md).
+- **Revisión independiente de rendimiento (E-8):** hecha, en [REVISION_E8](REVISION_E8.md). Cerrados después H-3, H-4, H-6 y H-8; sigue parcial H-10.
 - **Mitigado sin resolver del todo:** BUG-005: causa medida y respuesta mejorada, pero con pérdida siguen los picos (T-023).
 
 **B-8, señales y desvíos:** primer sistema implementado y comprobado en un PC con órdenes automáticas (T-024) y, para poner señales y ramales, con entradas reales (T-028). Con personas: **NO VERIFICADO**.

@@ -165,21 +165,72 @@ public sealed partial class World
     }
 
     /// <summary>Reconstruye índices y modificadores tras crear, cargar o aplicar una instantánea.</summary>
-    public void Reindex()
+    public void Reindex() => Reindex(ReindexScope.All);
+
+    /// <summary>
+    /// Reconstruye solo los índices de lo que cambió. El cliente lo usa con cada delta: construir una máquina
+    /// no debe recorrer vías ni cintas en una fábrica grande (H-4).
+    /// </summary>
+    public void Reindex(ReindexScope scope)
     {
-        _occupied.Clear();
-        _debrisCells.Clear();
-        foreach (var m in Machines.Values)
-            foreach (var cell in Footprint(m.Def, m.X, m.Z, m.Rot))
-                _occupied[(m.Planet, cell.x, cell.z)] = m.Id;
-        foreach (var d in DebrisById.Values) _debrisCells[(d.Planet, d.X, d.Z)] = d.Id;
-        foreach (var n in Nodes.Values) n.OccupiedBy = -1;
-        foreach (var m in Machines.Values)
-            if (Nodes.TryGetValue(m.NodeId, out var occupied)) occupied.OccupiedBy = m.Id;
-        _machineList = Machines.Values.ToArray();
-        ReindexBelts();
-        ReindexRail();
-        RecomputeMods();
+        if ((scope & ReindexScope.Machines) != 0)
+        {
+            _occupied.Clear();
+            foreach (var m in Machines.Values)
+                foreach (var cell in Footprint(m.Def, m.X, m.Z, m.Rot))
+                    _occupied[(m.Planet, cell.x, cell.z)] = m.Id;
+            foreach (var n in Nodes.Values) n.OccupiedBy = -1;
+            foreach (var m in Machines.Values)
+                if (Nodes.TryGetValue(m.NodeId, out var occupied)) occupied.OccupiedBy = m.Id;
+            _machineList = Machines.Values.ToArray();
+        }
+        if ((scope & ReindexScope.Debris) != 0)
+        {
+            _debrisCells.Clear();
+            foreach (var d in DebrisById.Values) _debrisCells[(d.Planet, d.X, d.Z)] = d.Id;
+        }
+        if ((scope & ReindexScope.Belts) != 0) ReindexBelts();
+        if ((scope & ReindexScope.Rail) != 0) ReindexRail();
+        if ((scope & ReindexScope.Mods) != 0) RecomputeMods();
+    }
+
+    /// <summary>Huella de los índices derivados, para comprobar en pruebas que reindexar por partes equivale a hacerlo todo.</summary>
+    public long IndexSignature()
+    {
+        var h = -3750763034362895579L;
+        void Add(long v) => h = unchecked((h ^ v) * 1099511628211L);
+        foreach (var ((planet, x, z), id) in _occupied.OrderBy(e => e.Key)) { Add(planet); Add(x); Add(z); Add(id); }
+        Add(-1);
+        foreach (var ((planet, x, z), id) in _debrisCells.OrderBy(e => e.Key)) { Add(planet); Add(x); Add(z); Add(id); }
+        Add(-2);
+        foreach (var n in Nodes.Values) { Add(n.Id); Add(n.OccupiedBy); }
+        Add(-3);
+        foreach (var m in _machineList) Add(m.Id);
+        Add(-4);
+        foreach (var (key, value) in _mods.OrderBy(e => e.Key, StringComparer.Ordinal)) { Add(key.GetHashCode()); Add(value); }
+        Add(-5);
+        foreach (var ((planet, x, z), use) in _beltCells.OrderBy(e => e.Key)) { Add(planet); Add(x); Add(z); Add(use.a); Add(use.b); }
+        Add(-6);
+        foreach (var c in _nodeCells.OrderBy(c => c)) { Add(c.Item1); Add(c.Item2); Add(c.Item3); }
+        Add(-7);
+        foreach (var l in _linkList) Add(l.Id);
+        Add(-8);
+        foreach (var (from, links) in _beltsOut.OrderBy(e => e.Key)) { Add(from); foreach (var l in links) Add(l.Id); }
+        Add(-9);
+        foreach (var (to, links) in _beltsIn.OrderBy(e => e.Key)) { Add(to); foreach (var l in links) Add(l.Id); }
+        Add(-10);
+        foreach (var ((planet, x, z), count) in _railCells.OrderBy(e => e.Key)) { Add(planet); Add(x); Add(z); Add(count); }
+        Add(-11);
+        foreach (var ((planet, x, z), id) in _nodeAt.OrderBy(e => e.Key)) { Add(planet); Add(x); Add(z); Add(id); }
+        Add(-12);
+        foreach (var (node, segments) in _adjacency.OrderBy(e => e.Key)) { Add(node); foreach (var s in segments) Add(s.Id); }
+        Add(-13);
+        foreach (var t in _trainList) Add(t.Id);
+        Add(-14);
+        foreach (var (segment, train) in _holds.OrderBy(e => e.Key)) { Add(segment); Add(train); }
+        Add(-15);
+        foreach (var (segment, others) in _crossings.OrderBy(e => e.Key)) { Add(segment); foreach (var o in others) Add(o); }
+        return h;
     }
 
     /// <summary>Un escombro replicado, sin reindexar todo el mundo: cortar y la chatarra renovada son frecuentes.</summary>
@@ -191,7 +242,8 @@ public sealed partial class World
 
     public void RemoveReplicatedDebris(int id)
     {
-        if (DebrisById.Remove(id, out var d)) _debrisCells.Remove((d.Planet, d.X, d.Z));
+        // Solo si la celda sigue siendo suya: en el mismo delta puede haber llegado otro escombro a esa celda.
+        if (DebrisById.Remove(id, out var d) && _debrisCells.TryGetValue((d.Planet, d.X, d.Z), out var at) && at == id) _debrisCells.Remove((d.Planet, d.X, d.Z));
     }
 
     /// <summary>
@@ -224,6 +276,10 @@ public sealed partial class World
             if (Content.Upgrades.TryGetValue(id, out var u))
                 foreach (var (key, value) in u.Mods)
                     _mods[key] = _mods.GetValueOrDefault(key) + value;
+        // Ventajas de las expediciones completadas, acumulables hasta el tope (B-7).
+        if (ExpeditionStacks > 0)
+            foreach (var (key, value) in B.Expedition.Mods)
+                _mods[key] = _mods.GetValueOrDefault(key) + value * ExpeditionStacks;
     }
 
     public int Mod(string key) => _mods.GetValueOrDefault(key);
@@ -315,6 +371,7 @@ public sealed partial class World
         var need = c.Type switch
         {
             CommandType.SetRole or CommandType.Kick or CommandType.SetEvent => Role.Admin,
+            CommandType.StartExpedition => Role.Owner,
             CommandType.Sell or CommandType.SetAutoSell or CommandType.FulfillContract or CommandType.BuyUpgrade => Role.Builder,
             _ => Role.Builder,
         };
@@ -346,6 +403,7 @@ public sealed partial class World
             CommandType.Travel => Travel(p, c.A),
             CommandType.SetEvent => SetEvent(c.Text, c.A != 0) ? CommandResult.Success : CommandResult.Fail("err_invalid"),
             CommandType.SetCosmetic => SetCosmetic(c.Text, c.A != 0),
+            CommandType.StartExpedition => StartExpedition(p, c.A),
             _ => CommandResult.Fail("err_invalid"),
         };
     }

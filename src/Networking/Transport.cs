@@ -71,6 +71,12 @@ public sealed class LiteNetTransport : ITransport
         };
         _listener.PeerDisconnectedEvent += (peer, info) =>
         {
+            // Un nombre de host que no se resuelve llega sin par: antes tumbaba el cliente (INC-35).
+            if (peer == null)
+            {
+                Disconnected?.Invoke(-1, info.Reason.ToString());
+                return;
+            }
             _peers.Remove(peer.Id);
             Disconnected?.Invoke(peer.Id, info.Reason.ToString());
         };

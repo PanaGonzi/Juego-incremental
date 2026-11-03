@@ -110,6 +110,13 @@ public static class Ui
         return string.Join(", ", parts);
     }
 
+    /// <summary>Aviso cuando solo alcanza contando lo que una terminal puede vender antes: «2 Lingotes están a la venta…». Vacío si no.</summary>
+    public static string OnSale(CostReport report)
+    {
+        var parts = report.AtRisk.Select(l => $"{Math.Min(l.OnSale, l.Need - (l.Have - l.OnSale))} {Loc.T("item_" + l.Item)}").ToList();
+        return parts.Count == 0 ? "" : Loc.T("cost_on_sale", string.Join(", ", parts));
+    }
+
     public static string Cost(long credits, Dictionary<string, long> items)
     {
         var parts = new List<string>();
@@ -909,6 +916,18 @@ public partial class Hud : Control
                 Add(Ui.Btn($"{Loc.T("event_" + id)}: {Loc.T(active ? "event_on" : "event_off")}", () => client.Send(new Command { Type = CommandType.SetEvent, Text = id, A = active ? 0 : 1 })));
             }
         }
+        var expedition = w.Content.Balance.Expedition;
+        if (expedition.MaxStacks > 0 && (w.Expeditions > 0 || w.ContractsDone.Contains(expedition.RequiresContract)))
+        {
+            Add(new HSeparator());
+            Add(Ui.Text(Loc.T("expedition_title"), UiTheme.Heading, Ui.Ink));
+            Add(Ui.Para(Loc.T("expedition_status", w.Expeditions, w.Mod("sell_bonus") / 10), UiTheme.Small, Ui.Dim));
+            var error = w.ExpeditionError(me);
+            if (me.Role == Role.Owner)
+                Add(error == null ? Ui.Btn(Loc.T("expedition_open"), () => Open(ExpeditionPanel)) : Ui.Para(Loc.T(error), UiTheme.Small, Ui.Dim));
+            else
+                Add(Ui.Para(Loc.T("expedition_owner_only"), UiTheme.Small, Ui.Dim));
+        }
         if (w.Cosmetics.Count > 0) Add(new HSeparator());
         foreach (var c in w.Cosmetics)
         {
@@ -917,6 +936,40 @@ public partial class Hud : Control
             Add(Ui.Btn($"{Loc.T("cosmetic_" + id)}: {Loc.T(worn ? "cosmetic_on" : "cosmetic_off")}", () => client.Send(new Command { Type = CommandType.SetCosmetic, Text = id, A = worn ? 0 : 1 })));
         }
         Add(Ui.Btn(Loc.T("panel_close"), ClosePanel));
+    }
+
+    /// <summary>Confirmación explícita del alcance de una nueva expedición. Solo la ve el propietario.</summary>
+    private void ExpeditionPanel()
+    {
+        var client = _view.Session.Client;
+        var w = client.World!;
+        var me = client.LocalPlayer!;
+        Clear();
+        _centerBody.CustomMinimumSize = new Vector2(760, 0);
+        var number = w.Expeditions;
+        var e = w.Content.Balance.Expedition;
+        var stacks = Mathf.Min(number + 1, e.MaxStacks);
+        Add(Ui.Heading(Loc.T("expedition_confirm_title", number + 1)));
+        Add(Ui.Para(Loc.T("expedition_resets"), UiTheme.Body, Ui.Bad));
+        Add(Ui.Para(Loc.T("expedition_keeps"), UiTheme.Body, Ui.Ink));
+        Add(Ui.Para(Loc.T("expedition_bonus", stacks * e.Mods.GetValueOrDefault("sell_bonus") / 10, w.NextExpeditionCredits()), UiTheme.Body, Ui.Ink));
+        if (number + 1 > e.MaxStacks) Add(Ui.Para(Loc.T("expedition_capped", e.MaxStacks), UiTheme.Small, Ui.Dim));
+        Add(Ui.Para(Loc.T("expedition_players", w.Players.Values.Count(p => p.Connected)), UiTheme.Small, Ui.Dim));
+        var error = w.ExpeditionError(me);
+        if (error != null)
+        {
+            Add(Ui.Para(Loc.T(error), UiTheme.Small, Ui.Bad));
+        }
+        else
+        {
+            // Lleva el número que se confirma: si otra orden ya inició esta expedición, el servidor la rechaza.
+            Add(Ui.Btn(Loc.T("expedition_confirm", number + 1), () =>
+            {
+                client.Send(new Command { Type = CommandType.StartExpedition, A = number });
+                ClosePanel();
+            }));
+        }
+        Add(Ui.Btn(Loc.T("expedition_cancel"), () => Open(PlayersPanel)));
     }
 
     public void OpenTech()
@@ -978,7 +1031,10 @@ public partial class Hud : Control
             }
             if (c.Event != null && !done) card.AddChild(Ui.Para(Loc.T("event_hint"), UiTheme.Caption, Ui.Amber));
             if (locked) card.AddChild(Ui.Para($"{Loc.T("tech_requires")}: {Loc.T("upgrade_" + c.Requires)}", UiTheme.Small, Ui.Warn));
-            var shortText = done || locked ? "" : Ui.Missing(w.CheckCost(me, 0, c.Items));
+            var contractCost = w.CheckCost(me, 0, c.Items);
+            var shortText = done || locked ? "" : Ui.Missing(contractCost);
+            var contractSale = done || locked ? "" : Ui.OnSale(contractCost);
+            if (contractSale.Length > 0) card.AddChild(Ui.Para(contractSale, UiTheme.Small, Ui.Amber));
             var b = Ui.Btn(done ? Loc.T("tech_done") : locked ? Loc.T("tech_locked") : ready ? Loc.T("tech_deliver") : shortText.Length > 0 ? Loc.T("cost_lacking", shortText) : Loc.T("tech_gather"),
                 () => client.Send(new Command { Type = CommandType.FulfillContract, Text = id }));
             b.Disabled = done || !ready;
@@ -1005,6 +1061,8 @@ public partial class Hud : Control
             if (locked) card.AddChild(Ui.Para($"{Loc.T("tech_requires")}: {Loc.T("upgrade_" + u.Requires)}", UiTheme.Small, Ui.Warn));
             // El mismo desglose que aplicará el servidor: qué falta exactamente y cuánto hay.
             if (!done && !locked && !afford) card.AddChild(Ui.Para(Loc.T("cost_lacking", Ui.Missing(report)), UiTheme.Small, Ui.Bad));
+            var onSale = done || locked ? "" : Ui.OnSale(report);
+            if (onSale.Length > 0) card.AddChild(Ui.Para(onSale, UiTheme.Small, Ui.Amber));
             var b = Ui.Btn(done ? Loc.T("tech_done") : locked ? Loc.T("tech_locked") : $"{Loc.T("tech_buy")} — {Ui.Cost(u.Credits, u.Cost)}",
                 () => client.Send(new Command { Type = CommandType.BuyUpgrade, Text = id }));
             b.Disabled = done || locked || !afford;

@@ -163,6 +163,7 @@ public partial class BeltView : Node3D
         public float[] Buffer = Array.Empty<float>();
         public int Count;
         public int Shown;
+        public long ShownPrint;
         public float Lift;
         public float Scale = 1;
     }
@@ -746,10 +747,23 @@ public partial class BeltView : Node3D
         foreach (var b in _batches.Values)
         {
             if (b.Count == 0 && b.Shown == 0) continue;
+            // Con la carga quieta (cintas atascadas o solo existencias) el contenido se repite: subirlo entero cada frame no aporta (H-8).
+            var print = b.Count > 0 ? Fingerprint(b.Buffer, b.Count * 12) : 0;
+            if (b.Count == b.Shown && print == b.ShownPrint) continue;
             if (b.Count > 0) b.Multi.Buffer = b.Buffer;
             b.Multi.VisibleInstanceCount = b.Count;
             b.Shown = b.Count;
+            b.ShownPrint = print;
         }
+    }
+
+    /// <summary>Huella de los valores en uso del búfer: recorrerlos cuesta mucho menos que copiarlos al motor.</summary>
+    private static long Fingerprint(float[] buffer, int length)
+    {
+        var bits = System.Runtime.InteropServices.MemoryMarshal.Cast<float, int>(buffer.AsSpan(0, length));
+        var h = -3750763034362895579L;
+        foreach (var v in bits) h = unchecked((h ^ v) * 1099511628211L);
+        return h;
     }
 
     private readonly List<(string item, Vector3 at)> _stock = new();
