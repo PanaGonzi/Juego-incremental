@@ -2,9 +2,9 @@
 
 **Última build estable:** `builds/alpha-0.4.1` (commit babc91c, etiqueta `alpha-0.4.1`, protocolo 4, guardado 4). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`.
 
-**Última build de prueba:** `builds/alpha-0.5.0-qa8` (protocolo 9, guardado 6; commit en su `VERSION.txt`). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`. Regresión automática sobre el paquete (T-029); entradas reales sobre `alpha-dev` (T-028).
+**Última build de prueba:** `builds/alpha-0.5.0-qa9` (protocolo 10, guardado 7; commit 62a09bf). Abrir con `Jugar.bat`; instrucciones en su `LEEME.txt`. Regresión automática sobre el paquete (T-031). La anterior, `alpha-0.5.0-qa8` (protocolo 9, guardado 6), tuvo además entradas reales sobre `alpha-dev` (T-028).
 
-**Rama tras la qa8, sin empaquetar:** protocolo 10, guardado 7, migra desde el 6 con un guardado real. Incluye la nueva expedición (B-7), el cierre de H-4, H-6 y H-8, el servidor Linux comprobado en WSL2 (B-5) y los arreglos INC-34 a INC-36. Comprobado con xUnit, recorridos automáticos y cooperativo con anfitrión en `alpha-dev` (T-030).
+**Novedades de la qa9 respecto a la qa8:** protocolo 10, guardado 7, migra desde el 6 con un guardado real. Incluye la nueva expedición (B-7), el cierre de H-4, H-6 y H-8, el servidor Linux comprobado en WSL2 (B-5) y los arreglos INC-34 a INC-36. Comprobado con xUnit, recorridos automáticos y cooperativo con anfitrión en `alpha-dev` (T-030).
 
 **Hitos:** M0, A0.1, A0.2, A0.4 y evento/offline de A0.5 implementados, con verificación en una sola máquina. A0.3 completo salvo Steam en el menú.
 

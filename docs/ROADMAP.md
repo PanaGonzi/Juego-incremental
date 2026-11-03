@@ -76,7 +76,7 @@ Cómo leer las columnas: **Implementado** es que el código existe. **Comprobado
 | E-8 | A | Revisión independiente de calidad y rendimiento con cintas cargadas | sí, hecha el 02-11-2026 | [REVISION_E8](REVISION_E8.md): cumple en este equipo, también con 20 160 objetos en cinta | H-3, H-4, H-6 y H-8 cerrados tras la revisión (T-030, sin revisor independiente). Abiertos parte de H-10, equipo modesto y cámara en movimiento |
 | E-9 | M | Divisores y combinadores | sustituida por C-3 | — | — |
 | E-10 | M | Acabado de Marte y del resto de máquinas | terreno y cielo de Marte, plataforma de carga; enfriador, refinería de obleas, radiadores, divisor y unificador rehechos; piloto y animación por estado (2865495) | `artifacts/qa/0.5-marte/`, `artifacts/qa/0.5-maquinas/` con antes y después; auto `gallery` | Valoración de una persona; rendimiento en equipo modesto |
-| E-11 | M | BUG-005: picos de respuesta | causa medida y mitigada: reenvío 1,3×RTT y lectura cada 5 ms | T-021, T-023, relé en un PC | Picos con pérdidas seguidas; canales separados sin probar; redes reales |
+| E-11 | M | BUG-005: picos de respuesta | causa medida y mitigada: reenvío 1,3×RTT y lectura cada 5 ms. Canal propio para resultados probado y descartado (D-052) | T-021, T-023, T-032, relé en un PC | Picos con pérdidas seguidas; redes reales |
 
 ## A0.6 — Construcción, gestión y primeros 30 minutos
 
